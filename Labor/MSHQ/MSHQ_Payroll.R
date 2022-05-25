@@ -45,7 +45,9 @@ labor <- function(start,end){
                                                     substr(Full.COA.for.Home,
                                                            12,16)))
   } else {
-    stop("New Paycode(s)")
+    new_paycodes <- df %>% filter(is.na(PAY.CODE))
+    return(new_paycodes)
+    stop("New Paycode(s). Check df for new paycode(s)")
   }
   return(df)
 }
@@ -280,12 +282,11 @@ save_payroll <- function(start,end){
 ###############################################################################
 
 #Enter start and end date needed for payroll upload
-start <- "02/27/2022" 
-end <- "03/26/2022"
+start <- "03/27/2022" 
+end <- "04/23/2022"
 df <- labor(start,end)
 #If you need to update jobcode list for new jobcodes leave R and do that in excel
 #"J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Useful Tools & Templates/Job Code Mappings/MSH MSQ Position Mappings.xlsx"
-#Also update two JC mapping files for FTE Trend Dashboard
 df <- jcdict(end)
 depdict(end)
 #Download and place department mapping file in MSH Labor folder
