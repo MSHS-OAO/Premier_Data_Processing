@@ -8,12 +8,6 @@
 # 5. Create subsections by starting a Section with two # signs (e.g. ##).  
 #    - See example within this section.
 
-
-## subsection example ----------------------------------------------------
-# The header for this section is an example of how to indent subsections by
-# adding an additional # symbol.
-
-
 # Libraries ---------------------------------------------------------------
 # Include all the packages that will be used throughout the code.
 # This is where packages can be installed if the user does not have them
@@ -24,7 +18,7 @@
 renv::restore()
 
 # Common Packages
-library(here)
+library(readxl)
 # library(rmarkdown)
 # library(shiny)
 
@@ -34,47 +28,28 @@ library(here)
 # library(tidyverse)
 
 
-# Assigning Directory(ies) ------------------------------------------------
-# Define variables for frequently used root directories or full directories.
-# (This section could be combined with the Constants section.)
-# Reminder: avoid using setwd()
+# Assigning Directory ------------------------------------------------
 
-
-
-## Shared Drive Path (Generic) --------------------------------------------
-sdp <- paste0("//researchsan02b/shr2/deans/Presidents")
-J_drive <- paste0("//researchsan02b/shr2/deans/Presidents")
-
-## J-drive Automatic Check ------------------------------------------------
-# Alternative mapping of the Windows Shared Drive using the drive letter
-# and an if-else check.
-# This code helps when the shared folder is mapped differently for different
-# users.
-# This code tests whether a user has the J drive mapped to Presidents or
-# deans
-if ("Presidents" %in% list.files("J://")) {
-  user_directory <- "J:/Presidents/"
-} else {
-  user_directory <- "J:/deans/Presidents/"
-}
-
-# an example project specific path that can be changed based on the project
-project_path <- paste0("/Operations Analytics and Optimization/Projects/",
-                       "Service Lines/Lab Kpi/Data/")
-
-# Here is the final path
-user_path <- paste0(user_directory, project_path,"*.*")
-
-
-# Constants ---------------------------------------------------------------
-# Define constants that will be used throughout the code. These are the
-# variables that are calculated here and not changed in the rest of the code.
-
+# rightsourcing project path
+project_path <- paste0("//researchsan02b/shr2/deans/Presidents/SixSigma/",
+                       "MSHS Productivity/Productivity/Labor - Data/",
+                       "Rightsourcing Labor/")
+# universal mapping path
+mapping_path <- paste0("//researchsan02b/shr2/deans/Presidents/SixSigma/",
+                       "MSHS Productivity/Productivity/universal Data/",
+                       "Mapping/")
 
 # Data Import / Data References--------------------------------------------
-# Importing data that is needed in the code whether it’s from the shared drive
-# or OneDrive or some other location.
 
+# jobcode list to map job description to job code
+jobcode_list <- read.csv(paste0(project_path, 
+                                "Rightsource Job Code.csv"))
+# pay period mapping file to determine max date of next upload
+pay_period_mapping <- read_xlsx(paste0(mapping_path, 
+                                       "MSHS_Pay_Cycle.xlsx"))
+# code conversion mapping file to convert legacy to oracle cc
+code_conversion <- read_xlsx(paste0(mapping_path, 
+                                    "MSHS_Code_Conversion_Mapping.xlsx"))
 
 # Data Pre-processing -----------------------------------------------------
 # Cleaning raw data and ensuring that all values are accounted for such as
