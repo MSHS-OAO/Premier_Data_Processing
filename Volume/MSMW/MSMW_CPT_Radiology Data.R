@@ -4,8 +4,8 @@ library(readxl)
 library(xlsx)
 
 # Constants ---------------------------------------------------------------
-start_date <- as.Date("2022-03-27")
-end_date <- as.Date("2022-04-23")
+start_date <- as.Date("2022-04-24")
+end_date <- as.Date("2022-05-21")
 #Defining paths
 dir <- paste0("J:/deans/Presidents/SixSigma/MSHS Productivity",
               "/Productivity/Volume - Data")
