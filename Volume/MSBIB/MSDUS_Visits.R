@@ -159,7 +159,6 @@ data_Epic <-
     all.x = T
   )
 
-# Merging Data from Epic & eIDX/IDX ------------------------------------------------
 # Removing Departments
 
 data_Epic_merge <-
@@ -209,6 +208,43 @@ if (length(remove_NA_CC$`Cost Center`) != 0) {
   data_visits <-
     data_visits[!data_visits$`Cost Center` %in% remove_NA_CC$`Cost Center`, ]
 }
+
+
+# Rehab off-site prep -----------------------------------------------------
+
+
+rehab_offs_ratio <- 0.34
+rehab_offs_docs <- c("SPINNER, DAVID A", "CHANG, RICHARD G")
+rehab_offs_dept <- c("300 CADMAN PLAZA REHAB MED",
+                     "309 W 23RD ST REHAB FLUOROSCOPY")
+rehab_offs_cc <- "407000040421109"
+rehab_offs_vol_id <- "407404211092"
+
+data_rehab_offs <- data_Epic %>%
+  filter(Provider %in% rehab_offs_docs,
+         Department %in% rehab_offs_dept) %>%
+    mutate(`Volume ID` = rehab_offs_vol_id,
+           `Cost Center` = rehab_offs_cc)
+
+if (remove_dates_Epic != "None" | is.na(remove_dates_Epic)) {
+  remove_dates_Epic <-
+    as.Date(remove_dates_Epic, tryFormats = "%m/%d/%Y")
+  data_rehab_offs <-
+    data_rehab_offs[!(data_Epic_merge$`Appt Date` %in% remove_dates_Epic), ]
+} # remove dates if user chooses
+
+# Selecting only needed columns
+data_rehab_offs <-
+  data_rehab_offs[, c("Cost Center", "Start Date", "End Date", "Volume ID")]
+data_rehab_offs$Volume <-
+  rep(rehab_offs_ratio, length(data_rehab_offs$`Cost Center`))
+colnames(data_rehab_offs) <-
+  c("Cost Center", "Start Date", "End Date", "Volume ID", "Volume")
+
+
+# Merge Offsite with Main Visits ------------------------------------------
+
+data_visits <- rbind(data_visits, data_rehab_offs)
 
 # Creating Premier Upload -------------------------------------------------
 # Created needed columns
@@ -263,6 +299,8 @@ data_visits <-
 data_visits$`Start Date` <-
   format(data_visits$`Start Date`, "%m/%d/%Y")
 data_visits$`End Date` <- format(data_visits$`End Date`, "%m/%d/%Y")
+
+data_visits$Volume <- round(data_visits$Volume, 0)
 
 # Exporting Premier Upload File -------------------------------------------
 file_name_Premier <-
