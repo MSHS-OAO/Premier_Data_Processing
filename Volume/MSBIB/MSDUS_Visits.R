@@ -76,33 +76,6 @@ dictionary_Premier_volume <-
     skip = 1
   )
 
-# eIDX/IDX Dictionaries
-# Rollup + Department Map for Visits:
-dictionary_eIDX_rollup_department <-
-  read_xlsx(
-    path_dictionary_Premier_volume,
-    sheet = "Sch Loc to Dept Map visit e.IDX",
-    col_types = c("skip", "skip", "text", "text", "text", "skip", "skip", "skip")
-  )
-# Volume ID (Premier),Type, and eIDX/idx Department Map:
-dictionary_eIDX_departments <-
-  read_xlsx(
-    path_dictionary_Premier_volume,
-    sheet = "New eIDX visit - volID map",
-    col_types = c("text", "text", "text", "skip")
-  )
-# Merging volID/departnent map with the cost center map
-dictionary_eIDX <-
-  merge(
-    x = dictionary_eIDX_departments,
-    y = dictionary_Premier_volume,
-    by.x = "VolumeID",
-    by.y = "Volume ID",
-    all.x = T
-  )
-# Departments to Remove
-remove_departments_eIDX <-
-  read_xlsx(path_dictionary_Premier_volume, sheet = "eIDX_IDX Departments to Remove")
 # Epic Dictionaries
 # Importing the Dictionaries
 dictionary_Epic_department_VolID <-
@@ -123,109 +96,6 @@ dictionary_EPIC <-
 remove_departments_Epic <-
   dictionary_Epic_department_VolID[dictionary_Epic_department_VolID$`Volume ID` %in% c("X", "TBD"), "Department"]
 
-# Importing eIDX/IDX Data -------------------------------------------------
-answer_eIDX <-
-  select.list(
-    choices = c("Yes", "No"),
-    title = "Is there an eIDX/IDX file?",
-    multiple = F,
-    graphics = T
-  )
-if (answer_eIDX == "Yes") {
-  path_eIDX <-
-    choose.files(
-      default = default_folder,
-      caption = "Select the eIDX/IDX file",
-      multi = F
-    )
-  choices_eIDX_sheets <- c(excel_sheets(path_eIDX), "None")
-  sheet_eIDX <-
-    select.list(
-      choices = choices_eIDX_sheets,
-      title = "Select eIDX Arrived Visits Sheet",
-      graphics = T
-    )
-  if (sheet_eIDX == "None") {
-    data_eIDX_visits <- NA
-  } else {
-    data_eIDX_visits <-
-      as.matrix(read_xlsx(path = path_eIDX, sheet = sheet_eIDX))
-  }
-  sheet_IDX <-
-    select.list(
-      choices = choices_eIDX_sheets,
-      title = "Select IDX Arrived Visits Sheet",
-      graphics = T
-    )
-  if (sheet_IDX == "None") {
-    data_IDX_visits <- NA
-  } else {
-    data_IDX_visits <-
-      as.matrix(read_xlsx(path = path_eIDX, sheet = sheet_IDX))
-  }
-  # importing data
-  if (length(data_eIDX_visits) == 1 | length(data_IDX_visits == 1)) {
-    if (length(data_IDX_visits) == 1 & length(data_eIDX_visits) != 1) {
-      data_eIDXIDX_visits <- as.data.frame(data_eIDX_visits)
-    } else if (length(data_IDX_visits) != 1 &
-      length(data_eIDX_visits) != 1) {
-      data_eIDXIDX_visits <- as.data.frame(data_IDX_visits)
-    } else {
-      data_eIDXIDX_visits <-
-        merge.data.frame(data_eIDX_visits,
-          data_IDX_visits,
-          all.x = T,
-          all.y = T
-        )
-    }
-  } # merging data from eIDX/IDX
-
-  # Pre Processing eIDX/IDX Data --------------------------------------------
-  data_eIDXIDX_visits$`Sch Visit Num` <-
-    as.numeric(as.character(data_eIDXIDX_visits$`Sch Visit Num`))
-  data_eIDXIDX_visits$`SchDateId Date (MM/DD/YYYY)` <-
-    as.Date(data_eIDXIDX_visits$`SchDateId Date (MM/DD/YYYY)`,
-      tryFormats = "%m/%d/%Y"
-    )
-  data_eIDXIDX_visits$`Sch SchDept` <-
-    as.character(data_eIDXIDX_visits$`Sch SchDept`)
-  data_eIDXIDX_visits$`Sch SchDeptSch SchLoc` <-
-    paste0(
-      data_eIDXIDX_visits$`Sch SchDept`,
-      data_eIDXIDX_visits$`Sch SchLoc`
-    )
-  data_eIDXIDX_visits <-
-    arrange(
-      data_eIDXIDX_visits,
-      `SchDateId Date (MM/DD/YYYY)`,
-      `Sch SchDeptSch SchLoc`
-    ) # sorting data
-  data_eIDXIDX_visits <-
-    merge(
-      x = data_eIDXIDX_visits,
-      y = dictionary_eIDX_rollup_department,
-      by = "Sch SchDeptSch SchLoc",
-      all.x = T
-    )
-  data_eIDXIDX_visits <-
-    merge(
-      data_eIDXIDX_visits,
-      subset(
-        dictionary_eIDX,
-        select = c("Department", "VolumeID", "Cost Center")
-      ),
-      by = "Department",
-      all.x = T
-    )
-  data_eIDXIDX_visits <-
-    merge(
-      x = data_eIDXIDX_visits,
-      y = dictionary_pay_cylces,
-      by.x = "SchDateId Date (MM/DD/YYYY)",
-      by.y = "Date",
-      all.x = T
-    )
-}
 # Importing Epic Data -----------------------------------------------------
 list_path_data_Epic <-
   as.list(choose.files(
@@ -292,45 +162,6 @@ data_Epic <-
 # Merging Data from Epic & eIDX/IDX ------------------------------------------------
 # Removing Departments
 
-if (answer_eIDX == "Yes") {
-  data_eIDXIDX_merge <-
-    data_eIDXIDX_visits[!(data_eIDXIDX_visits$`Sch SchDept` %in% remove_departments_eIDX$`Sch SchDept`), ]
-
-  # Date Range Check
-  # eIDX/IDX
-  choices_date_range_eIDX <-
-    format(
-      unique(data_eIDXIDX_visits$`SchDateId Date (MM/DD/YYYY)`),
-      "%m/%d/%Y"
-    )
-  remove_dates_eIDX <-
-    select.list(
-      choices = c("None", choices_date_range_eIDX),
-      title = "eIDX/IDX:Remove Dates?",
-      multiple = T,
-      graphics = T,
-      preselect = "None"
-    )
-  if (remove_dates_eIDX != "None" | is.na(remove_dates_eIDX)) {
-    remove_dates_eIDX <-
-      as.Date(remove_dates_eIDX, tryFormats = "%m/%d/%Y")
-    data_eIDXIDX_merge <-
-      data_eIDXIDX_visits[!(data_eIDXIDX_visits$`SchDateId Date (MM/DD/YYYY)` %in% remove_dates_eIDX), ]
-  }
-  
-  # Selecting only needed columns
-  data_eIDXIDX_merge <-
-    data_eIDXIDX_merge[, c(
-      "Cost Center",
-      "Start Date",
-      "End Date",
-      "VolumeID",
-      "Sch Visit Num"
-    )]
-  colnames(data_eIDXIDX_merge) <-
-    c("Cost Center", "Start Date", "End Date", "Volume ID", "Volume")
-}
-
 data_Epic_merge <-
   data_Epic[!data_Epic$Department %in% remove_departments_Epic, ]
 
@@ -361,12 +192,11 @@ data_Epic_merge$Volume <-
 colnames(data_Epic_merge) <-
   c("Cost Center", "Start Date", "End Date", "Volume ID", "Volume")
 
-# Merging Data
-if (answer_eIDX == "Yes") {
-  data_visits <- rbind(data_eIDXIDX_merge, data_Epic_merge)
-} else {
+# Used to have the option to merge eIDX/IDX data with Epic data.
+# No longer necessary.  For simplicity, just reassign data to the variable
+# used in the rest of the script
   data_visits <- data_Epic_merge
-}
+
 # Removing NA Vol IDs and Cost Centers
 remove_NA_vol <- data_visits[which(is.na(data_visits$VolumeID)), ]
 if (length(remove_NA_vol$VolumeID) != 0) {
