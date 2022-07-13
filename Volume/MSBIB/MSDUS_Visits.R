@@ -1,66 +1,31 @@
-# Loading Libraries -------------------------------------------------------
+# Libraries ---------------------------------------------------------------
 library(readxl)
 library(xlsx)
 library(dplyr)
 
-# Importing Dictionaries --------------------------------------------------
-default_folder <-
-  "J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSBI Data/Union Square"
 
-if (exists("Pay Cycles.xlsx")) {
-  dictionary_pay_cylces <-
-    read_xlsx(
-      "Pay Cycles.xlsx",
-      sheet = 1,
-      col_types = c(
-        "date",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "date",
-        "date",
-        "skip"
-      )
-    )
-} else {
-  path_dictionary_pay_cylces <-
-    choose.files(
-      default = default_folder,
-      caption = "Select Pay Cycles File",
-      multi = F
-    )
-  dictionary_pay_cylces <-
-    read_xlsx(
-      path_dictionary_pay_cylces,
-      sheet = 1,
-      col_types = c(
-        "date",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "date",
-        "date",
-        "skip"
-      )
-    )
-}
-dictionary_pay_cylces$Date <- as.Date(dictionary_pay_cylces$Date)
-dictionary_pay_cylces$`Start Date` <-
-  as.Date(dictionary_pay_cylces$`Start Date`)
-dictionary_pay_cylces$`End Date` <-
-  as.Date(dictionary_pay_cylces$`End Date`)
+# Assigning Directories ---------------------------------------------------
+J_drive <- paste0("//researchsan02b/shr2/deans/Presidents")
+
+
+default_folder <-
+  paste0(J_drive,"/SixSigma/MSHS Productivity/Productivity/",
+         "Volume - Data/MSBI Data/Union Square")
+
+# Importing Dictionaries --------------------------------------------------
+
+## Paycycles --------------------------------------------------------------
+dictionary_pay_cycles <- read_xlsx(
+  paste0(J_drive, "/SixSigma/MSHS Productivity/Productivity/Universal Data/",
+         "Mapping/MSHS_Pay_Cycle.xlsx"),
+  col_types = c("date", "date", "date", "skip"))
+dictionary_pay_cycles$DATE <- as.Date(dictionary_pay_cycles$DATE)
+dictionary_pay_cycles$START.DATE <-
+  as.Date(dictionary_pay_cycles$START.DATE)
+dictionary_pay_cycles$END.DATE <-
+  as.Date(dictionary_pay_cycles$END.DATE)
+
+## Dictionary ------------------------------------------------------------
 path_dictionary_Premier_volume <-
   choose.files(
     default = default_folder,
@@ -84,6 +49,7 @@ dictionary_Epic_department_VolID <-
     sheet = "New Epic Volume ID Map",
     col_types = c("text", "text", "skip")
   )
+
 # Merging Dictionaries into one
 dictionary_EPIC <-
   merge(
@@ -105,7 +71,7 @@ list_path_data_Epic <-
   ))
 list_data_Epic <-
   lapply(list_path_data_Epic, function(x) {
-    read_xlsx(path = x, sheet = 1, skip = 1)
+    read_xlsx(path = x, sheet = 1, skip = 2)
   })
 
 # Pre Processing Epic Data ------------------------------------------------
@@ -153,9 +119,9 @@ data_Epic <-
 data_Epic <-
   merge(
     x = data_Epic,
-    y = dictionary_pay_cylces,
+    y = dictionary_pay_cycles,
     by.x = "Appt Date",
-    by.y = "Date",
+    by.y = "DATE",
     all.x = T
   )
 
