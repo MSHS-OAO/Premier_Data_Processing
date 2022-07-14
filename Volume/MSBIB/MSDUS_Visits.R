@@ -71,7 +71,7 @@ list_path_data_Epic <-
   ))
 list_data_Epic <-
   lapply(list_path_data_Epic, function(x) {
-    read_xlsx(path = x, sheet = 1, skip = 2)
+    read_xlsx(path = x, sheet = 1, skip = 1)
   })
 
 # Pre Processing Epic Data ------------------------------------------------
@@ -149,6 +149,12 @@ if (remove_dates_Epic != "None" | is.na(remove_dates_Epic)) {
     data_Epic_merge[!(data_Epic_merge$`Appt Date` %in% remove_dates_Epic), ]
 } # remove dates if user chooses
 
+data_Epic_merge <- data_Epic_merge %>%
+  rename(
+    `Start Date` = START.DATE,
+    `End Date` = END.DATE
+  )
+
 # Selecting only needed columns
 data_Epic_merge <-
   data_Epic_merge[, c("Cost Center", "Start Date", "End Date", "Volume ID")]
@@ -178,7 +184,6 @@ if (length(remove_NA_CC$`Cost Center`) != 0) {
 
 # Rehab off-site prep -----------------------------------------------------
 
-
 rehab_offs_ratio <- 0.34
 rehab_offs_docs <- c("SPINNER, DAVID A", "CHANG, RICHARD G")
 rehab_offs_dept <- c("300 CADMAN PLAZA REHAB MED",
@@ -198,6 +203,12 @@ if (remove_dates_Epic != "None" | is.na(remove_dates_Epic)) {
   data_rehab_offs <-
     data_rehab_offs[!(data_Epic_merge$`Appt Date` %in% remove_dates_Epic), ]
 } # remove dates if user chooses
+
+data_rehab_offs <- data_rehab_offs %>%
+  rename(
+    `Start Date` = START.DATE,
+    `End Date` = END.DATE
+  )
 
 # Selecting only needed columns
 data_rehab_offs <-
