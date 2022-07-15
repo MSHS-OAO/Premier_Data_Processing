@@ -9,7 +9,7 @@ J_drive <- paste0("//researchsan02b/shr2/deans/Presidents")
 
 
 default_folder <-
-  paste0(J_drive,"/SixSigma/MSHS Productivity/Productivity/",
+  paste0(J_drive, "/SixSigma/MSHS Productivity/Productivity/",
          "Volume - Data/MSBI Data/Union Square")
 
 # Importing Dictionaries --------------------------------------------------
@@ -181,7 +181,6 @@ if (length(remove_NA_CC$`Cost Center`) != 0) {
     data_visits[!data_visits$`Cost Center` %in% remove_NA_CC$`Cost Center`, ]
 }
 
-
 # Rehab off-site prep -----------------------------------------------------
 
 rehab_offs_ratio <- 0.34
@@ -279,6 +278,44 @@ data_visits$`End Date` <- format(data_visits$`End Date`, "%m/%d/%Y")
 
 data_visits$Volume <- round(data_visits$Volume, 0)
 
+# Endo Special Roll-up prep -----------------------------------------------
+
+endo_ru_cc <- "401000040412828"
+endo_ru_vol_id <- "401404128281"
+
+endo_ind_vol_id <- c("401404128282", "401404128283", "414403128371")
+
+data_endo_ru <- data_visits %>%
+  filter(`Volume ID` %in% endo_ind_vol_id)
+
+data_endo_ru <- data_endo_ru %>%
+  group_by(
+    `Corporate ID`,
+    `Facility ID`,
+    `Start Date`,
+    `End Date`,
+    `Budget`
+  ) %>%
+  summarise(Volume = sum(Volume))
+
+data_endo_ru <- data_endo_ru %>%
+  mutate(
+    `Cost Center` = endo_ru_cc,
+    `Volume ID` = endo_ru_vol_id
+  ) %>%
+  select(
+    `Corporate ID`,
+    `Facility ID`,
+    `Cost Center`,
+    `Start Date`,
+    `End Date`,
+    `Volume ID`,
+    `Volume`,
+    `Budget`
+  )
+
+data_visits <- rbind(data_visits, data_endo_ru)
+
 # Exporting Premier Upload File -------------------------------------------
 file_name_Premier <-
   paste0(
@@ -293,7 +330,8 @@ file_name_Premier <-
     ".csv"
   )
 path_folder_Premier_export <-
-  choose.dir(default = default_folder, caption = "Select folder to export Premier upload file")
+  choose.dir(default = default_folder,
+             caption = "Select folder to export Premier upload file")
 write.table(
   data_visits,
   file = paste0(path_folder_Premier_export, "\\", file_name_Premier),
