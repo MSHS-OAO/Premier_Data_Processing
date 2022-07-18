@@ -131,6 +131,17 @@ data_Epic <-
     all.x = T
   )
 
+# new_dept <- data_Epic %>%
+#   filter(!(Department %in% dict_EPIC$Department)) %>%
+#   select(Department) %>%
+#   unique()
+
+# if(length(unique(xxx)) > 0) {
+#   winDialog(message = paste0("These Departments are not in the dictionary:\r",
+#                              paste(unique(zero_rows$`Volume ID`),
+#                                    collapse = "; ")))
+# }
+
 # Removing Departments
 data_Epic_merge <- data_Epic %>%
   filter(!(Department %in% remove_departments_Epic))
