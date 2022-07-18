@@ -15,7 +15,7 @@
 
 # Ensuring the appropriate package versions are used for the project based on
 # renv usage
-renv::restore()
+#renv::restore()
 
 # Common Packages
 library(readxl)
@@ -39,7 +39,57 @@ mapping_path <- paste0("//researchsan02b/shr2/deans/Presidents/SixSigma/",
                        "MSHS Productivity/Productivity/universal Data/",
                        "Mapping/")
 
-# Data Import / Data References--------------------------------------------
+
+# Constants ---------------------------------------------------------------
+
+#placeholder for gui site selection
+sites <- "MSHS"
+
+# Functions ---------------------------------------------------------------
+
+# create function to read in most recent .csv in a given path
+recent_file <- function(path, file_header = F, encoding = "", delimeter = ",", text_cols = NA) {
+  df <- file.info(list.files(paste0(path), 
+                             full.names = T,
+                             pattern = "*.csv"))
+  df <- read.csv(rownames(df)[which.max(df$mtime)], 
+                 stringsAsFactors = F,
+                 header = file_header,
+                 fileEncoding = encoding,
+                 sep = delimeter,
+                 colClasses = text_cols)
+}
+
+# user needs most recent raw data file
+raw_data <- recent_file(path = paste0(project_path, "Source Data"),
+                        file_header = T,
+                        encoding = "UTF-16LE",
+                        delimeter = "\t")
+
+#user needs most recent zero and upload files
+if(sites == "MSHS") {
+  msbib_zero <- recent_file(path = paste0(project_path, "MSBIB/Zero"),
+                            text_cols = rep("character", 14))
+  msbib_upload <- recent_file(path = paste0(project_path, "MSBIB/Uploads"),
+                              text_cols = rep("character", 14))
+  mshq_zero <- recent_file(path = paste0(project_path, "MSHQ/Zero"),
+                           text_cols = rep("character", 14))
+  mshq_upload <- recent_file(path = paste0(project_path, "MSHQ/Uploads"),
+                             text_cols = rep("character", 14))
+} else if(sites == "MSBIB") {
+  msbib_zero <- recent_file(path = paste0(project_path, "MSBIB/Zero"),
+                            text_cols = rep("character", 14))
+  msbib_upload <- recent_file(path = paste0(project_path, "MSBIB/Uploads"),
+                              text_cols = rep("character", 14))
+} else {
+  mshq_zero <- recent_file(path = paste0(project_path, "MSHQ/Zero"),
+                           text_cols = rep("character", 14))
+  mshq_upload <- recent_file(path = paste0(project_path, "MSHQ/Uploads"),
+                             text_cols = rep("character", 14))
+}
+  
+  
+# Data Import / Data References --------------------------------------------
 
 # jobcode list to map job description to job code
 jobcode_list <- read.csv(paste0(project_path, 
@@ -50,6 +100,14 @@ pay_period_mapping <- read_xlsx(paste0(mapping_path,
 # code conversion mapping file to convert legacy to oracle cc
 code_conversion <- read_xlsx(paste0(mapping_path, 
                                     "MSHS_Code_Conversion_Mapping.xlsx"))
+
+# user needs most recent data file
+df <- file.info(list.files(paste0(project_path, "Source Data"), 
+                           full.names = T,
+                           pattern = "*.csv"))
+df <- read.csv(rownames(df)[which.max(df$mtime)], header = T, sep = "~",
+               stringsAsFactors = F, colClasses = rep("character", 32))
+
 
 # Data Pre-processing -----------------------------------------------------
 # Cleaning raw data and ensuring that all values are accounted for such as
