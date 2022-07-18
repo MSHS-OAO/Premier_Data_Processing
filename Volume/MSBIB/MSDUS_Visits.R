@@ -360,6 +360,13 @@ zero_rows <- missing_vol_id_date %>%
     `Budget`
   )
 
+# would be better to display Cost Center name and the volume IDs
+if(length(unique(zero_rows$`Volume ID`)) > 0) {
+  winDialog(message = paste0("These volume IDs had a 0 volume:\r",
+                             paste(unique(zero_rows$`Volume ID`),
+                                   collapse = "; ")))
+}
+
 data_visits <- rbind(data_visits, zero_rows)
 
 # Exporting Premier Upload File -------------------------------------------
