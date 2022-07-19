@@ -44,7 +44,13 @@ mapping_path <- paste0("//researchsan02b/shr2/deans/Presidents/SixSigma/",
 # Constants ---------------------------------------------------------------
 
 #placeholder for gui site selection
-sites <- "MSHS"
+sites <- select.list(
+  choices = c("MSHS", "MSBIB", "MSHQ"),
+  title = "Select Output Site(s)",
+  multiple = T,
+  graphics = T,
+  preselect = "MSHS"
+)
 
 # Functions ---------------------------------------------------------------
 
