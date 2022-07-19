@@ -19,6 +19,7 @@
 
 # Common Packages
 library(readxl)
+library(dplyr)
 # library(rmarkdown)
 # library(shiny)
 
@@ -48,11 +49,13 @@ sites <- "MSHS"
 # Functions ---------------------------------------------------------------
 
 # create function to read in most recent .csv in a given path
-recent_file <- function(path, file_header = F, encoding = "", delimeter = ",", text_cols = NA) {
+recent_file <- function(path, file_header = F, encoding = "",
+                        delimeter = ",", text_cols = NA, desc_order = 1) {
   df <- file.info(list.files(paste0(path), 
                              full.names = T,
-                             pattern = "*.csv"))
-  df <- read.csv(rownames(df)[which.max(df$mtime)], 
+                             pattern = "*.csv")) %>%
+    arrange(desc(mtime))
+  df <- read.csv(rownames(df)[desc_order], 
                  stringsAsFactors = F,
                  header = file_header,
                  fileEncoding = encoding,
