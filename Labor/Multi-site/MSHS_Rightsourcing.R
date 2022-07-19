@@ -60,6 +60,18 @@ recent_file <- function(path, file_header = F, encoding = "", delimeter = ",", t
                  colClasses = text_cols)
 }
 
+# Data Import / Data References --------------------------------------------
+
+# jobcode list to map job description to job code
+jobcode_list <- read.csv(paste0(project_path, 
+                                "Rightsource Job Code.csv"))
+# pay period mapping file to determine max date of next upload
+pay_period_mapping <- read_xlsx(paste0(mapping_path, 
+                                       "MSHS_Pay_Cycle.xlsx"))
+# code conversion mapping file to convert legacy to oracle cc
+code_conversion <- read_xlsx(paste0(mapping_path, 
+                                    "MSHS_Code_Conversion_Mapping.xlsx"))
+
 # user needs most recent raw data file
 raw_data <- recent_file(path = paste0(project_path, "Source Data"),
                         file_header = T,
@@ -87,26 +99,6 @@ if(sites == "MSHS") {
   mshq_upload <- recent_file(path = paste0(project_path, "MSHQ/Uploads"),
                              text_cols = rep("character", 14))
 }
-  
-  
-# Data Import / Data References --------------------------------------------
-
-# jobcode list to map job description to job code
-jobcode_list <- read.csv(paste0(project_path, 
-                                "Rightsource Job Code.csv"))
-# pay period mapping file to determine max date of next upload
-pay_period_mapping <- read_xlsx(paste0(mapping_path, 
-                                       "MSHS_Pay_Cycle.xlsx"))
-# code conversion mapping file to convert legacy to oracle cc
-code_conversion <- read_xlsx(paste0(mapping_path, 
-                                    "MSHS_Code_Conversion_Mapping.xlsx"))
-
-# user needs most recent data file
-df <- file.info(list.files(paste0(project_path, "Source Data"), 
-                           full.names = T,
-                           pattern = "*.csv"))
-df <- read.csv(rownames(df)[which.max(df$mtime)], header = T, sep = "~",
-               stringsAsFactors = F, colClasses = rep("character", 32))
 
 
 # Data Pre-processing -----------------------------------------------------
