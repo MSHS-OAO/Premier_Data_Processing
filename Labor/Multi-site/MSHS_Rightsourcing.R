@@ -81,6 +81,53 @@ raw_data <- recent_file(path = paste0(project_path, "Source Data"),
                         encoding = "UTF-16LE",
                         delimeter = "\t")
 
+raw_data_prev <- recent_file(path = paste0(project_path, "Source Data"),
+                        file_header = T,
+                        encoding = "UTF-16LE",
+                        delimeter = "\t",
+                        desc_order = 2)
+
+new_col <- 
+  colnames(raw_data)[!(colnames(raw_data) %in% colnames(raw_data_prev))]
+new_col <- new_col %>%
+  data.frame()
+colnames(new_col) <- c("Column")
+new_col <- new_col %>%
+  mutate(Status = "new")
+
+missing_col <- 
+  colnames(raw_data)[!(colnames(raw_data_prev) %in% colnames(raw_data))]
+missing_col <- missing_col %>%
+  data.frame()
+colnames(missing_col) <- c("Column")
+missing_col <- missing_col %>%
+  mutate(Status = "missing")
+
+col_check <- rbind(new_col, missing_col)
+
+if(length(col_check$Column)>0) {
+  col_check_stop <- winDialog(
+    message = paste0("There are columns that are new and/or missing.\r",
+                     "Review the col_check dataframe for details",
+                     "\r\r",
+                     "To stop running this script, press \"Cancel\" \r",
+                     "\r",
+                     "Press \"OK\" to continue running the script."),
+    type = "okcancel")
+} else {
+  winDialog(
+    message = paste0("Column Check has passed.\r",
+                     "There are no new and/or missing columns.\r",
+                     "Press \"OK\" to continue."),
+    type = "ok")
+}
+
+if(col_check_stop == "CANCEL") {
+  stop("Script is discontinued by your request.")
+}
+
+rm(raw_data_prev)
+
 #user needs most recent zero and upload files
 if(sites == "MSHS") {
   msbib_zero <- recent_file(path = paste0(project_path, "MSBIB/Zero"),
