@@ -109,8 +109,8 @@ if (length(col_check$Column) > 0) {
   col_check_stop <- winDialog(
     message = paste0(
       "There are columns that are new and/or missing.\r",
-      "Review the col_check dataframe for details",
-      "\r\r",
+      "Review the col_check dataframe for details\r",
+      "\r",
       "To stop running this script, press \"Cancel\" \r",
       "\r",
       "Press \"OK\" to continue running the script."
