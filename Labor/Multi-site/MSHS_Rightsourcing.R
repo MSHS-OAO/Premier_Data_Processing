@@ -5,7 +5,7 @@
 # 3. Reference checklist for commenting and style guidelines
 # 4. Create Sections using the menu Code > Insert Section
 #    or the shortcut Ctrl+Shift+R
-# 5. Create subsections by starting a Section with two # signs (e.g. ##).  
+# 5. Create subsections by starting a Section with two # signs (e.g. ##).
 #    - See example within this section.
 
 # Libraries ---------------------------------------------------------------
@@ -51,11 +51,11 @@ sites <- "MSHS"
 # create function to read in most recent .csv in a given path
 recent_file <- function(path, file_header = F, encoding = "",
                         delimeter = ",", text_cols = NA, desc_order = 1) {
-  df <- file.info(list.files(paste0(path), 
+  df <- file.info(list.files(paste0(path),
                              full.names = T,
                              pattern = "*.csv")) %>%
     arrange(desc(mtime))
-  df <- read.csv(rownames(df)[desc_order], 
+  df <- read.csv(rownames(df)[desc_order],
                  stringsAsFactors = F,
                  header = file_header,
                  fileEncoding = encoding,
@@ -66,13 +66,13 @@ recent_file <- function(path, file_header = F, encoding = "",
 # Data Import / Data References --------------------------------------------
 
 # jobcode list to map job description to job code
-jobcode_list <- read.csv(paste0(project_path, 
+jobcode_list <- read.csv(paste0(project_path,
                                 "Rightsource Job Code.csv"))
 # pay period mapping file to determine max date of next upload
-pay_period_mapping <- read_xlsx(paste0(mapping_path, 
+pay_period_mapping <- read_xlsx(paste0(mapping_path,
                                        "MSHS_Pay_Cycle.xlsx"))
 # code conversion mapping file to convert legacy to oracle cc
-code_conversion <- read_xlsx(paste0(mapping_path, 
+code_conversion <- read_xlsx(paste0(mapping_path,
                                     "MSHS_Code_Conversion_Mapping.xlsx"))
 
 # user needs most recent raw data file
@@ -81,8 +81,56 @@ raw_data <- recent_file(path = paste0(project_path, "Source Data"),
                         encoding = "UTF-16LE",
                         delimeter = "\t")
 
+# user needs previous raw data file to compare column headers
+raw_data_prev <- recent_file(path = paste0(project_path, "Source Data"),
+                        file_header = T,
+                        encoding = "UTF-16LE",
+                        delimeter = "\t",
+                        desc_order = 2)
+
+new_col <-
+  colnames(raw_data)[!(colnames(raw_data) %in% colnames(raw_data_prev))]
+new_col <- new_col %>%
+  data.frame()
+colnames(new_col) <- c("Column")
+new_col <- new_col %>%
+  mutate(Status = "new")
+
+missing_col <-
+  colnames(raw_data)[!(colnames(raw_data_prev) %in% colnames(raw_data))]
+missing_col <- missing_col %>%
+  data.frame()
+colnames(missing_col) <- c("Column")
+missing_col <- missing_col %>%
+  mutate(Status = "missing")
+
+col_check <- rbind(new_col, missing_col)
+
+col_check <- NULL
+
+if (length(col_check$Column) > 0) {
+  col_check_stop <- winDialog(
+    message = paste0(
+      "There are columns that are new and/or missing.\r",
+      "Review the col_check dataframe for details\r",
+      "\r",
+      "To stop running this script, press \"Cancel\" \r",
+      "\r",
+      "Press \"OK\" to continue running the script\r",
+      "if you have already confirmed that the data is ok."
+    ),
+    type = "okcancel"
+  )
+}
+
+if (col_check_stop == "CANCEL") {
+  stop("Script is discontinued by your request.")
+}
+
+rm(raw_data_prev)
+
 #user needs most recent zero and upload files
-if(sites == "MSHS") {
+if (sites == "MSHS") {
   msbib_zero <- recent_file(path = paste0(project_path, "MSBIB/Zero"),
                             text_cols = rep("character", 14))
   msbib_upload <- recent_file(path = paste0(project_path, "MSBIB/Uploads"),
@@ -91,7 +139,7 @@ if(sites == "MSHS") {
                            text_cols = rep("character", 14))
   mshq_upload <- recent_file(path = paste0(project_path, "MSHQ/Uploads"),
                              text_cols = rep("character", 14))
-} else if(sites == "MSBIB") {
+} else if (sites == "MSBIB") {
   msbib_zero <- recent_file(path = paste0(project_path, "MSBIB/Zero"),
                             text_cols = rep("character", 14))
   msbib_upload <- recent_file(path = paste0(project_path, "MSBIB/Uploads"),
