@@ -81,6 +81,7 @@ raw_data <- recent_file(path = paste0(project_path, "Source Data"),
                         encoding = "UTF-16LE",
                         delimeter = "\t")
 
+# user needs previous raw data file to compare column headers
 raw_data_prev <- recent_file(path = paste0(project_path, "Source Data"),
                         file_header = T,
                         encoding = "UTF-16LE",
@@ -105,6 +106,8 @@ missing_col <- missing_col %>%
 
 col_check <- rbind(new_col, missing_col)
 
+col_check <- NULL
+
 if (length(col_check$Column) > 0) {
   col_check_stop <- winDialog(
     message = paste0(
@@ -113,18 +116,10 @@ if (length(col_check$Column) > 0) {
       "\r",
       "To stop running this script, press \"Cancel\" \r",
       "\r",
-      "Press \"OK\" to continue running the script."
+      "Press \"OK\" to continue running the script\r",
+      "if you have already confirmed that the data is ok."
     ),
     type = "okcancel"
-  )
-} else {
-  winDialog(
-    message = paste0(
-      "Column Check has passed.\r",
-      "There are no new and/or missing columns.\r",
-      "Press \"OK\" to continue."
-    ),
-    type = "ok"
   )
 }
 
