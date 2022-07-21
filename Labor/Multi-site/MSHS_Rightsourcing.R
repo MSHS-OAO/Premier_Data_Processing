@@ -43,11 +43,10 @@ mapping_path <- paste0("//researchsan02b/shr2/deans/Presidents/SixSigma/",
 
 # Constants ---------------------------------------------------------------
 
-#placeholder for gui site selection
+# user needs to select the site(s) they want to process rightsourcing for
 sites <- select.list(
   choices = c("MSHS", "MSBIB", "MSHQ"),
   title = "Select Output Site(s)",
-  multiple = T,
   graphics = T,
   preselect = "MSHS"
 )
