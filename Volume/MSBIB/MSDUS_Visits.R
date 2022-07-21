@@ -93,6 +93,15 @@ merge_multiple_dataframes <- function(list.dfs) {
   return(output)
 }
 data_Epic <- merge_multiple_dataframes(list_data_Epic)
+
+
+
+## Date Formatting ---------------------------------------------------------
+
+
+# insert if statements to modify date/time columns based on the
+# input data format
+
 data_Epic$`Appt Date` <-
   unname(sapply(
     data_Epic$Appt.Time,
@@ -114,6 +123,10 @@ data_Epic$Appt.Time <-
       unlist(strsplit(x, " "))[3]
     }
   ))) # Replace the Appt Time Column with the Hour of the appointment
+
+
+## Join IDs and pay cycles -------------------------------------------------
+
 data_Epic <- arrange(data_Epic, `Appt Date`, `Department`)
 data_Epic <-
   merge(
@@ -131,25 +144,30 @@ data_Epic <-
     all.x = T
   )
 
+## New Dept Check ------------------------------------------------------
+
 new_dept <- data_Epic %>%
   filter(!(Department %in% dict_EPIC$Department)) %>%
   select(Department) %>%
   unique() %>%
   sort()
 
-if(length(unique(new_dept$Department)) > 0) {
-  new_dept_stop <- winDialog(
-    message = paste0("These Departments are not in the dictionary:\r",
-                     paste(unique(zero_rows$`Volume ID`), collapse = "; "),
-                     "\r",
-                     "To stop running this script, press \"Cancel\" \r",
-                     "Press OK to continue"),
-    type = "okcancel")
-}
+# if(length(unique(new_dept$Department)) > 0) {
+#   new_dept_stop <- winDialog(
+#     message = paste0("These Departments are not in the dictionary:\r",
+#                      paste(unique(zero_rows$`Volume ID`), collapse = "; "),
+#                      "\r",
+#                      "To stop running this script, press \"Cancel\" \r",
+#                      "Press OK to continue"),
+#     type = "okcancel")
+# }
+# 
+# if(new_dept_stop == "CANCEL") {
+#   stop("Fix the dept dictionary if you like based on the new departments")
+# }
 
-if(new_dept_stop == "CANCEL") {
-  stop("Fix the dept dictionary if you like based on the new departments")
-}
+
+## Removing Data -----------------------------------------------------------
 
 # Removing Departments
 data_Epic_merge <- data_Epic %>%
@@ -193,6 +211,8 @@ colnames(data_Epic_merge) <-
 # used in the rest of the script
 data_visits <- data_Epic_merge
 
+## Removing NA data --------------------------------------------------
+
 # Removing NA Vol IDs and Cost Centers
 remove_NA_vol <- data_visits[which(is.na(data_visits$VolumeID)), ]
 if (length(remove_NA_vol$VolumeID) != 0) {
@@ -206,7 +226,7 @@ if (length(remove_NA_CC$`Cost Center`) != 0) {
     filter(!(`Cost Center` %in% remove_NA_CC$`Cost Center`))
 }
 
-# Rehab off-site prep -----------------------------------------------------
+## Rehab off-site prep -----------------------------------------------------
 
 rehab_offs_ratio <- 0.34
 rehab_offs_docs <- c("SPINNER, DAVID A", "CHANG, RICHARD G")
@@ -247,8 +267,6 @@ data_rehab_offs$Volume <-
   rep(rehab_offs_ratio, length(data_rehab_offs$`Cost Center`))
 colnames(data_rehab_offs) <-
   c("Cost Center", "Start Date", "End Date", "Volume ID", "Volume")
-
-# Merge Offsite with Main Visits ------------------------------------------
 
 data_visits <- rbind(data_visits, data_rehab_offs)
 
@@ -308,7 +326,7 @@ data_visits$`End Date` <- format(data_visits$`End Date`, "%m/%d/%Y")
 
 data_visits$Volume <- round(data_visits$Volume, 0)
 
-# Endo Special Roll-up prep -----------------------------------------------
+## Endo Special Roll-up prep -----------------------------------------------
 
 endo_ru_cc <- "401000040412828"
 endo_ru_vol_id <- "401404128281"
@@ -347,7 +365,7 @@ data_endo_ru <- data_endo_ru %>%
 data_visits <- rbind(data_visits, data_endo_ru)
 
 
-# Add rows for volume ID with 0 volume ------------------------------------
+## Add rows for volume ID with 0 volume ------------------------------------
 
 data_dates <- data_visits %>%
   select(`Start Date`, `End Date`) %>%
