@@ -15,11 +15,12 @@
 
 # Ensuring the appropriate package versions are used for the project based on
 # renv usage
-#renv::restore()
+# renv::restore()
 
 # Common Packages
 library(readxl)
 library(dplyr)
+library(lubridate)
 # library(rmarkdown)
 # library(shiny)
 
@@ -41,7 +42,7 @@ mapping_path <- paste0("//researchsan02b/shr2/deans/Presidents/SixSigma/",
                        "Mapping/")
 
 
-# Constants ---------------------------------------------------------------
+# Constants (round 1) ---------------------------------------------------------
 
 # user needs to select the site(s) they want to process rightsourcing for
 sites <- select.list(
@@ -66,7 +67,20 @@ recent_file <- function(path, file_header = F, encoding = "",
                  fileEncoding = encoding,
                  sep = delimeter,
                  colClasses = text_cols)
-}
+
+  # need names on columns of previous month's files
+  prem_upload_col_names <- c("partner",
+                             "hosp.home", "dept.home",
+                             "hosp.worked", "dept.worked",
+                             "date.start", "date.end",
+                             "emp.ID", "emp.name",
+                             "budget", "jobcode", "paycode",
+                             "hours", "spend")
+
+  colnames(df) <- prem_upload_col_names
+
+  return(df)
+  }
 
 # Data Import / Data References --------------------------------------------
 
@@ -111,8 +125,6 @@ missing_col <- missing_col %>%
 
 col_check <- rbind(new_col, missing_col)
 
-col_check <- NULL
-
 if (length(col_check$Column) > 0) {
   col_check_stop <- winDialog(
     message = paste0(
@@ -121,8 +133,8 @@ if (length(col_check$Column) > 0) {
       "\r",
       "To stop running this script, press \"Cancel\" \r",
       "\r",
-      "Press \"OK\" to continue running the script\r",
-      "if you have already confirmed that the data is ok."
+      "If you have already confirmed that the data is ok\r",
+      "press \"OK\" to continue running the script.",
     ),
     type = "okcancel"
   )
@@ -155,6 +167,58 @@ if (sites == "MSHS") {
   mshq_upload <- recent_file(path = paste0(project_path, "MSHQ/Uploads"),
                              text_cols = rep("character", 14))
 }
+
+# Constants (round 2) ------------------------------------------------------
+
+#Table of distribution dates
+dist_dates <- pay_period_mapping %>%
+  select(END.DATE, PREMIER.DISTRIBUTION) %>%
+  distinct() %>%
+  drop_na() %>%
+  arrange(END.DATE) %>%
+  #filter only on distribution end dates
+  filter(PREMIER.DISTRIBUTION %in% c(TRUE, 1),
+         #filter 2 weeks from run date (14 days) for data collection lag
+         #before run date
+         END.DATE < as.POSIXct(Sys.Date() - 14))
+
+#Selecting current distribution date
+distribution <- format(dist_dates$END.DATE[nrow(dist_dates)], "%m/%d/%Y")
+
+#Confirming distribution date which will be the max of the current upload
+answer <- winDialog(
+  message = paste0(
+    "Current distribution is ", distribution, "\r\r",
+    "If this is correct, press OK\r\r",
+    "If this is not correct, press Cancel and\r",
+    "you will be prompted to select the correct\r",
+    "distribution date."
+    ),
+  type = "okcancel"
+)
+
+if (answer == "CANCEL") {
+  distribution <- select.list(
+    choices =
+      format(sort.POSIXlt(dist_dates$END.DATE, decreasing = T), "%m/%d/%Y"),
+    multiple = F,
+    title = "Select current distribution",
+    graphics = T
+  )
+  which(distribution == format(dist_dates$END.DATE, "%m/%d/%Y"))
+}
+
+# max date of the previous zero files will be used to determine what the
+# min date is of the current upload and zero files
+prev_0_max_date_mshq <- mshq_zero %>%
+  mutate(date.end = as.Date(date.end, format = "%m/%d/%Y")) %>%
+  select(date.end)
+prev_0_max_date_mshq <- max(prev_0_max_date_mshq$date.end)
+
+prev_0_max_date_msbib <- msbib_zero %>%
+  mutate(date.end = as.Date(date.end, format = "%m/%d/%Y")) %>%
+  select(date.end)
+prev_0_max_date_msbib <- max(prev_0_max_date_msbib$date.end)
 
 
 # Data Pre-processing -----------------------------------------------------
