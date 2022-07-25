@@ -220,8 +220,6 @@ prev_0_max_date_mshq <- max(mdy(mshq_zero$date.end))
 
 prev_0_max_date_msbib <- max(mdy(msbib_zero$date.end))
 
-str(prev_0_max_date_msbib)
-
 # Data Pre-processing -----------------------------------------------------
 # Cleaning raw data and ensuring that all values are accounted for such as
 # blanks and NA. As well as excluding data that may not be used or needed. This
