@@ -21,6 +21,7 @@
 library(readxl)
 library(dplyr)
 library(lubridate)
+library(tidyr)
 # library(rmarkdown)
 # library(shiny)
 
@@ -56,7 +57,8 @@ sites <- select.list(
 
 # create function to read in most recent .csv in a given path
 recent_file <- function(path, file_header = F, encoding = "",
-                        delimeter = ",", text_cols = NA, desc_order = 1) {
+                        delimeter = ",", text_cols = NA, desc_order = 1,
+                        premier = TRUE) {
   df <- file.info(list.files(paste0(path),
                              full.names = T,
                              pattern = "*.csv")) %>%
@@ -69,7 +71,8 @@ recent_file <- function(path, file_header = F, encoding = "",
                  colClasses = text_cols)
 
   # need names on columns of previous month's files
-  prem_upload_col_names <- c("partner",
+  if (premier == TRUE) {
+    prem_upload_col_names <- c("partner",
                              "hosp.home", "dept.home",
                              "hosp.worked", "dept.worked",
                              "date.start", "date.end",
@@ -78,9 +81,10 @@ recent_file <- function(path, file_header = F, encoding = "",
                              "hours", "spend")
 
   colnames(df) <- prem_upload_col_names
-
-  return(df)
   }
+  
+  return(df)
+}
 
 # Data Import / Data References --------------------------------------------
 
@@ -98,14 +102,16 @@ code_conversion <- read_xlsx(paste0(mapping_path,
 raw_data <- recent_file(path = paste0(project_path, "Source Data"),
                         file_header = T,
                         encoding = "UTF-16LE",
-                        delimeter = "\t")
+                        delimeter = "\t",
+                        premier = FALSE)
 
 # user needs previous raw data file to compare column headers
 raw_data_prev <- recent_file(path = paste0(project_path, "Source Data"),
                         file_header = T,
                         encoding = "UTF-16LE",
                         delimeter = "\t",
-                        desc_order = 2)
+                        desc_order = 2,
+                        premier = FALSE)
 
 new_col <-
   colnames(raw_data)[!(colnames(raw_data) %in% colnames(raw_data_prev))]
@@ -134,7 +140,7 @@ if (length(col_check$Column) > 0) {
       "To stop running this script, press \"Cancel\" \r",
       "\r",
       "If you have already confirmed that the data is ok\r",
-      "press \"OK\" to continue running the script.",
+      "press \"OK\" to continue running the script."
     ),
     type = "okcancel"
   )
@@ -183,12 +189,12 @@ dist_dates <- pay_period_mapping %>%
          END.DATE < as.POSIXct(Sys.Date() - 14))
 
 #Selecting current distribution date
-distribution <- format(dist_dates$END.DATE[nrow(dist_dates)], "%m/%d/%Y")
+distribution <- dist_dates$END.DATE[nrow(dist_dates)]
 
 #Confirming distribution date which will be the max of the current upload
 answer <- winDialog(
   message = paste0(
-    "Current distribution is ", distribution, "\r\r",
+    "Current distribution will be ", distribution, "\r\r",
     "If this is correct, press OK\r\r",
     "If this is not correct, press Cancel and\r",
     "you will be prompted to select the correct\r",
@@ -210,16 +216,11 @@ if (answer == "CANCEL") {
 
 # max date of the previous zero files will be used to determine what the
 # min date is of the current upload and zero files
-prev_0_max_date_mshq <- mshq_zero %>%
-  mutate(date.end = as.Date(date.end, format = "%m/%d/%Y")) %>%
-  select(date.end)
-prev_0_max_date_mshq <- max(prev_0_max_date_mshq$date.end)
+prev_0_max_date_mshq <- max(mdy(mshq_zero$date.end))
 
-prev_0_max_date_msbib <- msbib_zero %>%
-  mutate(date.end = as.Date(date.end, format = "%m/%d/%Y")) %>%
-  select(date.end)
-prev_0_max_date_msbib <- max(prev_0_max_date_msbib$date.end)
+prev_0_max_date_msbib <- max(mdy(msbib_zero$date.end))
 
+str(prev_0_max_date_msbib)
 
 # Data Pre-processing -----------------------------------------------------
 # Cleaning raw data and ensuring that all values are accounted for such as
