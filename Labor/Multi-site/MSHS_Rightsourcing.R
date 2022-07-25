@@ -211,7 +211,6 @@ if (answer == "CANCEL") {
     title = "Select current distribution",
     graphics = T
   )
-  which(distribution == format(dist_dates$END.DATE, "%m/%d/%Y"))
 }
 
 # max date of the previous zero files will be used to determine what the
