@@ -42,17 +42,6 @@ mapping_path <- paste0("//researchsan02b/shr2/deans/Presidents/SixSigma/",
                        "MSHS Productivity/Productivity/universal Data/",
                        "Mapping/")
 
-
-# Constants (round 1) ---------------------------------------------------------
-
-# user needs to select the site(s) they want to process rightsourcing for
-sites <- select.list(
-  choices = c("MSHS", "MSBIB", "MSHQ"),
-  title = "Select Output Site(s)",
-  graphics = T,
-  preselect = "MSHS"
-)
-
 # Functions ---------------------------------------------------------------
 
 # create function to read in most recent .csv in a given path
@@ -153,28 +142,24 @@ if (col_check_stop == "CANCEL") {
 rm(raw_data_prev)
 
 #user needs most recent zero and upload files
-if (sites == "MSHS") {
-  msbib_zero <- recent_file(path = paste0(project_path, "MSBIB/Zero"),
+msbib_zero <- recent_file(path = paste0(project_path, "MSBIB/Zero"),
+                          text_cols = rep("character", 14))
+msbib_upload <- recent_file(path = paste0(project_path, "MSBIB/Uploads"),
                             text_cols = rep("character", 14))
-  msbib_upload <- recent_file(path = paste0(project_path, "MSBIB/Uploads"),
-                              text_cols = rep("character", 14))
-  mshq_zero <- recent_file(path = paste0(project_path, "MSHQ/Zero"),
+mshq_zero <- recent_file(path = paste0(project_path, "MSHQ/Zero"),
+                         text_cols = rep("character", 14))
+mshq_upload <- recent_file(path = paste0(project_path, "MSHQ/Uploads"),
                            text_cols = rep("character", 14))
-  mshq_upload <- recent_file(path = paste0(project_path, "MSHQ/Uploads"),
-                             text_cols = rep("character", 14))
-} else if (sites == "MSBIB") {
-  msbib_zero <- recent_file(path = paste0(project_path, "MSBIB/Zero"),
-                            text_cols = rep("character", 14))
-  msbib_upload <- recent_file(path = paste0(project_path, "MSBIB/Uploads"),
-                              text_cols = rep("character", 14))
-} else {
-  mshq_zero <- recent_file(path = paste0(project_path, "MSHQ/Zero"),
-                           text_cols = rep("character", 14))
-  mshq_upload <- recent_file(path = paste0(project_path, "MSHQ/Uploads"),
-                             text_cols = rep("character", 14))
-}
 
-# Constants (round 2) ------------------------------------------------------
+# Constants ------------------------------------------------------
+
+# user needs to select the site(s) they want to process rightsourcing for
+sites <- select.list(
+  choices = c("MSHS", "MSBIB", "MSHQ"),
+  title = "Select Output Site(s)",
+  graphics = T,
+  preselect = "MSHS"
+)
 
 #Table of distribution dates
 dist_dates <- pay_period_mapping %>%
@@ -211,6 +196,7 @@ if (answer == "CANCEL") {
     title = "Select current distribution",
     graphics = T
   )
+  distribution <- mdy(distribution)
 }
 
 # max date of the previous zero files will be used to determine what the
