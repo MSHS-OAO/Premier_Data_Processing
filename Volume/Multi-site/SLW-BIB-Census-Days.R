@@ -132,7 +132,7 @@ map_reports <- map_reports %>%
 
 data_upload <- left_join(data_census, map_CC_Vol)
 data_upload <- left_join(data_upload, dict_PC)
-data_upload <- left_join(data_upload, map_reports)
+#data_upload <- left_join(data_upload, map_reports)
 
 # QC --------------------------------------------------------------------
 if(nrow(data_census) != nrow(data_upload)){stop('Check Dictionaries for Duplicates')} #checking to see if vlookups are duplicating rows
@@ -210,13 +210,18 @@ quality_chart <- function(data, site.census) {
   data_chart <- data_upload %>%
     ungroup() %>%
     filter(Site == site.census) %>%
-    select(ReportCode, ReportName, CostCenter, Nursing.Station.Code, End.Date, Census.Day) %>%
+    select(#ReportCode,
+           #ReportName, 
+           CostCenter, 
+           Nursing.Station.Code, 
+           End.Date, 
+           Census.Day) %>%
     arrange(End.Date) %>%
     mutate(End.Date = format(End.Date, '%m.%d.%y')) %>%
     pivot_wider(names_from = End.Date, values_from = Census.Day,
-                values_fn = list(Census.Day = sum)) %>%
-    mutate(Report = paste(ReportCode, ReportName, sep = "-")) %>%
-    arrange(Report) 
+                values_fn = list(Census.Day = sum)) #%>%
+    #mutate(Report = paste(ReportCode, ReportName, sep = "-")) %>%
+    #arrange(Report) 
 }
 chart_master <- lapply(as.list(unique(data_upload$Site)),
                        function(x) quality_chart(data_upload, x))
