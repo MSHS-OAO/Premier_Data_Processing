@@ -41,8 +41,10 @@ colnames(dict_PC) <- c('Census.Date', 'Start.Date', 'End.Date')
 if(!pp.start %in% dict_PC$Start.Date){
   stop('Start date entered is not the start of a payperiod, please enter another start date')
 }else if(!pp.end %in% dict_PC$End.Date){stop('End date entered is not the end of a pay period, please enter another end date')}
-map_reports <- read.xlsx(paste0(dir_universal,
-                                '/Mapping/MSHS_Reporting_Definition_Mapping.xlsx'))
+map_reports <- read.xlsx(
+  paste0(dir_universal,
+         '/Mapping/MSHS_Reporting_Definition_Mapping.xlsx'),
+  detectDates = T)
   
 # Import Data -------------------------------------------------------------
 import_recent_file <- function(folder.path, place) {
@@ -120,6 +122,7 @@ if(any(!unique(map_CC_Vol$Site) %in% site_names) | any(!unique(data_census$Site)
 }
 
 map_reports <- map_reports %>%
+  filter(CLOSED > pp.end | is.na(CLOSED)) %>%
   select(ORACLE.COST.CENTER, DEFINITION.CODE, DEFINITION.NAME) %>%
   distinct() %>%
   drop_na() %>%
