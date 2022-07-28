@@ -174,12 +174,12 @@ dist_dates <- pay_period_mapping %>%
          END.DATE < as.POSIXct(Sys.Date() - 14))
 
 #Selecting current distribution date
-distribution <- dist_dates$END.DATE[nrow(dist_dates)]
+distribution_date <- dist_dates$END.DATE[nrow(dist_dates)]
 
 #Confirming distribution date which will be the max of the current upload
 answer <- winDialog(
   message = paste0(
-    "Current distribution will be ", distribution, "\r\r",
+    "Current distribution will be ", distribution_date, "\r\r",
     "If this is correct, press OK\r\r",
     "If this is not correct, press Cancel and\r",
     "you will be prompted to select the correct\r",
@@ -189,14 +189,14 @@ answer <- winDialog(
 )
 
 if (answer == "CANCEL") {
-  distribution <- select.list(
+  distribution_date <- select.list(
     choices =
       format(sort.POSIXlt(dist_dates$END.DATE, decreasing = T), "%m/%d/%Y"),
     multiple = F,
     title = "Select current distribution",
     graphics = T
   )
-  distribution <- mdy(distribution)
+  distribution_date <- mdy(distribution_date)
 }
 
 # max date of the previous zero files will be used to determine what the
@@ -206,13 +206,12 @@ prev_0_max_date_mshq <- max(mdy(mshq_zero_old$date.end))
 prev_0_max_date_msbib <- max(mdy(msbib_zero_old$date.end))
 
 # Data Pre-processing -----------------------------------------------------
-# Cleaning raw data and ensuring that all values are accounted for such as
-# blanks and NA. As well as excluding data that may not be used or needed. This
-# section can be split into multiple ones based on the data pre-processing
-# needed.
-# One of the first steps could be to perform initial checks to make sure data is
-# in the correct format.  This might also be done as soon as the data is
-# imported.
+# filter start and end dates to prep for upload date range
+processed_data <- raw_data %>%
+  filter(mdy(Date.Worked) > min(c(prev_0_max_date_mshq,
+                                  prev_0_max_date_msbib)),
+         mdy(Date.Worked) <= distribution_date) %>%
+  mutate(cost_center_info = gsub('^.*:\\s*|\\s*\\*.*$', '', Department.Billed))
 
 ## New Zero Upload ---------------------------------------------------------
 
