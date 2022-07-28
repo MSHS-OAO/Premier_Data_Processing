@@ -22,6 +22,7 @@ library(readxl)
 library(dplyr)
 library(lubridate)
 library(tidyr)
+library(stringr)
 # library(rmarkdown)
 # library(shiny)
 
@@ -206,12 +207,6 @@ prev_0_max_date_mshq <- max(mdy(mshq_zero_old$date.end))
 prev_0_max_date_msbib <- max(mdy(msbib_zero_old$date.end))
 
 # Data Pre-processing -----------------------------------------------------
-# filter start and end dates to prep for upload date range
-processed_data <- raw_data %>%
-  filter(mdy(Date.Worked) > min(c(prev_0_max_date_mshq,
-                                  prev_0_max_date_msbib)),
-         mdy(Date.Worked) <= distribution_date) %>%
-  mutate(cost_center_info = gsub('^.*:\\s*|\\s*\\*.*$', '', Department.Billed))
 
 ## New Zero Upload ---------------------------------------------------------
 
@@ -224,6 +219,34 @@ mshq_zero_new <- mshq_upload_old %>%
   filter(mdy(date.start) > prev_0_max_date_mshq) %>%
   mutate(hours = "0",
          spend = "0")
+
+## processed data -------------------------------------------------------
+processed_data <- raw_data %>%
+  filter(mdy(Date.Worked) > min(c(prev_0_max_date_mshq,
+                                  prev_0_max_date_msbib)),
+         mdy(Date.Worked) <= distribution_date) %>%
+  mutate(cost_center_info = gsub('^.*:\\s*|\\s*\\*.*$', '',
+                                 Department.Billed)) %>%
+  mutate(wrkd_dept_leg = case_when(
+    nchar(cost_center_info) == 12 ~ substr(cost_center_info, 1, 8),
+    nchar(cost_center_info) == 30 ~ str_c(substr(cost_center_info, 1, 4),
+                                          substr(cost_center_info, 13, 14),
+                                          substr(cost_center_info, 16, 19)),
+    TRUE ~ cost_center_info)
+  ) %>%
+  mutate(home_dept_oracle = case_when(
+    substr(wrkd_dept_leg, 1, 4) == "0130" ~ "101010101010102",
+    substr(wrkd_dept_leg, 1, 4) == "4709" ~ "900000040790000",
+    nchar(cost_center_info) == 12 ~ "101010101010101",
+    nchar(cost_center_info) == 30 ~ "900000040490000",
+    TRUE ~ cost_center_info
+  ))
+
+proof <- processed_data %>%
+  select(cost_center_info, wrkd_dept_leg, home_dept_oracle) %>%
+  unique()
+
+
 
 # Data Formatting ---------------------------------------------------------
 # How the data will look during the output of the script.
