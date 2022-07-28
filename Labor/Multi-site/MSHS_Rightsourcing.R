@@ -226,22 +226,24 @@ prev_0_max_date_msbib <- max(mdy(msbib_zero$date.end))
 # doesn't seem like it matters either way
 # 3. use apply or loop instead of doing the same thing 2x?
 # doesn't seem worth the effort at this time.
+# 4. update naming convention for dataframes?
+# where_what_which
 
-msbib_new_zero <- msbib_upload %>%
+msbib_zero_new <- msbib_upload %>%
   filter(mdy(date.start) > prev_0_max_date_msbib) %>%
   mutate(hours = "0",
          spend = "0")
 
-mshq_new_zero <- mshq_upload %>%
+mshq_zero_new <- mshq_upload %>%
   filter(mdy(date.start) > prev_0_max_date_mshq) %>%
   mutate(hours = "0",
          spend = "0")
 
 # proof, to be deleted after confirmation
-msbib_new_zero %>%
+msbib_zero_new %>%
   select(date.start, date.end, hours, spend) %>%
   unique()
-mshq_new_zero %>%
+mshq_zero_new %>%
   select(date.start, date.end, hours, spend) %>%
   unique()
 
