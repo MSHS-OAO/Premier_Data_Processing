@@ -214,6 +214,33 @@ prev_0_max_date_msbib <- max(mdy(msbib_zero$date.end))
 # in the correct format.  This might also be done as soon as the data is
 # imported.
 
+## New Zero Upload ---------------------------------------------------------
+
+# made a subsection for the outline
+
+# 1. always need to wrap mdy() around the dates in these dataframes?
+# or change the date format on these dataframes all around?
+# if changing the format, wrap it into the previous upload portion of the 
+# recent_file() function
+# 2. do we want the hours and spend to remain character or change to number?
+# doesn't seem like it matters either way
+# 3. use apply or loop instead of doing the same thing 2x?
+# doesn't seem worth the effort at this time.
+
+msbib_new_zero <- msbib_upload %>%
+  filter(mdy(date.start) > prev_0_max_date_msbib) %>%
+  mutate(hours = "0",
+         spend = "0")
+
+mshq_new_zero <- mshq_upload %>%
+  filter(mdy(date.start) > prev_0_max_date_mshq) %>%
+  mutate(hours = "0",
+         spend = "0")
+
+# proof, to be deleted after confirmation
+unique(msbib_new_zero[, c(6:7, 13,14)])
+unique(mshq_new_zero[, c(6:7, 13,14)])
+
 
 # Data Formatting ---------------------------------------------------------
 # How the data will look during the output of the script.
