@@ -142,14 +142,14 @@ if (col_check_stop == "CANCEL") {
 rm(raw_data_prev)
 
 #user needs most recent zero and upload files
-msbib_zero <- recent_file(path = paste0(project_path, "MSBIB/Zero"),
-                          text_cols = rep("character", 14))
-msbib_upload <- recent_file(path = paste0(project_path, "MSBIB/Uploads"),
-                            text_cols = rep("character", 14))
-mshq_zero <- recent_file(path = paste0(project_path, "MSHQ/Zero"),
-                         text_cols = rep("character", 14))
-mshq_upload <- recent_file(path = paste0(project_path, "MSHQ/Uploads"),
-                           text_cols = rep("character", 14))
+msbib_zero_old <- recent_file(path = paste0(project_path, "MSBIB/Zero"),
+                              text_cols = rep("character", 14))
+msbib_upload_old <- recent_file(path = paste0(project_path, "MSBIB/Uploads"),
+                                text_cols = rep("character", 14))
+mshq_zero_old <- recent_file(path = paste0(project_path, "MSHQ/Zero"),
+                             text_cols = rep("character", 14))
+mshq_upload_old <- recent_file(path = paste0(project_path, "MSHQ/Uploads"),
+                               text_cols = rep("character", 14))
 
 # Constants ------------------------------------------------------
 
@@ -201,9 +201,9 @@ if (answer == "CANCEL") {
 
 # max date of the previous zero files will be used to determine what the
 # min date is of the current upload and zero files
-prev_0_max_date_mshq <- max(mdy(mshq_zero$date.end))
+prev_0_max_date_mshq <- max(mdy(mshq_zero_old$date.end))
 
-prev_0_max_date_msbib <- max(mdy(msbib_zero$date.end))
+prev_0_max_date_msbib <- max(mdy(msbib_zero_old$date.end))
 
 # Data Pre-processing -----------------------------------------------------
 # Cleaning raw data and ensuring that all values are accounted for such as
@@ -216,37 +216,15 @@ prev_0_max_date_msbib <- max(mdy(msbib_zero$date.end))
 
 ## New Zero Upload ---------------------------------------------------------
 
-# made a subsection for the outline
-
-# 1. always need to wrap mdy() around the dates in these dataframes?
-# or change the date format on these dataframes all around?
-# if changing the format, wrap it into the previous upload portion of the 
-# recent_file() function
-# 2. do we want the hours and spend to remain character or change to number?
-# doesn't seem like it matters either way
-# 3. use apply or loop instead of doing the same thing 2x?
-# doesn't seem worth the effort at this time.
-# 4. update naming convention for dataframes?
-# where_what_which
-
-msbib_zero_new <- msbib_upload %>%
+msbib_zero_new <- msbib_upload_old %>%
   filter(mdy(date.start) > prev_0_max_date_msbib) %>%
   mutate(hours = "0",
          spend = "0")
 
-mshq_zero_new <- mshq_upload %>%
+mshq_zero_new <- mshq_upload_old %>%
   filter(mdy(date.start) > prev_0_max_date_mshq) %>%
   mutate(hours = "0",
          spend = "0")
-
-# proof, to be deleted after confirmation
-msbib_zero_new %>%
-  select(date.start, date.end, hours, spend) %>%
-  unique()
-mshq_zero_new %>%
-  select(date.start, date.end, hours, spend) %>%
-  unique()
-
 
 # Data Formatting ---------------------------------------------------------
 # How the data will look during the output of the script.
