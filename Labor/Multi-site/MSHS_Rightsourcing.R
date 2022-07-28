@@ -238,8 +238,12 @@ mshq_new_zero <- mshq_upload %>%
          spend = "0")
 
 # proof, to be deleted after confirmation
-unique(msbib_new_zero[, c(6:7, 13,14)])
-unique(mshq_new_zero[, c(6:7, 13,14)])
+msbib_new_zero %>%
+  select(date.start, date.end, hours, spend) %>%
+  unique()
+mshq_new_zero %>%
+  select(date.start, date.end, hours, spend) %>%
+  unique()
 
 
 # Data Formatting ---------------------------------------------------------
