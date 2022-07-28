@@ -207,7 +207,7 @@ prev_0_max_date_msbib <- max(mdy(msbib_zero$date.end))
 
 # Data Pre-processing -----------------------------------------------------
 # filter start and end dates to prep for upload date range
-df <- raw_data %>%
+processed_data <- raw_data %>%
   filter(mdy(Date.Worked) > min(c(prev_0_max_date_mshq,
                                   prev_0_max_date_msbib)),
          mdy(Date.Worked) <= distribution_date) %>%
