@@ -8,14 +8,14 @@ dir <- paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity",
               "/Volume - Data/Multisite Volumes/CSPD")
 
 #User inputs start and end dates for current period
-start_date <- as.Date("2022-01-30", format = "%Y-%m-%d")
-end_date <- as.Date("2022-02-26", format = "%Y-%m-%d")
+start_date <- as.Date("2022-05-22", format = "%Y-%m-%d")
+end_date <- as.Date("2022-07-02", format = "%Y-%m-%d")
 
 # Load Data & Dictionaries -------------------------------------------------
 #Pull in mapping file
 volume_mapping <- read_excel(paste0(dir,
                                 "/MSHS_Cost Center & Vol ID Mapping File.xlsx"),
-                             col_types = c(rep("text", 6)))
+                             col_types = c(rep("text", 7)))
 
 #Preprocessing-------------------------------------------------------------
 #Assigning sheet to the names of the excel sheets
@@ -88,7 +88,7 @@ CSPDdf1 <- CSPDdf %>%
          Budget = "0") %>%
   filter(`Start Date` >= start_date, `End Date` <= end_date) %>%
   left_join(volume_mapping,
-            by = c("Department ID" = "Cost Center")) %>%
+            by = c("Department ID" = "Old Cost Center")) %>%
   select(Health_System_ID, `Facility or Hospital ID`, `Department ID`,
          `Start Date`, `End Date`, `Vol ID`, Volume, Budget) %>%
   mutate(`Start Date` = as.character(`Start Date`, format = "%m/%d/%Y"),
