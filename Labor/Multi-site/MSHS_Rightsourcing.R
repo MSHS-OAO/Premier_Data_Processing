@@ -221,10 +221,12 @@ mshq_zero_new <- mshq_upload_old %>%
          spend = "0")
 
 ## Upload Preprocessing -------------------------------------------------------
+
 processed_data <- raw_data %>%
   filter(mdy(Date.Worked) > min(c(prev_0_max_date_mshq,
                                   prev_0_max_date_msbib)),
-         mdy(Date.Worked) <= distribution_date) %>%
+         mdy(Date.Worked) <= distribution_date,
+         Department.Billed != "") %>%
   mutate(cost_center_info = gsub('^.*:\\s*|\\s*\\*.*$', '',
                                  Department.Billed)) %>%
   mutate(wrkd_dept_leg = case_when(
@@ -242,19 +244,20 @@ processed_data <- raw_data %>%
     TRUE ~ cost_center_info
   ))
 
-proof <- processed_data %>%
-  select(cost_center_info, wrkd_dept_leg, home_dept_oracle) %>%
-  unique()
-
 row_count <- nrow(processed_data)
-test <- processed_data %>%
+processed_data <- processed_data %>%
   left_join(select(code_conversion, COST.CENTER.LEGACY, COST.CENTER.ORACLE), 
             by = c("wrkd_dept_leg" = "COST.CENTER.LEGACY")) %>%
   mutate(wrkd_dept_oracle = case_when(
     is.na(COST.CENTER.ORACLE) ~ home_dept_oracle,
     TRUE ~ COST.CENTER.ORACLE
   ))
-if (row_count != nrow(test)) {
+if (row_count != nrow(processed_data)) {
+  winDialog(
+    message = paste0("Error in code conversion mapping.",
+                     " Row count has been changed by left join"),
+    type = "ok"
+  )
   stop(paste0("Error in code conversion mapping.",
               " Row count has been changed by left join"))
 }
