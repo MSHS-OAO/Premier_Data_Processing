@@ -58,7 +58,8 @@ recent_file <- function(path, file_header = F, encoding = "",
                  header = file_header,
                  fileEncoding = encoding,
                  sep = delimeter,
-                 colClasses = text_cols)
+                 colClasses = text_cols,
+                 na.strings = c("","NA"))
 
   # need names on columns of previous month's files
   if (premier == TRUE) {
@@ -210,11 +211,13 @@ prev_0_max_date_msbib <- max(mdy(msbib_zero_old$date.end))
 
 ## New Zero Upload ---------------------------------------------------------
 
+# create zero upload for MSBIB
 msbib_zero_new <- msbib_upload_old %>%
   filter(mdy(date.start) > prev_0_max_date_msbib) %>%
   mutate(hours = "0",
          spend = "0")
 
+# create zero upload for MSHQ
 mshq_zero_new <- mshq_upload_old %>%
   filter(mdy(date.start) > prev_0_max_date_mshq) %>%
   mutate(hours = "0",
@@ -222,11 +225,15 @@ mshq_zero_new <- mshq_upload_old %>%
 
 ## Upload Preprocessing -------------------------------------------------------
 
+# filter raw data on date range needed for upload
 processed_data <- raw_data %>%
   filter(mdy(Date.Worked) > min(c(prev_0_max_date_mshq,
                                   prev_0_max_date_msbib)),
-         mdy(Date.Worked) <= distribution_date,
-         Department.Billed != "") %>%
+         mdy(Date.Worked) <= distribution_date) 
+
+# process department.billed to get oracle home and legacy worked department
+processed_data <- processed_data %>%
+  filter(Department.Billed != "") %>%
   mutate(cost_center_info = gsub('^.*:\\s*|\\s*\\*.*$', '',
                                  Department.Billed)) %>%
   mutate(wrkd_dept_leg = case_when(
@@ -244,6 +251,7 @@ processed_data <- raw_data %>%
     TRUE ~ cost_center_info
   ))
 
+# join legacy departments to oracle departments for premier format
 row_count <- nrow(processed_data)
 processed_data <- processed_data %>%
   left_join(select(code_conversion, COST.CENTER.LEGACY, COST.CENTER.ORACLE), 
@@ -252,6 +260,8 @@ processed_data <- processed_data %>%
     is.na(COST.CENTER.ORACLE) ~ home_dept_oracle,
     TRUE ~ COST.CENTER.ORACLE
   ))
+
+# quality check left join to make sure row count has not changed
 if (row_count != nrow(processed_data)) {
   winDialog(
     message = paste0("Error in code conversion mapping.",
@@ -261,6 +271,12 @@ if (row_count != nrow(processed_data)) {
   stop(paste0("Error in code conversion mapping.",
               " Row count has been changed by left join"))
 }
+
+# process job titles to allow for job code mapping
+processed_data <- processed_data %>%
+  mutate(Job.Title = replace_na(Job.Title, "Unknown"),
+         Job.Title = paste("Rightsourcing", Job.Title))
+
 
 
 # Data Formatting ---------------------------------------------------------
