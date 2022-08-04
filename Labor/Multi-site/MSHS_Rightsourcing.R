@@ -278,6 +278,21 @@ processed_data <- processed_data %>%
          Job.Title = paste("Rightsourcing", Job.Title))
 
 
+# join existing job codes
+row_count <- nrow(processed_data)
+processed_data <- processed_data %>%
+  left_join(jobcode_list) 
+
+# quality check left join to make sure row count has not changed
+if (row_count != nrow(processed_data)) {
+  winDialog(
+    message = paste0("Error in job code mapping.",
+                     " Row count has been changed by left join"),
+    type = "ok"
+  )
+  stop(paste0("Error in job code mapping.",
+              " Row count has been changed by left join"))
+}
 
 # Data Formatting ---------------------------------------------------------
 # How the data will look during the output of the script.
