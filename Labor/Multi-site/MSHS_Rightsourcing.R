@@ -135,6 +135,8 @@ if (length(col_check$Column) > 0) {
     ),
     type = "okcancel"
   )
+} else {
+  col_check_stop <- "OK"
 }
 
 if (col_check_stop == "CANCEL") {
@@ -249,6 +251,11 @@ processed_data <- processed_data %>%
     nchar(cost_center_info) == 12 ~ "101010101010101",
     nchar(cost_center_info) == 30 ~ "900000040490000",
     TRUE ~ cost_center_info
+  )) %>%
+  mutate(hospital = case_when(
+    nchar(cost_center_info) == 12 ~ "NY0014",
+    nchar(cost_center_info) == 30 ~ "630571",
+    TRUE ~ cost_center_info
   ))
 
 # join legacy departments to oracle departments for premier format
@@ -272,11 +279,31 @@ if (row_count != nrow(processed_data)) {
               " Row count has been changed by left join"))
 }
 
+
+## Job Code Handling -----------------------------------------------------
+
 # process job titles to allow for job code mapping
 processed_data <- processed_data %>%
   mutate(Job.Title = replace_na(Job.Title, "Unknown"),
          Job.Title = paste("Rightsourcing", Job.Title))
 
+
+# new job titles need a Rightsourcing Job Code created
+jc_new <- processed_data %>%
+  filter(!(Job.Title %in% jobcode_list$Job.Title)) %>%
+  select(Job.Title) %>%
+  distinct() %>%
+  mutate(jobcode = row_number()) %>%
+  mutate(jobcode = jobcode + length(jobcode_list$jobcode)) %>%
+  mutate(jobcode = stringr::str_pad(jobcode, 5, side = "left", pad = "0")) %>%
+  mutate(jobcode = paste0("R", jobcode))
+
+jobcode_list_new <- rbind(jobcode_list, jc_new)
+
+# need QC check for length of jobcode_list_new?
+# need an if statement to only create jobcode_list_new if jc_new is not 
+#  0 observations or NULL?
+# need to skip writing jobcode_list_new if there are no new jobcodes?
 
 # join existing job codes
 row_count <- nrow(processed_data)
@@ -293,6 +320,15 @@ if (row_count != nrow(processed_data)) {
   stop(paste0("Error in job code mapping.",
               " Row count has been changed by left join"))
 }
+
+jc_dict_upload <- processed_data %>%
+  select(hospital, wrkd_dept_oracle, jobcode, Job.Title) %>%
+  mutate(System = "729805") %>%
+  relocate(System, .before = hospital)
+# this may need to be separated into each site's upload file
+
+
+
 
 # Data Formatting ---------------------------------------------------------
 # How the data will look during the output of the script.
