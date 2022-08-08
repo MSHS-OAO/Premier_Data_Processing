@@ -279,7 +279,6 @@ if (row_count != nrow(processed_data)) {
               " Row count has been changed by left join"))
 }
 
-
 ## Job Code Handling -----------------------------------------------------
 
 # process job titles to allow for job code mapping
@@ -323,11 +322,49 @@ if (row_count != nrow(processed_data)) {
 
 jc_dict_upload <- processed_data %>%
   select(hospital, wrkd_dept_oracle, jobcode, Job.Title) %>%
-  mutate(System = "729805") %>%
-  relocate(System, .before = hospital)
+  mutate(system = "729805") %>%
+  relocate(system, .before = hospital)
 # this may need to be separated into each site's upload file
+# this could also be moved to be created later
 
 
+## Summarizing Hours and Expenses-------------------------------------------
+
+# all types of daily hours need to be summed up
+processed_data <- processed_data %>%
+  mutate(
+    Regular.Hours = case_when(
+      is.na(Regular.Hours) ~ 0,
+      TRUE ~ Regular.Hours),
+    OT.Hours = case_when(
+      is.na(OT.Hours) ~ 0,
+      TRUE ~ OT.Hours),
+    Holiday.Hours = case_when(
+      is.na(Holiday.Hours) ~ 0,
+      TRUE ~ Holiday.Hours),
+    Call.Back.Hours = case_when(
+      is.na(Call.Back.Hours) ~ 0,
+      TRUE ~ as.numeric(Call.Back.Hours))
+  ) %>%
+  mutate(worked_hours =
+           Regular.Hours + OT.Hours + Holiday.Hours + Call.Back.Hours)
+# is there a more efficient way of getting blank values with a 0 instead of NA?
+
+# Day Spend needs to be in numerical decimal format to summarize with it
+processed_data <- processed_data %>%
+  mutate(Day.Spend.char = Day.Spend,
+         Day.Spend = as.numeric(stringr::str_trim(gsub("[$,]", "", Day.Spend))))
+
+# need to summarize data
+rolled_up <- processed_data %>%
+  group_by(hospital, home_dept_oracle,  wrkd_dept_oracle, Earnings.E.D,
+           Worker.Name, jobcode) %>%
+  summarize(across(c(worked_hours, Day.Spend), sum, na.rm = T)) %>%
+  mutate(week_hours = worked_hours,
+         week_spend = Day.Spend)
+# needs to be checked for accuracy
+# calculation also seems to take time, if we filter down before summarizing
+#  (like by date), then this could be made faster
 
 
 # Data Formatting ---------------------------------------------------------
