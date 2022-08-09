@@ -59,7 +59,7 @@ recent_file <- function(path, file_header = F, encoding = "",
                  fileEncoding = encoding,
                  sep = delimeter,
                  colClasses = text_cols,
-                 na.strings = c("","NA"))
+                 na.strings = c("", "NA"))
 
   # need names on columns of previous month's files
   if (premier == TRUE) {
@@ -73,7 +73,7 @@ recent_file <- function(path, file_header = F, encoding = "",
 
   colnames(df) <- prem_upload_col_names
   }
-  
+
   return(df)
 }
 
@@ -231,12 +231,12 @@ mshq_zero_new <- mshq_upload_old %>%
 processed_data <- raw_data %>%
   filter(mdy(Date.Worked) > min(c(prev_0_max_date_mshq,
                                   prev_0_max_date_msbib)),
-         mdy(Date.Worked) <= distribution_date) 
+         mdy(Date.Worked) <= distribution_date)
 
 # process department.billed to get oracle home and legacy worked department
 processed_data <- processed_data %>%
   filter(Department.Billed != "") %>%
-  mutate(cost_center_info = gsub('^.*:\\s*|\\s*\\*.*$', '',
+  mutate(cost_center_info = gsub("^.*:\\s*|\\s*\\*.*$", "", # there are values that have another colon and this gsub doesn't work properly
                                  Department.Billed)) %>%
   mutate(wrkd_dept_leg = case_when(
     nchar(cost_center_info) == 12 ~ substr(cost_center_info, 1, 8),
@@ -261,7 +261,7 @@ processed_data <- processed_data %>%
 # join legacy departments to oracle departments for premier format
 row_count <- nrow(processed_data)
 processed_data <- processed_data %>%
-  left_join(select(code_conversion, COST.CENTER.LEGACY, COST.CENTER.ORACLE), 
+  left_join(select(code_conversion, COST.CENTER.LEGACY, COST.CENTER.ORACLE),
             by = c("wrkd_dept_leg" = "COST.CENTER.LEGACY")) %>%
   mutate(wrkd_dept_oracle = case_when(
     is.na(COST.CENTER.ORACLE) ~ home_dept_oracle,
@@ -300,14 +300,14 @@ jc_new <- processed_data %>%
 jobcode_list_new <- rbind(jobcode_list, jc_new)
 
 # need QC check for length of jobcode_list_new?
-# need an if statement to only create jobcode_list_new if jc_new is not 
+# need an if statement to only create jobcode_list_new if jc_new is not
 #  0 observations or NULL?
 # need to skip writing jobcode_list_new if there are no new jobcodes?
 
 # join existing job codes
 row_count <- nrow(processed_data)
 processed_data <- processed_data %>%
-  left_join(jobcode_list) 
+  left_join(jobcode_list_new)
 
 # quality check left join to make sure row count has not changed
 if (row_count != nrow(processed_data)) {
@@ -323,14 +323,17 @@ if (row_count != nrow(processed_data)) {
 jc_dict_upload <- processed_data %>%
   select(hospital, wrkd_dept_oracle, jobcode, Job.Title) %>%
   mutate(system = "729805") %>%
-  relocate(system, .before = hospital)
+  relocate(system, .before = hospital) %>%
+  filter(jobcode %in% jc_new$jobcode)
 # this may need to be separated into each site's upload file
 # this could also be moved to be created later
 
 
 ## Summarizing Hours and Expenses-------------------------------------------
 
-# all types of daily hours need to be summed up
+# all daily hours need to be summed up
+
+# NA values must be replaced with 0 or math will result in NA
 processed_data <- processed_data %>%
   mutate(
     Regular.Hours = case_when(
@@ -350,21 +353,24 @@ processed_data <- processed_data %>%
            Regular.Hours + OT.Hours + Holiday.Hours + Call.Back.Hours)
 # is there a more efficient way of getting blank values with a 0 instead of NA?
 
-# Day Spend needs to be in numerical decimal format to summarize with it
+# Day Spend needs to be in numerical decimal format to summarize it
 processed_data <- processed_data %>%
-  mutate(Day.Spend.char = Day.Spend,
-         Day.Spend = as.numeric(stringr::str_trim(gsub("[$,]", "", Day.Spend))))
+  mutate(
+    Day.Spend.char = Day.Spend,
+    Day.Spend = as.numeric(stringr::str_trim(gsub("[$,]", "", Day.Spend)))
+  )
 
 # need to summarize data
 rolled_up <- processed_data %>%
   group_by(hospital, home_dept_oracle,  wrkd_dept_oracle, Earnings.E.D,
            Worker.Name, jobcode) %>%
   summarize(across(c(worked_hours, Day.Spend), sum, na.rm = T)) %>%
-  mutate(week_hours = worked_hours,
+  rename(week_hours = worked_hours,
          week_spend = Day.Spend)
 # needs to be checked for accuracy
 # calculation also seems to take time, if we filter down before summarizing
 #  (like by date), then this could be made faster
+# and there are results that have blank hospital, home dept, and worked dept
 
 
 # Data Formatting ---------------------------------------------------------
