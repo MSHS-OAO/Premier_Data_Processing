@@ -236,8 +236,22 @@ processed_data <- raw_data %>%
 # process department.billed to get oracle home and legacy worked department
 processed_data <- processed_data %>%
   filter(Department.Billed != "") %>%
-  mutate(cost_center_info = gsub("^.*:\\s*|\\s*\\*.*$", "", # there are values that have another colon and this gsub doesn't work properly
-                                 Department.Billed)) %>%
+  # there are values that have another colon and the gsub regular expression
+  #  doesn't work properly
+  # mutate(cost_center_info = gsub("^.*:\\s*|\\s*\\*.*$", "",
+  #                                Department.Billed)) %>%
+  mutate(cost_center_info =
+           stringr::str_sub(
+             Department.Billed,
+             nchar("Department:") + 1, -1
+           )
+  ) %>%
+  mutate(cost_center_info =
+           stringr::str_sub(
+             cost_center_info,
+             1, stringr::str_locate(cost_center_info, "\\*")[, 1] - 1
+           )
+  )%>%
   mutate(wrkd_dept_leg = case_when(
     nchar(cost_center_info) == 12 ~ substr(cost_center_info, 1, 8),
     nchar(cost_center_info) == 30 ~ str_c(substr(cost_center_info, 1, 4),
