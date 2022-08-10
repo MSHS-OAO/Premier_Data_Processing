@@ -251,7 +251,7 @@ processed_data <- processed_data %>%
              cost_center_info,
              1, stringr::str_locate(cost_center_info, "\\*")[, 1] - 1
            )
-  )%>%
+  ) %>%
   mutate(wrkd_dept_leg = case_when(
     nchar(cost_center_info) == 12 ~ substr(cost_center_info, 1, 8),
     nchar(cost_center_info) == 30 ~ str_c(substr(cost_center_info, 1, 4),
@@ -292,6 +292,16 @@ if (row_count != nrow(processed_data)) {
   stop(paste0("Error in code conversion mapping.",
               " Row count has been changed by left join"))
 }
+
+cc_map_fail <- processed_data %>%
+  select(wrkd_dept_leg, Department.Billed) %>%
+  filter(!(wrkd_dept_leg %in% code_conversion$COST.CENTER.LEGACY)) %>%
+  distinct() %>%
+  mutate(Department.Billed =
+           stringr::str_sub(
+             Department.Billed,
+    stringr::str_locate(Department.Billed, "\\*")[, 1] + 1, -1
+  ))
 
 ## Job Code Handling -----------------------------------------------------
 
