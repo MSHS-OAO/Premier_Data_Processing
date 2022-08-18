@@ -208,6 +208,7 @@ if (answer == "CANCEL") {
 prev_0_max_date_mshq <- max(mdy(mshq_zero_old$date.end))
 
 prev_0_max_date_msbib <- max(mdy(msbib_zero_old$date.end))
+# should we compare these to make sure we have all files needed?
 
 # Data Pre-processing -----------------------------------------------------
 
@@ -236,10 +237,6 @@ processed_data <- raw_data %>%
 # process department.billed to get oracle home and legacy worked department
 processed_data <- processed_data %>%
   filter(Department.Billed != "") %>%
-  # there are values that have another colon and the gsub regular expression
-  #  doesn't work properly
-  # mutate(cost_center_info = gsub("^.*:\\s*|\\s*\\*.*$", "",
-  #                                Department.Billed)) %>%
   mutate(cost_center_info =
            stringr::str_sub(
              Department.Billed,
@@ -348,10 +345,9 @@ jc_dict_upload <- processed_data %>%
   select(hospital, wrkd_dept_oracle, jobcode, Job.Title) %>%
   mutate(system = "729805") %>%
   relocate(system, .before = hospital) %>%
-  filter(jobcode %in% jc_new$jobcode)
+  distinct()
 # this may need to be separated into each site's upload file
 # this could also be moved to be created later
-
 
 ## Summarizing Hours and Expenses-------------------------------------------
 
@@ -359,23 +355,10 @@ jc_dict_upload <- processed_data %>%
 
 # NA values must be replaced with 0 or math will result in NA
 processed_data <- processed_data %>%
-  mutate(
-    Regular.Hours = case_when(
-      is.na(Regular.Hours) ~ 0,
-      TRUE ~ Regular.Hours),
-    OT.Hours = case_when(
-      is.na(OT.Hours) ~ 0,
-      TRUE ~ OT.Hours),
-    Holiday.Hours = case_when(
-      is.na(Holiday.Hours) ~ 0,
-      TRUE ~ Holiday.Hours),
-    Call.Back.Hours = case_when(
-      is.na(Call.Back.Hours) ~ 0,
-      TRUE ~ as.numeric(Call.Back.Hours))
-  ) %>%
-  mutate(worked_hours =
-           Regular.Hours + OT.Hours + Holiday.Hours + Call.Back.Hours)
-# is there a more efficient way of getting blank values with a 0 instead of NA?
+  rowwise() %>%
+  mutate(daily_hours =
+           sum(Regular.Hours, OT.Hours, Holiday.Hours, Call.Back.Hours,
+               na.rm = T))
 
 # Day Spend needs to be in numerical decimal format to summarize it
 processed_data <- processed_data %>%
@@ -388,14 +371,10 @@ processed_data <- processed_data %>%
 rolled_up <- processed_data %>%
   group_by(hospital, home_dept_oracle,  wrkd_dept_oracle, Earnings.E.D,
            Worker.Name, jobcode) %>%
-  summarize(across(c(worked_hours, Day.Spend), sum, na.rm = T)) %>%
-  rename(week_hours = worked_hours,
+  summarize(across(c(daily_hours, Day.Spend), sum, na.rm = T)) %>%
+  rename(week_hours = daily_hours,
          week_spend = Day.Spend)
 # needs to be checked for accuracy
-# calculation also seems to take time, if we filter down before summarizing
-#  (like by date), then this could be made faster
-# and there are results that have blank hospital, home dept, and worked dept
-
 
 # Data Formatting ---------------------------------------------------------
 # How the data will look during the output of the script.
