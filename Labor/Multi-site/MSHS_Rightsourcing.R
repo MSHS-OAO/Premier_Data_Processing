@@ -377,10 +377,21 @@ rolled_up <- processed_data %>%
 # needs to be checked for accuracy
 
 # Data Formatting ---------------------------------------------------------
-# How the data will look during the output of the script.
-# For example, if you have a data table that needs the numbers to show up as
-# green or red depending on whether they meet a certain threshold.
 
+upload_new <- rolled_up %>%
+  mutate(partner = "729805", .before = hospital) %>%
+  mutate(hospital_worked = hospital, .before = wrkd_dept_oracle) %>%
+  mutate(start_date = format(mdy(Earnings.E.D) - 6, format = "%m/%d/%Y"), 
+         .before = Earnings.E.D) %>%
+  mutate(employee_id = paste0(
+    substr(trimws(sub(".*,", "", Worker.Name)), 1, 12),
+    substr(gsub("\\..*","", week_hours), 1, 3)),
+    .before = Worker.Name) %>%
+  mutate(Worker.Name = substr(Worker.Name, 1, 30)) %>%
+  mutate(approved_hours = "0", .before = jobcode) %>%
+  mutate(paycode = "AG1", .before = week_hours) %>%
+  mutate(week_hours = round(week_hours, digits = 2),
+         week_spend = round(week_spend, digits = 2))
 
 # Quality Checks ----------------------------------------------------------
 # Checks that are performed on the output to confirm data consistency and
