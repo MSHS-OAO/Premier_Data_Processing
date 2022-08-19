@@ -23,20 +23,30 @@ dict_pay_cycles <- read_xlsx(
     "Mapping/MSHS_Pay_Cycle.xlsx"
   ),
   col_types = c("date", "date", "date", "skip")
+  # bringing in the date as "text" results in the excel number representation
+  # of a date
 )
-dict_pay_cycles$DATE <- as.Date(dict_pay_cycles$DATE)
-dict_pay_cycles$START.DATE <-
-  as.Date(dict_pay_cycles$START.DATE)
-dict_pay_cycles$END.DATE <-
-  as.Date(dict_pay_cycles$END.DATE)
+
+# dates originally come in as POSIXct, so they're being converted to Date
+dict_pay_cycles <- dict_pay_cycles %>%
+  mutate(DATE = as.Date(DATE),
+         START.DATE = as.Date(START.DATE),
+         END.DATE = as.Date(END.DATE))
+# %>% mutate(DATE = format(DATE, "%m/%d/%Y"))
+# if we want the text format of the dictionary we can add this last format line
+  
 
 ## Dictionary ------------------------------------------------------------
+
+# improvement: create a single dictionary to import
+
 path_dict_Prem_vol <-
   choose.files(
     default = default_folder,
     caption = "Select DUS Main Dictionary",
     multi = F
   )
+
 dict_Prem_vol <-
   read_xlsx(
     path_dict_Prem_vol,
@@ -63,44 +73,48 @@ dict_EPIC <-
     by.x = "Volume ID",
     by.y = "Volume ID"
   )
+
+# path_dict_Prem <- choose.files(
+#     default = default_folder,
+#     caption = "Select DUS Main Dictionary",
+#     multi = F
+#   )
+# 
+# dict_EPIC2 <- read_xlsx(
+#     path_dict_Prem,
+#     sheet = 1,
+#     skip = 0
+#   )
+# 
+# dict_EPIC2 <- dict_EPIC2 %>%
+#   select(`Epic Department Name`,
+#          `Volume ID`,
+#          `Cost Center`)
+
 # Departments to Remove
 remove_departments_Epic <- dict_Epic_dept_VolID %>%
   filter(`Volume ID` %in% c("X", "TBD")) %>%
   select(Department)
 
 # Importing Epic Data -----------------------------------------------------
-list_path_data_Epic <-
-  as.list(choose.files(
-    default = default_folder,
-    caption = "Select Epic file(s)",
-    multi = T
-  ))
-list_data_Epic <-
-  lapply(list_path_data_Epic, function(x) {
-    read_xlsx(path = x, sheet = 1, skip = 1)
-  })
+path_data_Epic <- choose.files(default = default_folder,
+                               caption = "Select Epic file",
+                               multi = F
+                               )
+
+data_Epic <- read_xlsx(path = path_data_Epic, sheet = 1, skip = 1)
+# improve this segment by identifying the proper number of rows to skip
+# compare column names with the previous upload?  Or compare with the
+#  minimum columns needed?
 
 # Pre Processing Epic Data ------------------------------------------------
-merge_multiple_dataframes <- function(list.dfs) {
-  if (length(list.dfs) == 1) {
-    return(as.data.frame(list.dfs[1]))
-  }
-  output <- list.dfs[1]
-  for (i in 2:length(list.dfs)) {
-    output <-
-      merge.data.frame(output, list.dfs[i], all.x = T, all.y = T)
-  }
-  return(output)
-}
-data_Epic <- merge_multiple_dataframes(list_data_Epic)
-
-
 
 ## Date Formatting ---------------------------------------------------------
 
 
 # insert if statements to modify date/time columns based on the
 # input data format
+# use tidyverse and lubridate to handle the time/date??
 
 data_Epic$`Appt Date` <-
   unname(sapply(
@@ -110,7 +124,7 @@ data_Epic$`Appt Date` <-
     }
   )) # separating the Appt Time into Appt Date
 data_Epic$`Appt Date` <-
-  as.Date(data_Epic$`Appt Date`, tryFormats = "%m/%d/%Y")
+  as.Date(data_Epic$`Appt Time`, tryFormats = "%m/%d/%Y")
 data_Epic$Appt.Time <-
   paste(unname(sapply(
     data_Epic$Appt.Time,
@@ -149,8 +163,15 @@ data_Epic <-
 new_dept <- data_Epic %>%
   filter(!(Department %in% dict_EPIC$Department)) %>%
   select(Department) %>%
-  unique() %>%
-  sort()
+  unique() # %>%
+  # sort() # some issue with sorting the data frame
+
+# improvement: remove the Rehab off-site from this list,
+#  compare this with the list of remove depts,
+#  add the depts that have previously been in data to the dict
+#  so they no longer show up on the list,
+#  consider where this filtering is best positioned
+
 
 # if(length(unique(new_dept$Department)) > 0) {
 #   new_dept_stop <- winDialog(
@@ -171,7 +192,10 @@ new_dept <- data_Epic %>%
 
 # Removing Departments
 data_Epic_merge <- data_Epic %>%
-  filter(!(Department %in% remove_departments_Epic))
+  filter(!(Department %in% remove_departments_Epic$Department))
+
+data_Epic_remove <- data_Epic %>%
+  filter(Department %in% remove_departments_Epic$Department)
 
 # remove dates if user chooses
 # Epic
@@ -191,6 +215,11 @@ if (remove_dates_Epic != "None" | is.na(remove_dates_Epic)) {
   data_Epic_merge <- data_Epic_merge %>%
     filter(!(`Appt Date` %in% remove_dates_Epic))
 } # remove dates if user chooses
+# data has always been provided in the requested date range
+# filter the data based on report distribution if determined.
+# do this at the beginning of the script
+# identify the min date and max date of the data
+
 
 data_Epic_merge <- data_Epic_merge %>%
   rename(
@@ -225,9 +254,11 @@ if (length(remove_NA_CC$`Cost Center`) != 0) {
   data_visits <- data_visits %>%
     filter(!(`Cost Center` %in% remove_NA_CC$`Cost Center`))
 }
+# remove this data sooner in order to have meaningful summarization data
 
 ## Rehab off-site prep -----------------------------------------------------
 
+### Constants --------------------------------------------------------------
 rehab_offs_ratio <- 0.34
 rehab_offs_docs <- c("SPINNER, DAVID A", "CHANG, RICHARD G")
 rehab_offs_dept <- c(
@@ -237,6 +268,7 @@ rehab_offs_dept <- c(
 rehab_offs_cc <- "407000040421109"
 rehab_offs_vol_id <- "407404211092"
 
+### Processing ------------------------------------------------------------
 data_rehab_offs <- data_Epic %>%
   filter(
     Provider %in% rehab_offs_docs,
@@ -268,6 +300,7 @@ data_rehab_offs$Volume <-
 colnames(data_rehab_offs) <-
   c("Cost Center", "Start Date", "End Date", "Volume ID", "Volume")
 
+### Combining with Visits data --------------------------------------------
 data_visits <- rbind(data_visits, data_rehab_offs)
 
 # Creating Premier Upload -------------------------------------------------
@@ -327,12 +360,16 @@ data_visits$`End Date` <- format(data_visits$`End Date`, "%m/%d/%Y")
 data_visits$Volume <- round(data_visits$Volume, 0)
 
 ## Endo Special Roll-up prep -----------------------------------------------
+# this has to occur after the summarization because of the additional
+# roll-up tha thas to occur
 
+### Constants --------------------------------------------------------------
 endo_ru_cc <- "401000040412828"
 endo_ru_vol_id <- "401404128281"
 
 endo_ind_vol_id <- c("401404128282", "401404128283", "414403128371")
 
+### Processing -------------------------------------------------------------
 data_endo_ru <- data_visits %>%
   filter(`Volume ID` %in% endo_ind_vol_id)
 
@@ -362,6 +399,7 @@ data_endo_ru <- data_endo_ru %>%
     `Budget`
   )
 
+### Combining with Visits data --------------------------------------------
 data_visits <- rbind(data_visits, data_endo_ru)
 
 
@@ -405,6 +443,7 @@ if(length(unique(zero_rows$`Volume ID`)) > 0) {
                                    collapse = "; ")))
 }
 
+### Combining with Visits data --------------------------------------------
 data_visits <- rbind(data_visits, zero_rows)
 
 # Exporting Premier Upload File -------------------------------------------
