@@ -104,6 +104,9 @@ data_raw <- read_xlsx(path = path_data_Epic, sheet = 1, skip = 1)
 # compare column names with the previous upload?  Or compare with the
 #  minimum columns needed?
 
+data_raw <- data_raw %>%
+  select(Department, Provider, `Appt Time`, `Epic Department ID`)
+
 # Pre Processing Epic Data ------------------------------------------------
 
 ## Date Formatting ---------------------------------------------------------
