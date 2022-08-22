@@ -378,13 +378,14 @@ rolled_up <- processed_data %>%
 
 # Data Formatting ---------------------------------------------------------
 
+# upload needs to be formatted for premier upload criteria
 upload_new <- rolled_up %>%
   mutate(partner = "729805", .before = hospital) %>%
   mutate(hospital_worked = hospital, .before = wrkd_dept_oracle) %>%
   mutate(start_date = format(mdy(Earnings.E.D) - 6, format = "%m/%d/%Y"), 
          .before = Earnings.E.D) %>%
   mutate(employee_id = paste0(
-    substr(trimws(sub(".*,", "", Worker.Name)), 1, 12),
+    substr(trimws(sub(",.*", "", Worker.Name)), 1, 12),
     substr(gsub("\\..*","", week_hours), 1, 3)),
     .before = Worker.Name) %>%
   mutate(Worker.Name = substr(Worker.Name, 1, 30)) %>%
@@ -407,7 +408,57 @@ upload_new <- rolled_up %>%
 # check.
 
 # File Saving -------------------------------------------------------------
-# Writing files or data for storage
 
+if (sites == "MSHS"| sites == "MSHQ") {
+  # save MSHQ upload
+  write.table(filter(upload_new, hospital == "NY0014"), 
+              paste0(project_path, 
+                     "MSHQ/Uploads/MSHQ_Rightsourcing_",
+                     min(mdy(upload_new$start_date)), "_",
+                     max(mdy(upload_new$Earnings.E.D)), ".csv"),
+              row.names = F, col.names = F, sep = ",")
+  
+  # save MSHQ zero file
+  write.table(mshq_zero_new, paste0(project_path, 
+                                    "MSHQ/Zero/MSHQ_Rightsourcing Zero_",
+                                    min(mdy(mshq_zero_new$date.start)), "_",
+                                    max(mdy(mshq_zero_new$date.end)), ".csv"),
+              row.names = F, col.names = F, sep = ",")
+} 
+
+if (sites == "MSHS" | sites == "MSBIB") {
+  # save MSBIB upload
+  write.table(filter(upload_new, hospital == "630571"), 
+              paste0(project_path, 
+                     "MSBIB/Uploads/MSBIB_Rightsourcing_",
+                     min(mdy(upload_new$start_date)), "_",
+                     max(mdy(upload_new$Earnings.E.D)), ".csv"),
+              row.names = F, col.names = F, sep = ",")
+  
+  # save MSBIB zero file
+  write.table(mshq_zero_new, paste0(project_path, 
+                                    "MSBIB/Zero/MSBIB_Rightsourcing Zero_",
+                                    min(mdy(msbib_zero_new$date.start)), "_",
+                                    max(mdy(msbib_zero_new$date.end)), ".csv"),
+              row.names = F, col.names = F, sep = ",")
+}
+
+# overwrite job code list
+write.table(jobcode_list_new, paste0(project_path, "Rightsource Job Code.csv"),
+            row.names = F, sep = ",")
+
+# save jobcode dictionary upload
+write.table(jc_dict_upload, paste0(project_path, "Jobcode Dictionary/",
+                                   "MSHS_Jobcode Dictionary_",
+                                   max(mdy(upload_new$Earnings.E.D)),
+                                   ".csv"),
+            row.names = F, col.names = F, sep = ",")
+
+# save unmapped cost center list
+write.table(cc_map_fail, paste0(project_path, "Failed Cost Center Mappings/",
+                                "MSHS_Failed Cost Center Mappings_",
+                                max(mdy(upload_new$Earnings.E.D)),
+                                ".csv"),
+            row.names = F, sep = ",")
 
 # Script End --------------------------------------------------------------
