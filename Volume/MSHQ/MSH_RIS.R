@@ -8,7 +8,7 @@ RIS_dir <- paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
                   "Productivity/Volume - Data/MSH Data/RIS/")
 
 #month and year of charge detail
-month_year <- "FEB2022"
+month_year <- "MAY2022"
 #Diagnostic OR scaling factor
 diagnostic_scaling <- 2.69
 
@@ -139,8 +139,8 @@ neuro <- RIS_neuro %>%
          Hosp = "NY0014",
          DepID = "MSHRIS21050",
          Start = paste0(
-           substr(Date, 6, 7),
-           substr(Date, 9, 10),
+           substr(Date, 6, 7), "/",
+           substr(Date, 9, 10), "/",
            substr(Date, 1, 4))) %>%
   mutate(End = Start) %>%
   #select column order for upload

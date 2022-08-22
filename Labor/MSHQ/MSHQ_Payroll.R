@@ -1,6 +1,6 @@
-#MSHQ Payroll
+### MSHQ Payroll---------------------------------------------------------------
 
-##Libraries and Functions######################################################
+## Libraries and Functions-----------------------------------------------------
 library(dplyr)
 library(tidyr)
 library(lubridate)
@@ -27,28 +27,24 @@ labor <- function(start,end){
            !is.na(Job.Code))
   #format paycode, employee name, Department names, and home department ID
   df <- left_join(df,paycode,by=c("Pay.Code"="RAW.PAY.CODE"))
-  if(nrow(filter(df, is.na(PAY.CODE))) == 0){
-    df <- df %>%
-      mutate(Pay.Code = PAY.CODE,
-             PAY.CODE = NULL,
-             Employee.Name = substr(Employee.Name,1,30),
-             Department.Name.Worked.Dept = substr(Department.Name.Worked.Dept,
-                                                  1,50),
-             Department.Name.Home.Dept = substr(Department.Name.Home.Dept,
+  new_paycodes <- df %>% filter(is.na(PAY.CODE))
+  if(nrow(filter(df, is.na(PAY.CODE))) != 0) stop("New Paycode(s). Check df for new paycode(s)")
+  df <- df %>%
+    mutate(Pay.Code = PAY.CODE,
+           PAY.CODE = NULL,
+           Employee.Name = substr(Employee.Name,1,30),
+           Department.Name.Worked.Dept = substr(Department.Name.Worked.Dept,
                                                 1,50),
-             Department.ID.Home.Department = paste0(substr(Full.COA.for.Home,
-                                                           1,3),
-                                                    substr(Full.COA.for.Home,
-                                                           41,44),
-                                                    substr(Full.COA.for.Home,
-                                                           5,7),
-                                                    substr(Full.COA.for.Home,
-                                                           12,16)))
-  } else {
-    new_paycodes <- df %>% filter(is.na(PAY.CODE))
-    return(new_paycodes)
-    stop("New Paycode(s). Check df for new paycode(s)")
-  }
+           Department.Name.Home.Dept = substr(Department.Name.Home.Dept,
+                                              1,50),
+           Department.ID.Home.Department = paste0(substr(Full.COA.for.Home,
+                                                         1,3),
+                                                  substr(Full.COA.for.Home,
+                                                         41,44),
+                                                  substr(Full.COA.for.Home,
+                                                         5,7),
+                                                  substr(Full.COA.for.Home,
+                                                         12,16)))
   return(df)
 }
 #Create JCdict and find new job codes
@@ -279,11 +275,11 @@ save_payroll <- function(start,end){
                                substr(end,4,5),mon,substr(end,7,11),".csv"),
               sep=",",row.names = F,col.names = T)
 }
-###############################################################################
 
+## Function Execution --------------------------------------------------------
 #Enter start and end date needed for payroll upload
-start <- "03/27/2022" 
-end <- "04/23/2022"
+start <- "05/22/2022" 
+end <- "07/02/2022"
 df <- labor(start,end)
 #If you need to update jobcode list for new jobcodes leave R and do that in excel
 #"J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Useful Tools & Templates/Job Code Mappings/MSH MSQ Position Mappings.xlsx"

@@ -11,7 +11,7 @@ rev_map <- read_excel("J:\\deans\\Presidents\\SixSigma\\MSHS Productivity\\Produ
   distinct()
 #Bring in CPT reference table
 #For months: January,April,July,October there is a new cpt_ref to download
-cpt_ref <- read_excel("J:\\deans\\Presidents\\SixSigma\\MSHS Productivity\\Productivity\\Volume - Data\\MSH Data\\Charges\\CPT Reference\\CPT_Ref.xlsx") %>%
+cpt_ref <- read_excel("J:\\deans\\Presidents\\SixSigma\\MSHS Productivity\\Productivity\\Volume - Data\\MSH Data\\RIS\\Mapping\\CPT_Ref.xlsx") %>%
   select(1,2,3,6,11,12)
 
 #Prepares file for master
@@ -119,7 +119,7 @@ names(mylist)
 #Enter Year of data
 Year <- "2022"
 #Execute functions
-MSHQ <- charges(MSH = mylist[[2]],MSQ = mylist[[1]])
+MSHQ <- charges(MSH = mylist[[4]],MSQ = mylist[[3]])
 #Create master and master trend
 master()
 #Review master trend

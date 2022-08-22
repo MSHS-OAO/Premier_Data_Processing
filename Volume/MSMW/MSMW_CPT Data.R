@@ -6,8 +6,8 @@ library(stringi)
 library(xlsx)
 
 # Constants ---------------------------------------------------------------
-start_date <- as.Date('2022-01-30')
-end_date <- as.Date('2022-02-26')
+start_date <- as.Date('2022-04-24')
+end_date <- as.Date('2022-05-21')
 dir_files <- paste0('J:/deans/Presidents/SixSigma/MSHS Productivity',
                     '/Productivity/Volume - Data/MSLW Data/Both Sites Data',
                     '/Charge Detail/Source Data')
