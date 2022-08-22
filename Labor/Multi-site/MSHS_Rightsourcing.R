@@ -238,17 +238,10 @@ processed_data <- raw_data %>%
 processed_data <- processed_data %>%
   filter(Department.Billed != "") %>%
   mutate(cost_center_info =
-           stringr::str_sub(
-             Department.Billed,
-             nchar("Department:") + 1, -1
-           )
-  ) %>%
+           str_sub(Department.Billed, nchar("Department:") + 1, -1)) %>%
   mutate(cost_center_info =
-           stringr::str_sub(
-             cost_center_info,
-             1, stringr::str_locate(cost_center_info, "\\*")[, 1] - 1
-           )
-  ) %>%
+           str_sub(cost_center_info, 1,
+                   str_locate(cost_center_info, "\\*")[, 1] - 1)) %>%
   mutate(wrkd_dept_leg = case_when(
     nchar(cost_center_info) == 12 ~ substr(cost_center_info, 1, 8),
     nchar(cost_center_info) == 30 ~ str_c(substr(cost_center_info, 1, 4),
@@ -295,10 +288,8 @@ cc_map_fail <- processed_data %>%
   filter(!(wrkd_dept_leg %in% code_conversion$COST.CENTER.LEGACY)) %>%
   distinct() %>%
   mutate(Department.Billed =
-           stringr::str_sub(
-             Department.Billed,
-    stringr::str_locate(Department.Billed, "\\*")[, 1] + 1, -1
-  ))
+           str_sub(Department.Billed,
+                   str_locate(Department.Billed, "\\*")[, 1] + 1, -1))
 
 ## Job Code Handling -----------------------------------------------------
 
@@ -315,7 +306,7 @@ jc_new <- processed_data %>%
   distinct() %>%
   mutate(jobcode = row_number()) %>%
   mutate(jobcode = jobcode + length(jobcode_list$jobcode)) %>%
-  mutate(jobcode = stringr::str_pad(jobcode, 5, side = "left", pad = "0")) %>%
+  mutate(jobcode = str_pad(jobcode, 5, side = "left", pad = "0")) %>%
   mutate(jobcode = paste0("R", jobcode))
 
 jobcode_list_new <- rbind(jobcode_list, jc_new)
@@ -364,7 +355,7 @@ processed_data <- processed_data %>%
 processed_data <- processed_data %>%
   mutate(
     Day.Spend.char = Day.Spend,
-    Day.Spend = as.numeric(stringr::str_trim(gsub("[$,]", "", Day.Spend)))
+    Day.Spend = as.numeric(str_trim(gsub("[$,]", "", Day.Spend)))
   )
 
 # need to summarize data
@@ -372,6 +363,7 @@ rolled_up <- processed_data %>%
   group_by(hospital, home_dept_oracle,  wrkd_dept_oracle, Earnings.E.D,
            Worker.Name, jobcode) %>%
   summarize(across(c(daily_hours, Day.Spend), sum, na.rm = T)) %>%
+  ungroup() %>%
   rename(week_hours = daily_hours,
          week_spend = Day.Spend)
 # needs to be checked for accuracy
@@ -382,11 +374,11 @@ rolled_up <- processed_data %>%
 upload_new <- rolled_up %>%
   mutate(partner = "729805", .before = hospital) %>%
   mutate(hospital_worked = hospital, .before = wrkd_dept_oracle) %>%
-  mutate(start_date = format(mdy(Earnings.E.D) - 6, format = "%m/%d/%Y"), 
+  mutate(start_date = format(mdy(Earnings.E.D) - 6, format = "%m/%d/%Y"),
          .before = Earnings.E.D) %>%
   mutate(employee_id = paste0(
     substr(trimws(sub(",.*", "", Worker.Name)), 1, 12),
-    substr(gsub("\\..*","", week_hours), 1, 3)),
+    substr(gsub("\\..*", "", week_hours), 1, 3)),
     .before = Worker.Name) %>%
   mutate(Worker.Name = substr(Worker.Name, 1, 30)) %>%
   mutate(approved_hours = "0", .before = jobcode) %>%
@@ -409,34 +401,34 @@ upload_new <- rolled_up %>%
 
 # File Saving -------------------------------------------------------------
 
-if (sites == "MSHS"| sites == "MSHQ") {
+if (sites == "MSHS" | sites == "MSHQ") {
   # save MSHQ upload
-  write.table(filter(upload_new, hospital == "NY0014"), 
-              paste0(project_path, 
+  write.table(filter(upload_new, hospital == "NY0014"),
+              paste0(project_path,
                      "MSHQ/Uploads/MSHQ_Rightsourcing_",
                      min(mdy(upload_new$start_date)), "_",
                      max(mdy(upload_new$Earnings.E.D)), ".csv"),
               row.names = F, col.names = F, sep = ",")
-  
+
   # save MSHQ zero file
-  write.table(mshq_zero_new, paste0(project_path, 
+  write.table(mshq_zero_new, paste0(project_path,
                                     "MSHQ/Zero/MSHQ_Rightsourcing Zero_",
                                     min(mdy(mshq_zero_new$date.start)), "_",
                                     max(mdy(mshq_zero_new$date.end)), ".csv"),
               row.names = F, col.names = F, sep = ",")
-} 
+}
 
 if (sites == "MSHS" | sites == "MSBIB") {
   # save MSBIB upload
-  write.table(filter(upload_new, hospital == "630571"), 
-              paste0(project_path, 
+  write.table(filter(upload_new, hospital == "630571"),
+              paste0(project_path,
                      "MSBIB/Uploads/MSBIB_Rightsourcing_",
                      min(mdy(upload_new$start_date)), "_",
                      max(mdy(upload_new$Earnings.E.D)), ".csv"),
               row.names = F, col.names = F, sep = ",")
-  
+
   # save MSBIB zero file
-  write.table(mshq_zero_new, paste0(project_path, 
+  write.table(msbib_zero_new, paste0(project_path,
                                     "MSBIB/Zero/MSBIB_Rightsourcing Zero_",
                                     min(mdy(msbib_zero_new$date.start)), "_",
                                     max(mdy(msbib_zero_new$date.end)), ".csv"),
