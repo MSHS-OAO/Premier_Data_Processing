@@ -226,7 +226,7 @@ worktrend <- function(){
   trend <- left_join(trend,paycode,by=c("Pay.Code"="RAW.PAY.CODE")) 
   trend <- trend %>%
     #filter on productive and included hours
-    filter(PAY.CODE.CATEGORY %in% c("REGULAR","OTHER_WORKED","OVETIME"),
+    filter(PAY.CODE.CATEGORY %in% c("REGULAR","OTHER_WORKED","OVERTIME"),
            INCLUDE.HOURS == 1) %>%
     group_by(Department.IdWHERE.Worked,END.DATE) %>%
     #summarise hours by worked department by pay period end date
