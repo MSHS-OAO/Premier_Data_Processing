@@ -5,8 +5,8 @@ library(readxl)
 
 default_dir <- "J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSBI Data/Charge Detail/Calculation Worksheets"
 
-begin_date <- as.Date("2021/08/01")
-final_date <- as.Date("2021/08/28")
+begin_date <- as.Date("2022/04/24")
+final_date <- as.Date("2022/05/21")
 
 
 month_dir <- choose.dir(default = default_dir)

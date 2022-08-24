@@ -9,8 +9,8 @@ library(xlsx)
 library(openxlsx)
 
 # User Input --------------------------------------------------------------
-pp.start <- as.Date('2022-03-27') # start date of first pay period needed
-pp.end <- as.Date('2022-04-23') # end date of the last pay period needed
+pp.start <- as.Date('2022-07-03') # start date of first pay period needed
+pp.end <- as.Date('2022-07-30') # end date of the last pay period needed
 if(pp.end < pp.start){stop('End date before Start date')} # initial QC check on date range
 warning('Update Pay Periods Start and End Dates Needed:') #reminder to update dates
 cat(paste('Pay period starting on',
@@ -41,8 +41,10 @@ colnames(dict_PC) <- c('Census.Date', 'Start.Date', 'End.Date')
 if(!pp.start %in% dict_PC$Start.Date){
   stop('Start date entered is not the start of a payperiod, please enter another start date')
 }else if(!pp.end %in% dict_PC$End.Date){stop('End date entered is not the end of a pay period, please enter another end date')}
-map_reports <- read.xlsx(paste0(dir_universal,
-                                '/Mapping/MSHS_Reporting_Definition_Mapping.xlsx'))
+map_reports <- read.xlsx(
+  paste0(dir_universal,
+         '/Mapping/MSHS_Reporting_Definition_Mapping.xlsx'),
+  detectDates = T)
   
 # Import Data -------------------------------------------------------------
 import_recent_file <- function(folder.path, place) {
@@ -120,6 +122,7 @@ if(any(!unique(map_CC_Vol$Site) %in% site_names) | any(!unique(data_census$Site)
 }
 
 map_reports <- map_reports %>%
+  filter(CLOSED > pp.end | is.na(CLOSED)) %>%
   select(ORACLE.COST.CENTER, DEFINITION.CODE, DEFINITION.NAME) %>%
   distinct() %>%
   drop_na() %>%
@@ -129,7 +132,7 @@ map_reports <- map_reports %>%
 
 data_upload <- left_join(data_census, map_CC_Vol)
 data_upload <- left_join(data_upload, dict_PC)
-data_upload <- left_join(data_upload, map_reports)
+#data_upload <- left_join(data_upload, map_reports)
 
 # QC --------------------------------------------------------------------
 if(nrow(data_census) != nrow(data_upload)){stop('Check Dictionaries for Duplicates')} #checking to see if vlookups are duplicating rows
@@ -207,13 +210,18 @@ quality_chart <- function(data, site.census) {
   data_chart <- data_upload %>%
     ungroup() %>%
     filter(Site == site.census) %>%
-    select(ReportCode, ReportName, CostCenter, Nursing.Station.Code, End.Date, Census.Day) %>%
+    select(#ReportCode,
+           #ReportName, 
+           CostCenter, 
+           Nursing.Station.Code, 
+           End.Date, 
+           Census.Day) %>%
     arrange(End.Date) %>%
     mutate(End.Date = format(End.Date, '%m.%d.%y')) %>%
     pivot_wider(names_from = End.Date, values_from = Census.Day,
-                values_fn = list(Census.Day = sum)) %>%
-    mutate(Report = paste(ReportCode, ReportName, sep = "-")) %>%
-    arrange(Report) 
+                values_fn = list(Census.Day = sum)) #%>%
+    #mutate(Report = paste(ReportCode, ReportName, sep = "-")) %>%
+    #arrange(Report) 
 }
 chart_master <- lapply(as.list(unique(data_upload$Site)),
                        function(x) quality_chart(data_upload, x))
