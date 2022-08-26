@@ -1,8 +1,3 @@
-# GENERAL QUESTIONS -------------------------------------------------------
-
-# Future work: Templates for Shiny projects
-
-
 # GENERAL REMINDERS -------------------------------------------------------
 
 # 1. The outline can be customized based on project requirements.
@@ -26,17 +21,21 @@
 
 # Ensuring the appropriate package versions are used for the project based on
 # renv usage
-renv::restore()
+# renv::restore()
 
 # Common Packages
-library(here)
-library(rmarkdown)
-library(shiny)
+# library(here)
+# library(rmarkdown)
+# library(shiny)
 
 # tidyverse includes: dplyr, ggplot2, lubridate, purrr, readr, readxl,
 # reprex, stringr, tidyr...and more
 # See this link for full list: https://tidyverse.tidyverse.org/
-library(tidyverse)
+# library(tidyverse)
+
+library(readxl)
+library(xlsx)
+library(dplyr)
 
 
 # Source Global Functions -------------------------------------------------
@@ -44,7 +43,7 @@ library(tidyverse)
 # Global functions would include functions that are used regularly
 # throughout the rest of the script and should make code more readable.
 
-source()
+# source()
 
 
 # Assigning Directory(ies) ------------------------------------------------
@@ -53,29 +52,7 @@ source()
 # Reminder: avoid using setwd()
 
 ## Shared Drive Path (Generic) --------------------------------------------
-sdp <- paste0("//researchsan02b/shr2/deans/Presidents")
 J_drive <- paste0("//researchsan02b/shr2/deans/Presidents")
-
-## J-drive Automatic Check ------------------------------------------------
-# Alternative mapping of the Windows Shared Drive using the drive letter
-# and an if-else check.
-# This code helps when the shared folder is mapped differently for different
-# users.
-# This code tests whether a user has the J drive mapped to Presidents or
-# deans
-if ("Presidents" %in% list.files("J://")) {
-  user_directory <- "J:/Presidents/"
-} else {
-  user_directory <- "J:/deans/Presidents/"
-}
-
-# an example project specific path that can be changed based on the project
-project_path <- paste0("/Operations Analytics and Optimization/Projects/",
-                       "Service Lines/Lab Kpi/Data/")
-
-# Here is the final path
-user_path <- paste0(user_directory, project_path,"*.*")
-
 
 # Constants ---------------------------------------------------------------
 # Define constants that will be used throughout the code. These are the
