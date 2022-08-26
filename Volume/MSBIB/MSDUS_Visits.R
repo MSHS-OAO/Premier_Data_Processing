@@ -86,7 +86,10 @@ dict_EPIC <-
 # dict_EPIC2 <- dict_EPIC2 %>%
 #   select(`Epic Department Name`,
 #          `Volume ID`,
-#          `Cost Center`)
+#          `Cost Center`,
+#          `Epic Dept ID`,
+#          `Main Premier Report ID`,
+#          `Main Premier Report Name`)
 
 # # Departments to Remove
 # remove_departments_Epic <- dict_Epic_dept_VolID %>%
@@ -120,10 +123,21 @@ data_Epic <- data_raw %>%
     `Appt Time`, 1, nchar("00/00/0000"))
   )
 
-data_min_date <- min(as.Date(data_Epic$`Appt Date`, "%m/%d/%Y"))
-data_max_date <- max(as.Date(data_Epic$`Appt Date`, "%m/%d/%Y"))
+data_min_date <- min(as.Date(data_Epic$`Appt Date`, "%Y-%m-%d"))
+data_max_date <- max(as.Date(data_Epic$`Appt Date`, "%Y-%m-%d"))
 
-# improvement: prompt user to determine if date range is appropriate
+date_ok <- winDialog(type = c("yesno"),
+                     message = paste0("The date range for the data is:\n",
+                                      data_min_date, "\n",
+                                      "to\n",
+                                      data_max_date, "\n\n",
+                                      "Is this correct?"))
+
+if (date_ok == "NO") {
+  stop(paste0("Please get the data for the correct date range.\n",
+       "Then restart running this script.")
+       )
+}
 
 ## Join IDs and pay cycles -------------------------------------------------
 
