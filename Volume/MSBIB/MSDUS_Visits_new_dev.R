@@ -52,23 +52,86 @@ library(dplyr)
 # Reminder: avoid using setwd()
 
 ## Shared Drive Path (Generic) --------------------------------------------
-J_drive <- paste0("//researchsan02b/shr2/deans/Presidents")
+j_drive <- paste0("//researchsan02b/shr2/deans/Presidents")
 
 # Constants ---------------------------------------------------------------
 # Define constants that will be used throughout the code. These are the
 # variables that are calculated here and not changed in the rest of the code.
 
-
-# Data Import -------------------------------------------------------------
-# Importing data that is needed in the code whether it’s from the shared drive
-# or OneDrive or some other location.
-
+## rehab ------------------------------------------------------------
+rehab_offs_ratio <- 0.34
+rehab_offs_docs <- c("SPINNER, DAVID A", "CHANG, RICHARD G")
+rehab_offs_dept <- c("300 CADMAN PLAZA REHAB MED",
+                     "309 W 23RD ST REHAB FLUOROSCOPY"
+                     )
+rehab_offs_cc <- "407000040421109"
+rehab_offs_vol_id <- "407404211092"
 
 # Data References ---------------------------------------------------------
 # (aka Mapping Tables)
 # Files that need to be imported for mappings and look-up tables.
 # (This section may be combined into the Data Import section.)
 
+## Pay cycles -------------------------------------------------------------
+dict_pay_cycles <- read_xlsx(
+  paste0(
+    j_drive, "/SixSigma/MSHS Productivity/Productivity/Universal Data/",
+    "Mapping/MSHS_Pay_Cycle.xlsx"
+  ),
+  col_types = c("date", "date", "date", "skip")
+  # bringing in the date as "text" results in the excel number representation
+  # of a date
+)
+
+# dates originally come in as POSIXct, so they're being converted to Date
+dict_pay_cycles <- dict_pay_cycles %>%
+  mutate(DATE = format(as.Date(DATE), "%m/%d/%Y"),
+         START.DATE = format(as.Date(START.DATE), "%m/%d/%Y"),
+         END.DATE = format(as.Date(END.DATE), "%m/%d/%Y"))
+
+## Dictionary ------------------------------------------------------------
+
+path_dict_prem <- choose.files(
+    default = paste0(j_drive,
+                     "/SixSigma/MSHS Productivity/Productivity",
+                     "/Volume - Data/MSBI Data/Union Square",
+                     "/R Code"),
+    caption = "Select DUS Main Dictionary",
+    multi = F
+  )
+
+dict_epic <- read_xlsx(
+    path_dict_prem,
+    sheet = 1,
+    skip = 0
+  )
+
+# Data Import -------------------------------------------------------------
+
+path_data_epic <- choose.files(default = j_drive,
+                               caption = "Select Epic file",
+                               multi = F
+                               )
+
+skip_ct <- 0
+d_check <- 1
+
+while (d_check != 0 & skip_ct < 5) {
+  col_check <- read_xlsx(path_data_epic, sheet = 1, skip = skip_ct, n_max = 10)
+  
+  if ("Department" %in% colnames(col_check)) {
+    data_raw <- read_xlsx(path_data_epic, sheet = 1, skip = skip_ct)
+    d_check <- 0
+  } else {
+    skip_ct <- skip_ct + 1
+  }
+}
+
+if (skip_ct == 5) {
+  stop(paste0("The raw data is not in the appropriate format.\n",
+              "Identify the appropriate file and restart")
+       )
+}
 
 # Creation of Functions --------------------------------------------------
 # These are functions that will be commonly used within the rest of the script.
@@ -85,6 +148,58 @@ J_drive <- paste0("//researchsan02b/shr2/deans/Presidents")
 # in the correct format.  This might also be done as soon as the data is
 # imported.
 
+
+data_epic <- data_raw %>%
+  select(Department, Provider, `Appt Time`, `Epic Department ID`)
+
+
+## date formatting, date range check, pay period dates------------------------
+
+data_epic <- data_epic %>%
+  mutate(`Appt Date` = stringr::str_sub(
+    `Appt Time`, 1, nchar("00/00/0000"))
+  ) %>%
+  mutate(`Appt Date` = format(lubridate::ymd(`Appt Date`), "%m/%d/%Y"))
+
+# if () {
+#   date_format <- "%m/%d/%Y"
+# } else {
+#   date_format <- "%Y-%m-%d"
+# }
+
+data_date_min <- min(as.Date(data_epic$`Appt Date`, "%m/%d/%Y"))
+data_date_max <- max(as.Date(data_epic$`Appt Date`, "%m/%d/%Y"))
+
+date_ok <- winDialog(type = c("yesno"),
+                     message = paste0("The date range for the data is:\n",
+                                      data_date_min, "\n",
+                                      "to\n",
+                                      data_date_max, "\n\n",
+                                      "Is this correct?"))
+
+if (date_ok == "NO") {
+  stop(paste0("Please get the data for the correct date range.\n",
+              "Then restart running this script.")
+  )
+}
+
+data_epic <- data_epic %>%
+  left_join(dict_pay_cycles, by = c("Appt Date" = "DATE"))
+
+## Visit count ------------------------------------------------------------
+
+data_epic <- data_epic %>%
+  mutate(volume = case_when(
+    Provider %in% rehab_offs_docs &
+      Department %in% rehab_offs_dept ~ rehab_offs_ratio,
+    TRUE ~ 1
+  ))
+
+# summary_epic <- data_epic %>%
+#   summarize()
+
+# incorporate the endo roll-ups into the dictionary so no special code handling
+  
 
 # Data Formatting ---------------------------------------------------------
 # How the data will look during the output of the script.
