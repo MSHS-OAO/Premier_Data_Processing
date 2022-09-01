@@ -58,15 +58,6 @@ j_drive <- paste0("//researchsan02b/shr2/deans/Presidents")
 # Define constants that will be used throughout the code. These are the
 # variables that are calculated here and not changed in the rest of the code.
 
-## rehab ------------------------------------------------------------
-rehab_offs_ratio <- 0.34
-rehab_offs_docs <- c("SPINNER, DAVID A", "CHANG, RICHARD G")
-rehab_offs_dept <- c("300 CADMAN PLAZA REHAB MED",
-                     "309 W 23RD ST REHAB FLUOROSCOPY"
-                     )
-rehab_offs_cc <- "407000040421109"
-rehab_offs_vol_id <- "407404211092"
-
 # Data References ---------------------------------------------------------
 # (aka Mapping Tables)
 # Files that need to be imported for mappings and look-up tables.
@@ -106,6 +97,17 @@ dict_epic <- read_xlsx(
     skip = 0
   )
 
+dict_epic_short <- dict_epic %>%
+  select(`Epic Department Name`, `Volume ID`, `Cost Center`, `volume ratio`)
+
+### rehab offsite ---------------------------------------------------------
+
+dict_rehab_docs <- read_xlsx(
+  path_dict_prem,
+  sheet = 2,
+  skip = 0
+)
+
 # Data Import -------------------------------------------------------------
 
 path_data_epic <- choose.files(default = j_drive,
@@ -113,25 +115,33 @@ path_data_epic <- choose.files(default = j_drive,
                                multi = F
                                )
 
+## Skip rows and import ---------------------------------------------------
+
+# The data is not provided in a consistent way.  The number of extra rows
+# at the top of the file varies.
+
 skip_ct <- 0
 d_check <- 1
+skip_ct_max <- 5
 
-while (d_check != 0 & skip_ct < 5) {
+while (d_check != 0 & skip_ct < skip_ct_max) {
   col_check <- read_xlsx(path_data_epic, sheet = 1, skip = skip_ct, n_max = 10)
   
   if ("Department" %in% colnames(col_check)) {
     data_raw <- read_xlsx(path_data_epic, sheet = 1, skip = skip_ct)
     d_check <- 0
+    rm(col_check)
   } else {
     skip_ct <- skip_ct + 1
   }
 }
 
-if (skip_ct == 5) {
+if (skip_ct == skip_ct_max) {
   stop(paste0("The raw data is not in the appropriate format.\n",
               "Identify the appropriate file and restart")
        )
 }
+
 
 # Creation of Functions --------------------------------------------------
 # These are functions that will be commonly used within the rest of the script.
@@ -153,7 +163,7 @@ data_epic <- data_raw %>%
   select(Department, Provider, `Appt Time`, `Epic Department ID`)
 
 
-## date formatting, date range check, pay period dates------------------------
+## date formatting, check, pay periods -------------------------------------
 
 data_epic <- data_epic %>%
   mutate(`Appt Date` = stringr::str_sub(
@@ -186,30 +196,95 @@ if (date_ok == "NO") {
 data_epic <- data_epic %>%
   left_join(dict_pay_cycles, by = c("Appt Date" = "DATE"))
 
-## Visit count ------------------------------------------------------------
+## Join Dept & Vol ID -----------------------------------------------------
 
+data_epic_row <- nrow(data_epic)
 data_epic <- data_epic %>%
+  left_join(dict_epic_short, c("Department" = "Epic Department Name"))
+data_epic_row2 <- nrow(data_epic)
+
+winDialog(type = "ok",
+          message = paste0("The number of rows in data increased\n",
+                           "when joining Volume IDs.\n\n",
+                           "This can be expected because of special\n",
+                           "rolled-up volumes.\n\n",
+                           "The row increase was:\n",
+                           data_epic_row2 - data_epic_row, "\n\n",
+                           "Press OK to continue."))
+
+
+## Visit counter ----------------------------------------------------------
+
+# rehab offsite docs that are not included docs get 0
+# all others keep their ratio
+data_epic <- data_epic %>%
+  rename(volume = `volume ratio`) %>%
   mutate(volume = case_when(
-    Provider %in% rehab_offs_docs &
-      Department %in% rehab_offs_dept ~ rehab_offs_ratio,
-    TRUE ~ 1
+    Department %in% dict_rehab_docs$`Epic Department Name` &
+      !(Provider %in% dict_rehab_docs$Provider) ~ 0,
+    TRUE ~ volume
   ))
 
-# summary_epic <- data_epic %>%
-#   summarize()
+## upload summary ---------------------------------------------------------
+summary_upload <- data_epic %>%
+  group_by(`Cost Center`, START.DATE, END.DATE, `Volume ID`) %>%
+  summarize(visits = sum(volume)) %>%
+  mutate(visits = round(visits, digits = 0)) %>%
+  ungroup() %>%
+  filter(!is.na(`Volume ID`)) %>%
+  filter(!(`Volume ID` %in% c("TBD", "X")))
 
-# incorporate the endo roll-ups into the dictionary so no special code handling
-  
+## Add rows for volume ID with 0 volume ------------------------------------
+
+data_dates <- data_epic %>%
+  select(START.DATE, END.DATE) %>%
+  unique()
+
+dict_epic_unique <- dict_epic %>%
+  select(`Cost Center`, `Volume ID`) %>%
+  unique()
+
+dict_and_date <- merge(data_dates, dict_epic_unique)
+
+missing_vol_id_date <- dict_and_date %>%
+  anti_join(data_epic)
+
+zero_rows <- missing_vol_id_date %>%
+  mutate(visits = 0) %>%
+  relocate(`Cost Center`, .before = START.DATE)
+
+# would be better to display Cost Center name and the volume IDs
+if (length(unique(zero_rows$`Volume ID`)) > 0) {
+  winDialog(message = paste0("These volume IDs had a 0 volume:\r",
+                             paste(unique(zero_rows$`Volume ID`),
+                                   collapse = "; ")))
+}
+
+### Combining with upload summary --------------------------------------------
+summary_upload <- rbind(summary_upload, zero_rows)
 
 # Data Formatting ---------------------------------------------------------
 # How the data will look during the output of the script.
 # For example, if you have a data table that needs the numbers to show up as
 # green or red depending on whether they meet a certain threshold.
 
+upload_file <- summary_upload %>%
+  mutate(entity = "729805",
+         facility = "630571",
+         budget = "0") %>%
+  relocate(c(entity, facility), .before = `Cost Center`)
 
 # Quality Checks ----------------------------------------------------------
 # Checks that are performed on the output to confirm data consistency and
 # expected outputs.
+
+## new departments --------------------------------------------------------
+
+
+
+## volume history ---------------------------------------------------------
+
+
 
 
 # Visualization -----------------------------------------------------------
@@ -221,5 +296,23 @@ data_epic <- data_epic %>%
 # File Saving -------------------------------------------------------------
 # Writing files or data for storage
 
+date_min_char <- format(as.Date(data_date_min, "%m/%d/%Y"), "%Y-%m-%d")
+date_max_char <- format(as.Date(data_date_max, "%m/%d/%Y"), "%Y-%m-%d")
+
+file_name_Premier <-
+  paste0("MSDUS_Department Volumes_", date_min_char, "_to_", date_max_char,
+         ".csv")
+path_folder_Premier_export <-
+  choose.dir(
+    default = j_drive,
+    caption = "Select folder to export Premier upload file"
+  )
+write.table(
+  upload_file,
+  file = paste0(path_folder_Premier_export, "\\", file_name_Premier),
+  row.names = F,
+  col.names = F,
+  sep = ","
+)
 
 # Script End --------------------------------------------------------------
