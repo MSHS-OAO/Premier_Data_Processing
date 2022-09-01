@@ -63,10 +63,14 @@ dict_rehab_docs <- read_xlsx(
 
 # Data Import -------------------------------------------------------------
 
-path_data_epic <- choose.files(default = j_drive,
-                               caption = "Select Epic file",
-                               multi = F
-                               )
+path_data_epic <- choose.files(
+  default = paste0(j_drive,
+                   "/SixSigma/MSHS Productivity/Productivity",
+                   "/Volume - Data/MSBI Data/Union Square/",
+                   "Source Data"),
+  caption = "Select Epic file",
+  multi = F
+)
 
 
 ## Skip rows and import ---------------------------------------------------
@@ -89,6 +93,9 @@ while (d_check != 0 & skip_ct < skip_ct_max) {
     skip_ct <- skip_ct + 1
   }
 }
+# alternatively, to help with date handling, could bring all columns
+# in as character strings
+
 
 if (skip_ct == skip_ct_max) {
   stop(paste0("The raw data is not in the appropriate format.\n",
@@ -108,14 +115,14 @@ data_epic <- data_raw %>%
 data_epic <- data_epic %>%
   mutate(`Appt Date` = stringr::str_sub(
     `Appt Time`, 1, nchar("00/00/0000"))
-  ) %>%
-  mutate(`Appt Date` = format(lubridate::ymd(`Appt Date`), "%m/%d/%Y"))
+  )
 
-# if () {
-#   date_format <- "%m/%d/%Y"
-# } else {
-#   date_format <- "%Y-%m-%d"
-# }
+if ("POSIXct" %in% class(data_epic$`Appt Time`)) {
+data_epic <- data_epic %>%
+  mutate(`Appt Date` = format(lubridate::ymd(`Appt Date`), "%m/%d/%Y"))
+}
+# alternatively, could bring all columns of raw data as character
+
 
 data_date_min <- min(as.Date(data_epic$`Appt Date`, "%m/%d/%Y"))
 data_date_max <- max(as.Date(data_epic$`Appt Date`, "%m/%d/%Y"))
@@ -243,13 +250,15 @@ if (length(new_dept$Department) > 0) {
                      "Press OK to continue"),
     type = "okcancel")
 } else {
+  new_dept_stop <- "OK"
   message("No new departments identified.")
 }
+
 
 if (new_dept_stop == "CANCEL") {
   stop(paste0("Fix the dept dictionary based on the new departments.\n",
               "Identify the appropriate file and restart")
-       )
+  )
 }
 
 
