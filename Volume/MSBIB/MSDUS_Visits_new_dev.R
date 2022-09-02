@@ -239,15 +239,15 @@ upload_file <- summary_upload %>%
 new_dept <- data_epic %>%
   filter(is.na(volume)) %>%
   select(Department, `Epic Department ID`) %>%
-  unique() # %>%
+  unique()
 
 if (length(new_dept$Department) > 0) {
   new_dept_stop <- winDialog(
-    message = paste0("These Departments are not in the dictionary:\r",
-                     paste(unique(zero_rows$`Volume ID`), collapse = "; "),
-                     "\r",
-                     "To stop running this script, press \"Cancel\" \r",
-                     "Press OK to continue"),
+    message = paste0("These Departments are not in the dictionary:\r\r",
+                     paste(unique(new_dept$Department), collapse = "\n\n"),
+                     "\r\r",
+                     "Press \"OK\" to continue\r",
+                     "Press \"Cancel\" to stop running this script"),
     type = "okcancel")
 } else {
   new_dept_stop <- "OK"
@@ -256,8 +256,8 @@ if (length(new_dept$Department) > 0) {
 
 
 if (new_dept_stop == "CANCEL") {
-  stop(paste0("Fix the dept dictionary based on the new departments.\n",
-              "Identify the appropriate file and restart")
+  stop(paste0("Incorporate the new depts into the dictionary as desired.\n",
+              "Restart the script after the dictionary is as desired.")
   )
 }
 
