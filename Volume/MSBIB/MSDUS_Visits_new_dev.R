@@ -85,7 +85,8 @@ skip_ct_max <- 5
 while (d_check != 0 & skip_ct < skip_ct_max) {
   col_check <- read_xlsx(path_data_epic, sheet = 1, skip = skip_ct, n_max = 10)
 
-  if ("Department" %in% colnames(col_check)) {
+  if ("Department" %in% colnames(col_check) |
+      "DEPARTMENT_NAME" %in% colnames(col_check)) {
     data_raw <- read_xlsx(path_data_epic, sheet = 1, skip = skip_ct)
     d_check <- 0
     rm(col_check)
@@ -103,11 +104,27 @@ if (skip_ct == skip_ct_max) {
        )
 }
 
+# if the atypical file format has been provided, the column names
+# need to be changed in order for the rest of the script to work
+if ("DEPARTMENT_NAME" %in% colnames(data_raw)) {
+  data_raw <- data_raw %>%
+    rename(Department = DEPARTMENT_NAME,
+           Provider = PROV_NAME,
+           `Appt Time` = APPT_TIME)
+
+  # if there are NA dates then Date of Service can be used instead
+  data_raw <- data_raw %>%
+    mutate(`Appt Time` = case_when(
+      is.na(`Appt Time`) ~ DATE_OF_SERVICE,
+      TRUE ~ `Appt Time`
+    ))
+}
+
 
 # Data Pre-processing -----------------------------------------------------
 
 data_epic <- data_raw %>%
-  select(Department, Provider, `Appt Time`, `Epic Department ID`)
+  select(Department, Provider, `Appt Time`)
 
 
 ## date formatting, check, pay periods -------------------------------------
@@ -122,7 +139,6 @@ data_epic <- data_epic %>%
   mutate(`Appt Date` = format(lubridate::ymd(`Appt Date`), "%m/%d/%Y"))
 }
 # alternatively, could bring all columns of raw data as character
-
 
 data_date_min <- min(as.Date(data_epic$`Appt Date`, "%m/%d/%Y"))
 data_date_max <- max(as.Date(data_epic$`Appt Date`, "%m/%d/%Y"))
@@ -221,9 +237,6 @@ summary_upload <- rbind(summary_upload, zero_rows)
 
 
 # Data Formatting ---------------------------------------------------------
-# How the data will look during the output of the script.
-# For example, if you have a data table that needs the numbers to show up as
-# green or red depending on whether they meet a certain threshold.
 
 upload_file <- summary_upload %>%
   mutate(entity = "729805",
@@ -238,7 +251,7 @@ upload_file <- summary_upload %>%
 
 new_dept <- data_epic %>%
   filter(is.na(volume)) %>%
-  select(Department, `Epic Department ID`) %>%
+  select(Department) %>%
   unique()
 
 if (length(new_dept$Department) > 0) {
@@ -249,21 +262,20 @@ if (length(new_dept$Department) > 0) {
                      "Press \"OK\" to continue\r",
                      "Press \"Cancel\" to stop running this script"),
     type = "okcancel")
+
+  if (new_dept_stop == "CANCEL") {
+    stop(paste0("Incorporate the new depts into the dictionary as desired.\n",
+                "Restart the script after the dictionary is as desired.")
+    )
+  }
+
 } else {
   new_dept_stop <- "OK"
   message("No new departments identified.")
 }
 
 
-if (new_dept_stop == "CANCEL") {
-  stop(paste0("Incorporate the new depts into the dictionary as desired.\n",
-              "Restart the script after the dictionary is as desired.")
-  )
-}
-
-
 # File Saving -------------------------------------------------------------
-# Writing files or data for storage
 
 date_min_char <- format(as.Date(data_date_min, "%m/%d/%Y"), "%Y-%m-%d")
 date_max_char <- format(as.Date(data_date_max, "%m/%d/%Y"), "%Y-%m-%d")
