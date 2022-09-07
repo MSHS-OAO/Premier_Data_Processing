@@ -8,19 +8,11 @@ library(readxl)
 
 # Assigning Directory(ies) ------------------------------------------------
 
-sdp <- paste0("//researchsan02b/shr2/deans/Presidents")
-
-j_drive <- paste0("J:/deans/Presidents")
-
-default_dir <- paste0(j_drive,
-                      "/SixSigma/MSHS Productivity/Productivity",
-                      "/Volume - Data/MSBI Data/Charge Detail")
-
-# where the monthly data is typically pulled from
-# this is typically on the shared drive to expedite the processing time
-month_dir <- choose.dir(default = default_dir,
-                        caption = "Select the folder with the data files")
-
+if ("Presidents" %in% list.files("J:/")) {
+  j_drive <- "J:/Presidents"
+} else {
+  j_drive <- "J:/deans/Presidents"
+}
 
 # Data References ---------------------------------------------------------
 
@@ -29,46 +21,114 @@ map_file_folder <- paste0(j_drive,
                           "/Volume - Data/MSBI Data/Charge Detail",
                           "/Instruction Files")
 
-path_dictionary_pay_cycles <- choose.files(default = map_file_folder,
-                                           caption = "Select Pay Cycles File",
-                                           multi = F)
-dictionary_pay_cycles <- read_xlsx(path_dictionary_pay_cycles,
-                                   sheet = 1,
-                                   col_types = c("date", "skip", "skip", "skip",
-                                                 "skip", "skip", "skip", "skip",
-                                                 "skip", "skip", "date", "date",
-                                                 "skip"))
-dictionary_pay_cycles$Date <- as.Date(dictionary_pay_cycles$Date)
-dictionary_pay_cycles$`Start Date` <- as.Date(
-  dictionary_pay_cycles$`Start Date`)
-dictionary_pay_cycles$`End Date` <- as.Date(dictionary_pay_cycles$`End Date`)
+## Pay cycles -------------------------------------------------------------
+dict_pay_cycles <- read_xlsx(
+  paste0(
+    j_drive, "/SixSigma/MSHS Productivity/Productivity/Universal Data/",
+    "Mapping/MSHS_Pay_Cycle.xlsx"
+  )
+)
 
-CDM_file_path <- choose.files(default = map_file_folder,
-                              caption = "Select CDM File",
-                              multi = F)
+# dates originally come in as POSIXct, so they're being converted to Date
+dict_pay_cycles <- dict_pay_cycles %>%
+  mutate(DATE = format(as.Date(DATE), "%m/%d/%Y"),
+         START.DATE = format(as.Date(START.DATE), "%m/%d/%Y"),
+         END.DATE = format(as.Date(END.DATE), "%m/%d/%Y"))
+
+# path_dict_pay_cycles <- choose.files(default = map_file_folder,
+#                                            caption = "Select Pay Cycles File",
+#                                            multi = F)
+# dictionary_pay_cycles <- read_xlsx(path_dict_pay_cycles,
+#                                    sheet = 1,
+#                                    col_types = c("date", "skip", "skip", "skip",
+#                                                  "skip", "skip", "skip", "skip",
+#                                                  "skip", "skip", "date", "date",
+#                                                  "skip"))
+# dictionary_pay_cycles$Date <- as.Date(dictionary_pay_cycles$Date)
+# dictionary_pay_cycles$`Start Date` <- as.Date(
+#   dictionary_pay_cycles$`Start Date`)
+# dictionary_pay_cycles$`End Date` <- as.Date(dictionary_pay_cycles$`End Date`)
+
+
+## CDM ---------------------------------------------------------------------
+
+CDM_file_path <- choose.files(
+  default = paste0(j_drive, "/SixSigma/MSHS Productivity/Productivity/",
+                   "Volume - Data/CDMs/BIB"),
+  caption = "Select CDM File",
+  multi = F)
 CDM <- read_xlsx(CDM_file_path, sheet = 1)
-# , col_types = c('date', 'skip', 'skip', 'skip', 'skip','skip', 'skip',
-# 'skip', 'skip','skip','date', 'date', 'skip'))
 CDM_slim <- CDM %>% select(CHARGE_CODE, CHARGE_DESC, OPTB_cpt4)
 CDM_slim$CHARGE_CODE <- stringr::str_trim(CDM_slim$CHARGE_CODE)
 CDM_slim$OPTB_cpt4[is.na(CDM_slim$OPTB_cpt4)] <- "0"
 
-CC_xwalk_file_path <- choose.files(default = map_file_folder,
-                                   caption = "Select Crosswalk File", multi = F)
+
+## crosswalk --------------------------------------------------------------
+
+CC_xwalk_file_path <- choose.files(
+  default = paste0(j_drive, "/SixSigma/MSHS Productivity/Productivity/",
+                   "Volume - Data/MSBI Data/Charge Detail/Instruction Files"),
+  caption = "Select Crosswalk File", multi = F)
 CC_xwalk <- read_xlsx(CC_xwalk_file_path, sheet = 1)
-# , col_types = c('date', 'skip', 'skip', 'skip', 'skip','skip', 'skip',
-# skip', 'skip','skip','date', 'date', 'skip'))
 CC_xwalk$`EPSI Revenue Department` <- as.character(
   CC_xwalk$`EPSI Revenue Department`)
 
 
 # Constants ---------------------------------------------------------------
 
-begin_date <- as.Date("2022/04/24")
-final_date <- as.Date("2022/05/21")
+# select distribution dates that are less than today, take the max
+
+# Table of distribution dates
+dist_dates <- dict_pay_cycles %>%
+  select(END.DATE, PREMIER.DISTRIBUTION) %>%
+  distinct() %>%
+  drop_na() %>%
+  arrange(END.DATE) %>%
+  #filter only on distribution end dates
+  filter(PREMIER.DISTRIBUTION %in% c(TRUE, 1),
+         as.POSIXct(END.DATE) < as.POSIXct(Sys.Date()))
+
+#Selecting current distribution date
+dist_date <- last(dist_dates$END.DATE)
+  
+#Confirming distribution date which will be the max of the current upload
+answer <- winDialog(
+  message = paste0(
+    "Current distribution will be ", dist_date, "\r\r",
+    "If this is correct, press OK\r\r",
+    "If this is not correct, press Cancel and\r",
+    "you will be prompted to select the correct\r",
+    "distribution date."
+  ),
+  type = "okcancel"
+)
+
+if (answer == "CANCEL") {
+  dist_date <- select.list(
+    choices =
+      format(sort.POSIXlt(dist_dates$END.DATE, decreasing = T), "%m/%d/%Y"),
+    multiple = F,
+    title = "Select current distribution",
+    graphics = T
+  )
+  dist_date <- mdy(dist_date)
+}
+
+# the start date of data will be the date of previous distribution + 1
+prev_dist <- dist_dates$END.DATE[which(dist_date$END.DATE == dist_date) - 1]
+date_start <- prev_dist + 1
 
 
 # Data Import -------------------------------------------------------------
+
+# select where the monthly data is pulled from
+# this is typically on a hard-drive to expedite the processing time
+# but default is set to the shared drive location
+month_dir <- choose.dir(
+  default = paste0(j_drive, "/SixSigma/MSHS Productivity/Productivity",
+                   "/Volume - Data/MSBI Data/Charge Detail"),
+  caption = "Select the folder with the data files")
+
 # read file path
 all_folders <-
   list.dirs(
