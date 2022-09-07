@@ -214,7 +214,7 @@ prev_0_max_date_msbib <- max(mdy(msbib_zero_old$date.end))
 # should we compare these to make sure we have all files needed?
 
 # need threshold for weekly hour total for an employee to highlight for review
-week_hr_indiv_emp_qc <- 37.5
+week_hr_indiv_emp_qc <- 40
 
 # Data Pre-processing -----------------------------------------------------
 
@@ -397,18 +397,46 @@ upload_new <- rolled_up %>%
 # expected outputs.
 
 ## Employee check ---------------------------------------------------------
+
+# get total regular hours in each week by employee
+hrs_reg_indiv_emp <- processed_data %>%
+  group_by(Worker.Name, Earnings.E.D) %>%
+  summarize(week_hours_reg = sum(Regular.Hours, na.rm = T)) %>%
+  ungroup() %>%
+  arrange(-week_hours_reg, Worker.Name, as.Date(Earnings.E.D, "%m/%d/%Y"))
+
+# filter process_data down to the employees with high hours that are in
+# Premier reports and have more than a week's worth of regular hours
+high_hr_reg_emp <- processed_data %>%
+  left_join(
+    filter(
+      select(report_info, DEFINITION.CODE, DEFINITION.NAME,
+             ORACLE.COST.CENTER, DEPARTMENT.BREAKDOWN, CLOSED),
+      is.na(CLOSED)),
+    c("wrkd_dept_oracle" = "ORACLE.COST.CENTER")) %>%
+  filter(DEPARTMENT.BREAKDOWN == 1) %>%
+  left_join(hrs_reg_indiv_emp) %>%
+  filter(week_hours_reg > week_hr_indiv_emp_qc) %>%
+  arrange(-week_hours_reg, Worker.Name, as.Date(Earnings.E.D, "%m/%d/%Y"),
+          as.Date(Date.Worked, "%m/%d/%Y"))
+
+
 # get total hours in each week by employee
 hrs_indiv_emp <- processed_data %>%
   group_by(Worker.Name, Earnings.E.D) %>%
   summarize(week_hours = sum(daily_hours, na.rm = T)) %>%
-  ungroup()
+  ungroup() %>%
+  arrange(-week_hours, Worker.Name, as.Date(Earnings.E.D, "%m/%d/%Y"))
 
 # filter process_data down to the employees with high hours that are in
 # Premier reports and have more than a standard week's worth of hours
 high_hr_emp <- processed_data %>%
-  left_join(select(report_info, DEFINITION.CODE, DEFINITION.NAME,
-                   ORACLE.COST.CENTER, DEPARTMENT.BREAKDOWN),
-            c("wrkd_dept_oracle" = "ORACLE.COST.CENTER")) %>%
+  left_join(
+    filter(
+      select(report_info, DEFINITION.CODE, DEFINITION.NAME,
+             ORACLE.COST.CENTER, DEPARTMENT.BREAKDOWN, CLOSED),
+      is.na(CLOSED)),
+    c("wrkd_dept_oracle" = "ORACLE.COST.CENTER")) %>%
   filter(DEPARTMENT.BREAKDOWN == 1) %>%
   left_join(hrs_indiv_emp) %>%
   filter(week_hours > week_hr_indiv_emp_qc) %>%
@@ -423,6 +451,7 @@ high_hr_emp <- processed_data %>%
 
 # saw some employees who are not within Premier reports who looked like they
 # were being paid 2x within a pay period
+
 
 # Visualization -----------------------------------------------------------
 # How the data will be plotted or how the data table will look including axis
