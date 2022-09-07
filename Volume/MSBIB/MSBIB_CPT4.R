@@ -1,27 +1,71 @@
 # Libraries ---------------------------------------------------------------
 
-library(tidyverse)
+# library(tidyverse)
+library(dplyr)
 library(data.table)
 library(xlsx)
 library(readxl)
 
 # Assigning Directory(ies) ------------------------------------------------
 
-j_drive <- paste0("//researchsan02b/shr2/deans/Presidents")
+sdp <- paste0("//researchsan02b/shr2/deans/Presidents")
+
+j_drive <- paste0("J:/deans/Presidents")
 
 default_dir <- paste0(j_drive,
                       "/SixSigma/MSHS Productivity/Productivity",
-                      "/Volume - Data/MSBI Data/Charge Detail",
-                      "/Calculation Worksheets")
+                      "/Volume - Data/MSBI Data/Charge Detail")
+
+# where the monthly data is typically pulled from
+# this is typically on the shared drive to expedite the processing time
+month_dir <- choose.dir(default = default_dir,
+                        caption = "Select the folder with the data files")
+
+
+# Data References ---------------------------------------------------------
+
+map_file_folder <- paste0(j_drive,
+                          "/SixSigma/MSHS Productivity/Productivity",
+                          "/Volume - Data/MSBI Data/Charge Detail",
+                          "/Instruction Files")
+
+path_dictionary_pay_cycles <- choose.files(default = map_file_folder,
+                                           caption = "Select Pay Cycles File",
+                                           multi = F)
+dictionary_pay_cycles <- read_xlsx(path_dictionary_pay_cycles,
+                                   sheet = 1,
+                                   col_types = c("date", "skip", "skip", "skip",
+                                                 "skip", "skip", "skip", "skip",
+                                                 "skip", "skip", "date", "date",
+                                                 "skip"))
+dictionary_pay_cycles$Date <- as.Date(dictionary_pay_cycles$Date)
+dictionary_pay_cycles$`Start Date` <- as.Date(
+  dictionary_pay_cycles$`Start Date`)
+dictionary_pay_cycles$`End Date` <- as.Date(dictionary_pay_cycles$`End Date`)
+
+CDM_file_path <- choose.files(default = map_file_folder,
+                              caption = "Select CDM File",
+                              multi = F)
+CDM <- read_xlsx(CDM_file_path, sheet = 1)
+# , col_types = c('date', 'skip', 'skip', 'skip', 'skip','skip', 'skip',
+# 'skip', 'skip','skip','date', 'date', 'skip'))
+CDM_slim <- CDM %>% select(CHARGE_CODE, CHARGE_DESC, OPTB_cpt4)
+CDM_slim$CHARGE_CODE <- stringr::str_trim(CDM_slim$CHARGE_CODE)
+CDM_slim$OPTB_cpt4[is.na(CDM_slim$OPTB_cpt4)] <- "0"
+
+CC_xwalk_file_path <- choose.files(default = map_file_folder,
+                                   caption = "Select Crosswalk File", multi = F)
+CC_xwalk <- read_xlsx(CC_xwalk_file_path, sheet = 1)
+# , col_types = c('date', 'skip', 'skip', 'skip', 'skip','skip', 'skip',
+# skip', 'skip','skip','date', 'date', 'skip'))
+CC_xwalk$`EPSI Revenue Department` <- as.character(
+  CC_xwalk$`EPSI Revenue Department`)
 
 
 # Constants ---------------------------------------------------------------
 
 begin_date <- as.Date("2022/04/24")
 final_date <- as.Date("2022/05/21")
-
-
-month_dir <- choose.dir(default = default_dir)
 
 
 # Data Import -------------------------------------------------------------
@@ -73,45 +117,6 @@ all_result$TransDate <- as.Date(all_result$TransDate, format = "%m/%d/%Y")
 all_result$ChargeCode <- stringr::str_trim(all_result$ChargeCode)
 # all_result <- all_result %>%
 #   filter(EntityId == "MSBI" | EntityId == "MSCCW")
-
-# Data References ---------------------------------------------------------
-
-map_file_folder <- paste0(j_drive,
-                          "/SixSigma/MSHS Productivity/Productivity",
-                          "/Volume - Data/MSBI Data/Charge Detail",
-                          "/Instruction Files/*.*")
-
-path_dictionary_pay_cycles <- choose.files(default = map_file_folder,
-                                           caption = "Select Pay Cycles File",
-                                           multi = F)
-dictionary_pay_cycles <- read_xlsx(path_dictionary_pay_cycles,
-                                   sheet = 1,
-                                   col_types = c("date", "skip", "skip", "skip",
-                                                 "skip", "skip", "skip", "skip",
-                                                 "skip", "skip", "date", "date",
-                                                 "skip"))
-dictionary_pay_cycles$Date <- as.Date(dictionary_pay_cycles$Date)
-dictionary_pay_cycles$`Start Date` <- as.Date(
-  dictionary_pay_cycles$`Start Date`)
-dictionary_pay_cycles$`End Date` <- as.Date(dictionary_pay_cycles$`End Date`)
-
-CDM_file_path <- choose.files(default = map_file_folder,
-                              caption = "Select CDM File",
-                              multi = F)
-CDM <- read_xlsx(CDM_file_path, sheet = 1)
-  # , col_types = c('date', 'skip', 'skip', 'skip', 'skip','skip', 'skip',
-  # 'skip', 'skip','skip','date', 'date', 'skip'))
-CDM_slim <- CDM %>% select(CHARGE_CODE, CHARGE_DESC, OPTB_cpt4)
-CDM_slim$CHARGE_CODE <- stringr::str_trim(CDM_slim$CHARGE_CODE)
-CDM_slim$OPTB_cpt4[is.na(CDM_slim$OPTB_cpt4)] <- "0"
-
-CC_xwalk_file_path <- choose.files(default = map_file_folder,
-                                   caption = "Select Crosswalk File", multi = F)
-CC_xwalk <- read_xlsx(CC_xwalk_file_path, sheet = 1)
-  # , col_types = c('date', 'skip', 'skip', 'skip', 'skip','skip', 'skip',
-  # skip', 'skip','skip','date', 'date', 'skip'))
-CC_xwalk$`EPSI Revenue Department` <- as.character(
-  CC_xwalk$`EPSI Revenue Department`)
 
 
 # Data Pre-processing -----------------------------------------------------
