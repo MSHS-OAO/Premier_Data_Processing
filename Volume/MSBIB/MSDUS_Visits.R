@@ -33,14 +33,10 @@ dict_pay_cycles <- dict_pay_cycles %>%
 
 ## Dictionary ------------------------------------------------------------
 
-path_dict_prem <- choose.files(
-    default = paste0(j_drive,
-                     "/SixSigma/MSHS Productivity/Productivity",
-                     "/Volume - Data/MSBI Data/Union Square",
-                     "/R Code"),
-    caption = "Select DUS Main Dictionary",
-    multi = F
-  )
+path_dict_prem <- paste0(j_drive,
+                         "/SixSigma/MSHS Productivity/Productivity",
+                         "/Volume - Data/MSBI Data/Union Square/",
+                         "R Code/MSUS Epic Dictionary.xlsx")
 
 dict_epic <- read_xlsx(
     path_dict_prem,
@@ -66,8 +62,8 @@ dict_rehab_docs <- read_xlsx(
 path_data_epic <- choose.files(
   default = paste0(j_drive,
                    "/SixSigma/MSHS Productivity/Productivity",
-                   "/Volume - Data/MSBI Data/Union Square/",
-                   "Source Data"),
+                   "/Volume - Data/MSBI Data/Union Square",
+                   "/Source Data"),
   caption = "Select Epic file",
   multi = F
 )
@@ -124,7 +120,8 @@ if ("DEPARTMENT_NAME" %in% colnames(data_raw)) {
 # Data Pre-processing -----------------------------------------------------
 
 data_epic <- data_raw %>%
-  select(Department, Provider, `Appt Time`)
+  select(Department, Provider, `Appt Time`) %>%
+  filter(! is.na(`Appt Time`))
 
 
 ## date formatting, check, pay periods -------------------------------------
@@ -135,8 +132,8 @@ data_epic <- data_epic %>%
   )
 
 if ("POSIXct" %in% class(data_epic$`Appt Time`)) {
-data_epic <- data_epic %>%
-  mutate(`Appt Date` = format(lubridate::ymd(`Appt Date`), "%m/%d/%Y"))
+  data_epic <- data_epic %>%
+    mutate(`Appt Date` = format(lubridate::ymd(`Appt Date`), "%m/%d/%Y"))
 }
 # alternatively, could bring all columns of raw data as character
 
@@ -283,11 +280,10 @@ date_max_char <- format(as.Date(data_date_max, "%m/%d/%Y"), "%Y-%m-%d")
 file_name_premier <-
   paste0("MSDUS_Department Volumes_", date_min_char, "_to_", date_max_char,
          ".csv")
-path_folder_premier_export <-
-  choose.dir(
-    default = j_drive,
-    caption = "Select folder to export Premier upload file"
-  )
+path_folder_premier_export <- paste0(j_drive,
+                     "/SixSigma/MSHS Productivity/Productivity",
+                     "/Volume - Data/MSBI Data/Union Square",
+                     "/Calculation Worksheets")
 write.table(
   upload_file,
   file = paste0(path_folder_premier_export, "\\", file_name_premier),
@@ -295,5 +291,9 @@ write.table(
   col.names = F,
   sep = ","
 )
+
+message(paste0("\nUpload file written to:\n",
+               paste0(path_folder_premier_export, "\\", file_name_premier,
+                      "\n")))
 
 # Script End --------------------------------------------------------------
