@@ -178,7 +178,7 @@ dist_dates <- pay_period_mapping %>%
   filter(PREMIER.DISTRIBUTION %in% c(TRUE, 1),
          #filter 2 weeks from run date (14 days) for data collection lag
          #before run date
-         END.DATE < as.POSIXct(Sys.Date() - 14))
+         END.DATE < as.POSIXct(Sys.Date()))
 
 #Selecting current distribution date
 distribution_date <- dist_dates$END.DATE[nrow(dist_dates)]
@@ -398,11 +398,19 @@ upload_new <- rolled_up %>%
 
 ## Employee check ---------------------------------------------------------
 
+# what will we do with this info?
+
+# saw some employees with 22 hours in a single day.  is this realistic?
+
+# saw some employees who are not within Premier reports who looked like they
+# were being paid 2x within a pay period
+
 # get total regular hours in each week by employee
 hrs_reg_indiv_emp <- processed_data %>%
   group_by(Worker.Name, Earnings.E.D) %>%
   summarize(week_hours_reg = sum(Regular.Hours, na.rm = T)) %>%
   ungroup() %>%
+  filter(week_hours_reg > week_hr_indiv_emp_qc) %>%
   arrange(-week_hours_reg, Worker.Name, as.Date(Earnings.E.D, "%m/%d/%Y"))
 
 # filter process_data down to the employees with high hours that are in
@@ -414,12 +422,10 @@ high_hr_reg_emp <- processed_data %>%
              ORACLE.COST.CENTER, DEPARTMENT.BREAKDOWN, CLOSED),
       is.na(CLOSED)),
     c("wrkd_dept_oracle" = "ORACLE.COST.CENTER")) %>%
+  inner_join(hrs_reg_indiv_emp) %>%
   filter(DEPARTMENT.BREAKDOWN == 1) %>%
-  left_join(hrs_reg_indiv_emp) %>%
-  filter(week_hours_reg > week_hr_indiv_emp_qc) %>%
   arrange(-week_hours_reg, Worker.Name, as.Date(Earnings.E.D, "%m/%d/%Y"),
           as.Date(Date.Worked, "%m/%d/%Y"))
-
 
 # get total hours in each week by employee
 hrs_indiv_emp <- processed_data %>%
@@ -446,11 +452,6 @@ high_hr_emp <- processed_data %>%
   #        Manager.Name, daily_hours, week_hours)
 # could only look at a subset of columns, but might not be able to see some data
 # issues
-
-# saw some employees with 22 hours in a single day.  is this realistic?
-
-# saw some employees who are not within Premier reports who looked like they
-# were being paid 2x within a pay period
 
 
 # Visualization -----------------------------------------------------------
