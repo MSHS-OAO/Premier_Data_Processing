@@ -391,11 +391,18 @@ upload_new <- rolled_up %>%
 # expected outputs.
 
 # trend hours by cost center by Earnings.E.D to check hours trend
-check <- upload_new %>%
+qc_hours_by_cc <- upload_new %>%
   group_by(wrkd_dept_oracle, Earnings.E.D) %>%
   summarise(Hours = sum(week_hours, na.rm = T)) %>%
   arrange(desc(Hours)) %>%
-  pivot_wider(id_cols = wrkd_dept_oracle, names_from = Earnings.E.D, values_from = Hours)
+  arrange(mdy(Earnings.E.D)) %>%
+  left_join(distinct(select(code_conversion, 
+                            COST.CENTER.ORACLE, 
+                            COST.CENTER.DESCRIPTION.ORACLE)),
+                     by = c("wrkd_dept_oracle" = "COST.CENTER.ORACLE")) %>%
+  pivot_wider(id_cols = c(wrkd_dept_oracle, COST.CENTER.DESCRIPTION.ORACLE),
+              names_from = Earnings.E.D, 
+              values_from = Hours) 
 
 # Visualization -----------------------------------------------------------
 # How the data will be plotted or how the data table will look including axis
