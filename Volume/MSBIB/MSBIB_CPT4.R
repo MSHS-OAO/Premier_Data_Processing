@@ -127,15 +127,15 @@ date_start <- prev_dist + days(1)
 # select where the monthly data is pulled from
 # this is typically on a hard-drive to expedite the processing time
 # but default is set to the shared drive location
-month_dir <- choose.dir(
+work_path <- choose.dir(
   default = paste0(j_drive, "/SixSigma/MSHS Productivity/Productivity",
                    "/Volume - Data/MSBI Data/Charge Detail"),
-  caption = "Select the folder with the data files")
+  caption = "Select folder above all data files")
 
-# read file path
+# get file paths
 all_folders <-
   list.dirs(
-    path = month_dir,
+    path = work_path,
     full.names = TRUE
   )
 
@@ -145,6 +145,23 @@ all_paths <-
     pattern = "*.txt",
     full.names = TRUE
   )
+
+# just file names
+all_filenames <- all_paths %>%
+  basename() %>%
+  as.data.frame()
+colnames(all_filenames) <- c("file")
+
+file_ok <- winDialog(message = paste0(
+  "The files listed below will be processed.\r\r",
+  "Are these correct?\r\r",
+  paste(sort(unique(all_filenames$file)),
+        collapse = "\n")),
+  type = "yesno")
+
+if (file_ok == "NO") {
+  stop("Script is stopped so files can be organized for proper import.")
+}
 
 # read file content
 all_content <-
@@ -156,33 +173,57 @@ all_content <-
          stringsAsFactors = F
   )
 
-# read file name
+
+# combine file content list and file name list
 all_filenames <- all_paths %>%
   basename() %>%
   as.list()
 
-# combine file content list and file name list
+# append file name to each data point
 all_lists <- mapply(c, all_content, all_filenames, SIMPLIFY = FALSE)
 
 # unlist all lists and change column name
 all_result <- rbindlist(all_lists, fill = T)
-
-rm(all_lists, all_content)
-
 # change column name
-names(all_result)[10] <- "File.Path"
-saveRDS(all_result, file = paste0(month_dir, "/all_merged.rds"))
+names(all_result)[10] <- "file_path"
+
+
+## confirm date range of data ----------------------------------------------
+
+
+
+## save merged files for reference -----------------------------------------
+
+saveRDS(all_result, file = paste0(work_path,
+                                  "/all_merged_",
+                                  date_start,
+                                  "_to_",
+                                  dist_date,
+                                  ".rds"))
 write.table(all_result, file = paste0(month_dir, "/all_merged.csv"),
             row.names = F, col.names = T, sep = ",")
 
+
+## import rds if preferred ------------------------------------------------
+
 # all_result <- readRDS(file = paste0(month_dir, "/all_merged.rds"))
-all_result$TransDate <- as.Date(all_result$TransDate, format = "%m/%d/%Y")
-all_result$ChargeCode <- stringr::str_trim(all_result$ChargeCode)
-# all_result <- all_result %>%
-#   filter(EntityId == "MSBI" | EntityId == "MSCCW")
+
+# could make this an if statement earlier in the process
+# and prompt user about data import process
+
+
+## remove unneeded data ---------------------------------------------------
+
+rm(all_lists, all_content)
 
 
 # Data Pre-processing -----------------------------------------------------
+
+all_result$TransDate <- as.Date(all_result$TransDate, format = "%m/%d/%Y")
+all_result$ChargeCode <- stringr::str_trim(all_result$ChargeCode)
+
+# all_result <- all_result %>%
+#   filter(EntityId == "MSBI" | EntityId == "MSCCW")
 
 all_result <- left_join(x = all_result,
                         y = dictionary_pay_cycles,
