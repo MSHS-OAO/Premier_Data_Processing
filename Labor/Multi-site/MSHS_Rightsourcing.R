@@ -390,6 +390,12 @@ upload_new <- rolled_up %>%
 # Checks that are performed on the output to confirm data consistency and
 # expected outputs.
 
+# trend hours by cost center by Earnings.E.D to check hours trend
+check <- upload_new %>%
+  group_by(wrkd_dept_oracle, Earnings.E.D) %>%
+  summarise(Hours = sum(week_hours, na.rm = T)) %>%
+  arrange(desc(Hours)) %>%
+  pivot_wider(id_cols = wrkd_dept_oracle, names_from = Earnings.E.D, values_from = Hours)
 
 # Visualization -----------------------------------------------------------
 # How the data will be plotted or how the data table will look including axis
