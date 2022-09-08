@@ -5,6 +5,9 @@ library(dplyr)
 library(data.table)
 library(xlsx)
 library(readxl)
+library(tidyr)
+library(lubridate)
+# does sequence of loading affect which functions are masked?
 
 # Assigning Directory(ies) ------------------------------------------------
 
@@ -30,10 +33,10 @@ dict_pay_cycles <- read_xlsx(
 )
 
 # dates originally come in as POSIXct, so they're being converted to Date
-dict_pay_cycles <- dict_pay_cycles %>%
-  mutate(DATE = format(as.Date(DATE), "%m/%d/%Y"),
-         START.DATE = format(as.Date(START.DATE), "%m/%d/%Y"),
-         END.DATE = format(as.Date(END.DATE), "%m/%d/%Y"))
+# dict_pay_cycles <- dict_pay_cycles %>%
+#   mutate(DATE = format(as.Date(DATE), "%m/%d/%Y"),
+#          START.DATE = format(as.Date(START.DATE), "%m/%d/%Y"),
+#          END.DATE = format(as.Date(END.DATE), "%m/%d/%Y"))
 
 # path_dict_pay_cycles <- choose.files(default = map_file_folder,
 #                                            caption = "Select Pay Cycles File",
@@ -89,21 +92,21 @@ dist_dates <- dict_pay_cycles %>%
          as.POSIXct(END.DATE) < as.POSIXct(Sys.Date()))
 
 #Selecting current distribution date
-dist_date <- last(dist_dates$END.DATE)
+dist_date <- dplyr::last(dist_dates$END.DATE)
   
 #Confirming distribution date which will be the max of the current upload
 answer <- winDialog(
   message = paste0(
     "Current distribution will be ", dist_date, "\r\r",
-    "If this is correct, press OK\r\r",
-    "If this is not correct, press Cancel and\r",
+    "If this is correct?\r\r",
+    "(If this is not correct,\r",
     "you will be prompted to select the correct\r",
-    "distribution date."
+    "distribution date.)"
   ),
-  type = "okcancel"
+  type = "yesno"
 )
 
-if (answer == "CANCEL") {
+if (answer == "NO") {
   dist_date <- select.list(
     choices =
       format(sort.POSIXlt(dist_dates$END.DATE, decreasing = T), "%m/%d/%Y"),
@@ -115,8 +118,8 @@ if (answer == "CANCEL") {
 }
 
 # the start date of data will be the date of previous distribution + 1
-prev_dist <- dist_dates$END.DATE[which(dist_date$END.DATE == dist_date) - 1]
-date_start <- prev_dist + 1
+prev_dist <- dist_dates$END.DATE[which(dist_dates$END.DATE == dist_date) - 1]
+date_start <- prev_dist + days(1)
 
 
 # Data Import -------------------------------------------------------------
