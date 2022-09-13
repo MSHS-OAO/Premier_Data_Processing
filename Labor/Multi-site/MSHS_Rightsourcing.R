@@ -397,6 +397,7 @@ upload_new <- rolled_up %>%
 # Checks that are performed on the output to confirm data consistency and
 # expected outputs.
 
+## Trend hours ------------------------------------------------------------
 
 # trend hours by cost center by Earnings.E.D to check hours trend
 qc_hours_by_cc <- upload_new %>%
@@ -411,6 +412,8 @@ qc_hours_by_cc <- upload_new %>%
   pivot_wider(id_cols = c(wrkd_dept_oracle, COST.CENTER.DESCRIPTION.ORACLE),
               names_from = Earnings.E.D, 
               values_from = Hours) 
+
+View(qc_hours_by_cc)
 
 ## Employee check ---------------------------------------------------------
 
