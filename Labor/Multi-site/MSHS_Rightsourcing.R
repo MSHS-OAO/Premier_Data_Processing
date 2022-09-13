@@ -88,6 +88,9 @@ pay_period_mapping <- read_xlsx(paste0(mapping_path,
 # code conversion mapping file to convert legacy to oracle cc
 code_conversion <- read_xlsx(paste0(mapping_path,
                                     "MSHS_Code_Conversion_Mapping.xlsx"))
+# report mapping file for QC check to identify published departments
+report_info <- read_xlsx(paste0(mapping_path,
+                                "MSHS_Reporting_Definition_Mapping.xlsx"))
 
 # user needs most recent raw data file
 raw_data <- recent_file(path = paste0(project_path, "Source Data"),
@@ -175,7 +178,7 @@ dist_dates <- pay_period_mapping %>%
   filter(PREMIER.DISTRIBUTION %in% c(TRUE, 1),
          #filter 2 weeks from run date (14 days) for data collection lag
          #before run date
-         END.DATE < as.POSIXct(Sys.Date() - 14))
+         END.DATE < as.POSIXct(Sys.Date()))
 
 #Selecting current distribution date
 distribution_date <- dist_dates$END.DATE[nrow(dist_dates)]
@@ -209,6 +212,10 @@ prev_0_max_date_mshq <- max(mdy(mshq_zero_old$date.end))
 
 prev_0_max_date_msbib <- max(mdy(msbib_zero_old$date.end))
 # should we compare these to make sure we have all files needed?
+
+# need threshold for weekly hour total for an employee to highlight for review
+week_reg_hr_indiv_emp_qc <- 40
+week_hr_indiv_emp_qc <- 55
 
 # Data Pre-processing -----------------------------------------------------
 
@@ -390,6 +397,7 @@ upload_new <- rolled_up %>%
 # Checks that are performed on the output to confirm data consistency and
 # expected outputs.
 
+
 # trend hours by cost center by Earnings.E.D to check hours trend
 qc_hours_by_cc <- upload_new %>%
   group_by(wrkd_dept_oracle, Earnings.E.D) %>%
@@ -403,6 +411,61 @@ qc_hours_by_cc <- upload_new %>%
   pivot_wider(id_cols = c(wrkd_dept_oracle, COST.CENTER.DESCRIPTION.ORACLE),
               names_from = Earnings.E.D, 
               values_from = Hours) 
+
+## Employee check ---------------------------------------------------------
+
+# get total regular hours in each week by employee and above regular hours
+# threshold
+hrs_reg_indiv_emp <- processed_data %>%
+  group_by(Worker.Name, Earnings.E.D) %>%
+  summarize(week_hours_reg = sum(Regular.Hours, na.rm = T)) %>%
+  ungroup() %>%
+  filter(week_hours_reg > week_reg_hr_indiv_emp_qc) %>%
+  arrange(-week_hours_reg, Worker.Name, as.Date(Earnings.E.D, "%m/%d/%Y"))
+
+View(hrs_reg_indiv_emp)
+
+# filter process_data down to the employees with high hours that are in
+# Premier reports
+high_hr_reg_emp <- processed_data %>%
+  left_join(
+    filter(
+      select(report_info, DEFINITION.CODE, DEFINITION.NAME,
+             ORACLE.COST.CENTER, DEPARTMENT.BREAKDOWN, CLOSED),
+      is.na(CLOSED)),
+    c("wrkd_dept_oracle" = "ORACLE.COST.CENTER")) %>%
+  inner_join(hrs_reg_indiv_emp) %>%
+  filter(DEPARTMENT.BREAKDOWN == 1) %>%
+  arrange(-week_hours_reg, Worker.Name, as.Date(Earnings.E.D, "%m/%d/%Y"),
+          as.Date(Date.Worked, "%m/%d/%Y"))
+
+View(high_hr_reg_emp)
+
+# get total hours in each week by employee and filter above threshold
+hrs_indiv_emp <- processed_data %>%
+  group_by(Worker.Name, Earnings.E.D) %>%
+  summarize(week_hours = sum(daily_hours, na.rm = T)) %>%
+  ungroup() %>%
+  filter(week_hours > week_hr_indiv_emp_qc) %>%
+  arrange(-week_hours, Worker.Name, as.Date(Earnings.E.D, "%m/%d/%Y"))
+
+View(hrs_indiv_emp)
+
+# filter process_data down to the employees with high hours that are in
+# Premier reports
+high_hr_emp <- processed_data %>%
+  left_join(
+    filter(
+      select(report_info, DEFINITION.CODE, DEFINITION.NAME,
+             ORACLE.COST.CENTER, DEPARTMENT.BREAKDOWN, CLOSED),
+      is.na(CLOSED)),
+    c("wrkd_dept_oracle" = "ORACLE.COST.CENTER")) %>%
+  filter(DEPARTMENT.BREAKDOWN == 1) %>%
+  inner_join(hrs_indiv_emp) %>%
+  arrange(-week_hours, Worker.Name, as.Date(Earnings.E.D, "%m/%d/%Y"),
+          as.Date(Date.Worked, "%m/%d/%Y")) # %>%
+
+View(high_hr_emp)
 
 # Visualization -----------------------------------------------------------
 # How the data will be plotted or how the data table will look including axis
