@@ -5,8 +5,9 @@ library(readxl)
 
 # Directories -------------------------------------------------------------
 dir <- 'J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity'
-dir_data <- paste0(dir, '/Labor - Data/CHP Source Data')
-
+dir_BISLR <- paste0(dir, '/Labor - Data/Multi-site/BISLR')
+dir_universal <- paste0(dir, '/Universal Data')
+  
 # Constants ---------------------------------------------------------------
 new_dpt_map <- 10095
 map_effective_date <- as.Date('2022-01-01') #is this date ok?
@@ -35,11 +36,10 @@ productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
   data_recent <- data_recent %>% mutate(Source = File.Table$File.Path[place]) #File Source Column for Reference
   return(data_recent)
 }
-bislr_payroll <- import_recent_file(dir_data, 1)
-#quality check if correct file selected
 
 # Import Data -------------------------------------------------------------
-
+  bislr_payroll <- import_recent_file(dir_BISLR, 1)
+  #quality check if correct file selected
 
 # Import References -------------------------------------------------------
 
