@@ -214,7 +214,8 @@ prev_0_max_date_msbib <- max(mdy(msbib_zero_old$date.end))
 # should we compare these to make sure we have all files needed?
 
 # need threshold for weekly hour total for an employee to highlight for review
-week_hr_indiv_emp_qc <- 40
+week_reg_hr_indiv_emp_qc <- 40
+week_hr_indiv_emp_qc <- 55
 
 # Data Pre-processing -----------------------------------------------------
 
@@ -398,23 +399,19 @@ upload_new <- rolled_up %>%
 
 ## Employee check ---------------------------------------------------------
 
-# what will we do with this info?
-
-# saw some employees with 22 hours in a single day.  is this realistic?
-
-# saw some employees who are not within Premier reports who looked like they
-# were being paid 2x within a pay period
-
-# get total regular hours in each week by employee
+# get total regular hours in each week by employee and above regular hours
+# threshold
 hrs_reg_indiv_emp <- processed_data %>%
   group_by(Worker.Name, Earnings.E.D) %>%
   summarize(week_hours_reg = sum(Regular.Hours, na.rm = T)) %>%
   ungroup() %>%
-  filter(week_hours_reg > week_hr_indiv_emp_qc) %>%
+  filter(week_hours_reg > week_reg_hr_indiv_emp_qc) %>%
   arrange(-week_hours_reg, Worker.Name, as.Date(Earnings.E.D, "%m/%d/%Y"))
 
+View(hrs_reg_indiv_emp)
+
 # filter process_data down to the employees with high hours that are in
-# Premier reports and have more than a week's worth of regular hours
+# Premier reports
 high_hr_reg_emp <- processed_data %>%
   left_join(
     filter(
@@ -427,15 +424,20 @@ high_hr_reg_emp <- processed_data %>%
   arrange(-week_hours_reg, Worker.Name, as.Date(Earnings.E.D, "%m/%d/%Y"),
           as.Date(Date.Worked, "%m/%d/%Y"))
 
-# get total hours in each week by employee
+View(high_hr_reg_emp)
+
+# get total hours in each week by employee and filter above threshold
 hrs_indiv_emp <- processed_data %>%
   group_by(Worker.Name, Earnings.E.D) %>%
   summarize(week_hours = sum(daily_hours, na.rm = T)) %>%
   ungroup() %>%
+  filter(week_hours > week_hr_indiv_emp_qc) %>%
   arrange(-week_hours, Worker.Name, as.Date(Earnings.E.D, "%m/%d/%Y"))
 
+View(hrs_indiv_emp)
+
 # filter process_data down to the employees with high hours that are in
-# Premier reports and have more than a standard week's worth of hours
+# Premier reports
 high_hr_emp <- processed_data %>%
   left_join(
     filter(
@@ -444,15 +446,11 @@ high_hr_emp <- processed_data %>%
       is.na(CLOSED)),
     c("wrkd_dept_oracle" = "ORACLE.COST.CENTER")) %>%
   filter(DEPARTMENT.BREAKDOWN == 1) %>%
-  left_join(hrs_indiv_emp) %>%
-  filter(week_hours > week_hr_indiv_emp_qc) %>%
+  inner_join(hrs_indiv_emp) %>%
   arrange(-week_hours, Worker.Name, as.Date(Earnings.E.D, "%m/%d/%Y"),
           as.Date(Date.Worked, "%m/%d/%Y")) # %>%
-  # select(Earnings.E.D, Date.Worked, wrkd_dept_oracle, Job.Title, Worker.Name,
-  #        Manager.Name, daily_hours, week_hours)
-# could only look at a subset of columns, but might not be able to see some data
-# issues
 
+View(high_hr_emp)
 
 # Visualization -----------------------------------------------------------
 # How the data will be plotted or how the data table will look including axis
