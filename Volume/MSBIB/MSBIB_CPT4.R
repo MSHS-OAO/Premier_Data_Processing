@@ -57,24 +57,49 @@ dict_pay_cycles <- read_xlsx(
 
 CDM_file_path <- choose.files(
   default = paste0(j_drive, "/SixSigma/MSHS Productivity/Productivity/",
-                   "Volume - Data/CDMs/BIB"),
+                   "Volume - Data/CDMs/BIB/*"),
   caption = "Select CDM File",
   multi = F)
 CDM <- read_xlsx(CDM_file_path, sheet = 1)
-CDM_slim <- CDM %>% select(CHARGE_CODE, CHARGE_DESC, OPTB_cpt4)
-CDM_slim$CHARGE_CODE <- stringr::str_trim(CDM_slim$CHARGE_CODE)
-CDM_slim$OPTB_cpt4[is.na(CDM_slim$OPTB_cpt4)] <- "0"
+CDM_slim <- CDM %>%
+  select(CHARGE_CODE, CHARGE_DESC, OPTB_cpt4) %>%
+  mutate(CHARGE_CODE = stringr::str_trim(CHARGE_CODE),
+         OPTB_cpt4 = case_when(
+           is.na(OPTB_cpt4) ~ "0",
+           TRUE ~ OPTB_cpt4
+         )
+  )
 
 
 ## crosswalk --------------------------------------------------------------
 
-CC_xwalk_file_path <- choose.files(
+cc_xwalk_file_path <- choose.files(
   default = paste0(j_drive, "/SixSigma/MSHS Productivity/Productivity/",
-                   "Volume - Data/MSBI Data/Charge Detail/Instruction Files"),
+                   "Volume - Data/MSBI Data/Charge Detail/Instruction Files/",
+                   "*"),
   caption = "Select Crosswalk File", multi = F)
-CC_xwalk <- read_xlsx(CC_xwalk_file_path, sheet = 1)
-CC_xwalk$`EPSI Revenue Department` <- as.character(
-  CC_xwalk$`EPSI Revenue Department`)
+cc_xwalk <- read_xlsx(cc_xwalk_file_path, sheet = 1, 
+                      col_types = c("guess", "text", "text"))
+# cc_xwalk <- cc_xwalk %>%
+#   mutate(`EPSI Revenue Department` = as.character(`EPSI Revenue Department`))
+# cc_xwalk$`EPSI Revenue Department` <- as.character(
+#   cc_xwalk$`EPSI Revenue Department`)
+
+
+## CPT Count/RVU map ------------------------------------------------------
+
+# ask Greg L to move this file to Universal?
+
+cpt_ref_path <- choose.files(
+  default = paste0(j_drive, "/SixSigma/MSHS Productivity/Productivity/",
+                   "Volume - Data/MSH Data/Charges/CPT Reference/",
+                   "CPT_ref.xlsx"),
+  caption = "Select CPT Reference File", multi = F)
+cpt_ref <- read_xlsx(
+  cpt_ref_path,
+  sheet = 1,
+  col_types = c(rep("text", 4), rep("numeric", 10), rep("text", 4))
+)
 
 
 # Constants ---------------------------------------------------------------
@@ -98,7 +123,7 @@ dist_date <- dplyr::last(dist_dates$END.DATE)
 answer <- winDialog(
   message = paste0(
     "Current distribution will be ", dist_date, "\r\r",
-    "If this is correct?\r\r",
+    "Is this correct?\r\r",
     "(If this is not correct,\r",
     "you will be prompted to select the correct\r",
     "distribution date.)"
@@ -110,6 +135,8 @@ if (answer == "NO") {
   dist_date <- select.list(
     choices =
       format(sort.POSIXlt(dist_dates$END.DATE, decreasing = T), "%m/%d/%Y"),
+    preselect = format(
+      sort.POSIXlt(dist_dates$END.DATE, decreasing = T), "%m/%d/%Y")[2],
     multiple = F,
     title = "Select current distribution",
     graphics = T
