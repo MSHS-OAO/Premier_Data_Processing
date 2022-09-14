@@ -29,7 +29,8 @@ dict_pay_cycles <- read_xlsx(
   paste0(
     j_drive, "/SixSigma/MSHS Productivity/Productivity/Universal Data/",
     "Mapping/MSHS_Pay_Cycle.xlsx"
-  )
+  ),
+  col_types = c("guess", "guess", "guess", "skip")
 )
 
 # dates originally come in as POSIXct, so they're being converted to Date
@@ -53,15 +54,15 @@ dict_pay_cycles <- read_xlsx(
 # dictionary_pay_cycles$`End Date` <- as.Date(dictionary_pay_cycles$`End Date`)
 
 
-## CDM ---------------------------------------------------------------------
+## cdm ---------------------------------------------------------------------
 
-CDM_file_path <- choose.files(
+cdm_file_path <- choose.files(
   default = paste0(j_drive, "/SixSigma/MSHS Productivity/Productivity/",
-                   "Volume - Data/CDMs/BIB/*"),
-  caption = "Select CDM File",
+                   "Volume - Data/cdms/BIB/*"),
+  caption = "Select cdm File",
   multi = F)
-CDM <- read_xlsx(CDM_file_path, sheet = 1)
-CDM_slim <- CDM %>%
+cdm <- read_xlsx(cdm_file_path, sheet = 1)
+cdm_slim <- cdm %>%
   select(CHARGE_CODE, CHARGE_DESC, OPTB_cpt4) %>%
   mutate(CHARGE_CODE = stringr::str_trim(CHARGE_CODE),
          OPTB_cpt4 = case_when(
@@ -70,6 +71,7 @@ CDM_slim <- CDM %>%
          )
   )
 
+rm(cdm)
 
 ## crosswalk --------------------------------------------------------------
 
@@ -79,7 +81,7 @@ cc_xwalk_file_path <- choose.files(
                    "*"),
   caption = "Select Crosswalk File", multi = F)
 cc_xwalk <- read_xlsx(cc_xwalk_file_path, sheet = 1, 
-                      col_types = c("guess", "text", "text"))
+                      col_types = c("guess", rep("text", 7), "skip"))
 # cc_xwalk <- cc_xwalk %>%
 #   mutate(`EPSI Revenue Department` = as.character(`EPSI Revenue Department`))
 # cc_xwalk$`EPSI Revenue Department` <- as.character(
@@ -100,6 +102,15 @@ cpt_ref <- read_xlsx(
   sheet = 1,
   col_types = c(rep("text", 4), rep("numeric", 10), rep("text", 4))
 )
+
+cpt_ref_slim <- cpt_ref %>%
+  select(`Effective Year/Quarter`, `CPT/HCPCS Code`, `Modifier Code`,
+         `Worked RVU Factor`, `CPT Procedure Count`, `Short Description`,
+         `Long Description`) %>%
+  filter(`Effective Year/Quarter` == 
+           unique(cpt_ref$`Effective Year/Quarter`)[1])
+
+rm(cpt_ref)
 
 
 # Constants ---------------------------------------------------------------
@@ -210,30 +221,36 @@ all_filenames <- all_paths %>%
 all_lists <- mapply(c, all_content, all_filenames, SIMPLIFY = FALSE)
 
 # unlist all lists and change column name
-all_result <- rbindlist(all_lists, fill = T)
+raw_data <- rbindlist(all_lists, fill = T)
 # change column name
-names(all_result)[10] <- "file_path"
-
+raw_data <- raw_data %>%
+  rename(file_path = V1)
 
 ## confirm date range of data ----------------------------------------------
 
-
+## TBD
 
 ## save merged files for reference -----------------------------------------
 
-saveRDS(all_result, file = paste0(work_path,
-                                  "/all_merged_",
-                                  date_start,
-                                  "_to_",
-                                  dist_date,
+raw_path <- choose.dir(default = work_path,
+                       caption = "Select folder to store consolidated raw data"
+                       )
+
+# this needs to be improved because the default doesn't go to the desired path.
+# it seems like the default path isn't in the My Computer directory to select
+
+saveRDS(raw_data,
+        file = paste0(raw_path, "/all_merged_", date_start, "_to_", dist_date,
                                   ".rds"))
-write.table(all_result, file = paste0(month_dir, "/all_merged.csv"),
+write.table(raw_data,
+            file = paste0(raw_path, "/all_merged_", date_start, "_to_",
+                          dist_date, ".csv"),
             row.names = F, col.names = T, sep = ",")
 
 
 ## import rds if preferred ------------------------------------------------
 
-# all_result <- readRDS(file = paste0(month_dir, "/all_merged.rds"))
+# raw_data <- readRDS(file = choose.files()))
 
 # could make this an if statement earlier in the process
 # and prompt user about data import process
@@ -241,85 +258,114 @@ write.table(all_result, file = paste0(month_dir, "/all_merged.csv"),
 
 ## remove unneeded data ---------------------------------------------------
 
-rm(all_lists, all_content)
+rm(all_content, all_lists, all_folders, all_paths, all_filenames)
 
 
 # Data Pre-processing -----------------------------------------------------
 
-all_result$TransDate <- as.Date(all_result$TransDate, format = "%m/%d/%Y")
-all_result$ChargeCode <- stringr::str_trim(all_result$ChargeCode)
+processed_data <- raw_data
+
+processed_data <- processed_data %>%
+  mutate(TransDate = as.Date(TransDate, format = "%m/%d/%Y"),
+         ChargeCode = stringr::str_trim(ChargeCode))
 
 # all_result <- all_result %>%
 #   filter(EntityId == "MSBI" | EntityId == "MSCCW")
 
-all_result <- left_join(x = all_result,
-                        y = dictionary_pay_cycles,
-                        by = c("TransDate" = "Date"),
-                        all.x = T)
+# join pay cycle info, cc_xwalk, cdm, and Premier CPT counter
+processed_data <- processed_data %>%
+  left_join(y = dict_pay_cycles,
+            by = c("TransDate" = "DATE"),
+            all.x = T) %>%
+  left_join(y = cc_xwalk,
+            by = c("FacilityId" = "FacilityId",
+                   "RevDept" = "EPSI Revenue Department"),
+            all.x = T) %>%
+  left_join(y = select(cdm_slim, -any_of("CHARGE_DESC")),
+            by = c("ChargeCode" = "CHARGE_CODE"),
+            all.x = T) %>%
+  mutate(OPTB_cpt4 = case_when(
+    is.na(OPTB_cpt4) ~ "#N/A",
+    TRUE ~ OPTB_cpt4)) %>%
+  left_join(y = cpt_ref_slim,
+            by = c("OPTB_cpt4" = "CPT/HCPCS Code"),
+            all.x = T)
 
-all_result <- left_join(x = all_result,
-                        y = CC_xwalk,
-                        by = c("FacilityId" = "FacilityId",
-                               "RevDept" = "EPSI Revenue Department"),
-                        all.x = T)
-
-all_result <- left_join(x = all_result,
-                        y = select(CDM_slim, -any_of("CHARGE_DESC")),
-                        by = c("ChargeCode" = "CHARGE_CODE"),
-                        all.x = T)
-
-all_result$OPTB_cpt4[is.na(all_result$OPTB_cpt4)] <- "#N/A"
-
-NA_CC_result <- all_result %>%
-  filter(is.na(`Labor Department`) |
-           str_detect(`Labor Department`, "NOMAP")) %>%
-  group_by(FacilityId, RevDept) %>%
-  summarise(Vol = sum(Qty))
-
-NA_CPT4_result <- all_result %>%
-  filter(OPTB_cpt4 == "#N/A" | OPTB_cpt4 == 0 |
-           OPTB_cpt4 == 99999 | is.na(OPTB_cpt4)) %>%
-  group_by(FacilityId, RevDept, ChargeCode, OPTB_cpt4) %>%
-  summarise(Vol = sum(Qty))
-
-charge_summary <- all_result %>%
+charge_summary <- processed_data %>%
   group_by(`Labor Department`, TransDate, OPTB_cpt4) %>%
-  summarise(Vol = sum(Qty))
-
-charge_summary <- charge_summary %>%
-  filter(TransDate >= begin_date &
-           TransDate <= final_date)
-
-# Data Formatting ---------------------------------------------------------
-
-charge_summary$EntityID <- rep(729805, nrow(charge_summary))
-charge_summary$FacilID <- rep(630571, nrow(charge_summary))
-charge_summary$budget <- rep(0, nrow(charge_summary))
-charge_summary <- charge_summary %>%
-  mutate(EndDate = TransDate) %>%
-  rename(StartDate = TransDate) %>%
-  select(EntityID, FacilID, `Labor Department`, StartDate, EndDate,
-         OPTB_cpt4, Vol, budget) %>%
+  summarise(Vol = sum(Qty)) %>%
+  ungroup() %>%
+  filter(TransDate >= date_start &
+           TransDate <= dist_date) %>%
   filter(!is.na(`Labor Department`)) %>%
   filter(!is.na(OPTB_cpt4)) %>%
   filter(OPTB_cpt4 != "#N/A") %>%
-  filter(OPTB_cpt4 != 0) %>%
-  filter(OPTB_cpt4 != 99999) %>%
-  filter(!str_detect(`Labor Department`, "NOMAP"))
+  filter(OPTB_cpt4 != "0") %>%
+  filter(OPTB_cpt4 != "99999") %>%
+  filter(!stringr::str_detect(`Labor Department`, "NOMAP"))
 
-charge_summary$StartDate <- format(charge_summary$StartDate, "%m/%d/%Y")
-charge_summary$EndDate <- format(charge_summary$EndDate, "%m/%d/%Y")
+# Data Formatting ---------------------------------------------------------
+
+charge_summary <- charge_summary %>%
+  mutate(EntityID = 729805,
+         FacilID = 630571,
+         budget = 0,
+         EndDate = TransDate) %>%
+  rename(StartDate = TransDate) %>%
+  mutate(StartDate = format(StartDate, "%m/%d/%Y"),
+         EndDate = format(EndDate, "%m/%d/%Y")) %>%
+  select(EntityID, FacilID, `Labor Department`, StartDate, EndDate,
+         OPTB_cpt4, Vol, budget)
+# can this be modified to make the start date the pay cycle start
+# and the end date the pay cycle end?
+# this would reduce the upload size significantly
 
 # Quality Checks ----------------------------------------------------------
 
+charge_summary_qc <- processed_data %>%
+  group_by(`Labor Department`, START.DATE, END.DATE, OPTB_cpt4) %>%
+  summarise(Vol = sum(Qty)) %>%
+  ungroup() %>%
+  filter(END.DATE >= date_start &
+           START.DATE <= dist_date) %>%
+  filter(!is.na(`Labor Department`)) %>%
+  filter(!is.na(OPTB_cpt4)) %>%
+  filter(OPTB_cpt4 != "#N/A") %>%
+  filter(OPTB_cpt4 != "0") %>%
+  filter(OPTB_cpt4 != "99999") %>%
+  filter(!stringr::str_detect(`Labor Department`, "NOMAP"))
+# join the premier report info
+
+na_cc_summary <- processed_data %>%
+  filter(is.na(`Labor Department`) |
+           stringr::str_detect(`Labor Department`, "NOMAP")) %>%
+  filter(END.DATE > date_start & START.DATE < dist_date) %>%
+  group_by(FacilityId, RevDept, `Labor Department`, END.DATE) %>%
+  summarise(vol = sum(Qty),
+            prem_cpt = sum(Qty * `CPT Procedure Count`)) %>%
+  ungroup()
+
+View(na_cc_summary)
+
+# could improve this by considering how many of these are in 
+# depts that are used for premier reports and having that be in another column
+na_cpt4_summary <- processed_data %>%
+  filter(OPTB_cpt4 == "#N/A" | OPTB_cpt4 == 0 |
+           OPTB_cpt4 == 99999 | is.na(OPTB_cpt4)) %>%
+  filter(END.DATE > date_start & START.DATE < dist_date) %>%
+  group_by(ChargeCode, OPTB_cpt4) %>%
+  summarise(vol = sum(Qty)) %>%
+  ungroup()
+
+View(na_cpt4_summary)
 
 # File Saving -------------------------------------------------------------
 
 write.table(charge_summary, file = paste0(month_dir, "/CPT upload.csv"),
             row.names = F, col.names = F, sep = ",")
-write.table(NA_CC_result, file = paste0(month_dir, "/CPT no CC.csv"),
+write.table(na_cc_result, file = paste0(month_dir, "/CPT no CC.csv"),
             row.names = F, col.names = T, sep = ",")
-write.table(NA_CPT4_result, file = paste0(month_dir, "/CPT no CPT4 map.csv"),
+write.table(na_cpt4_result, file = paste0(month_dir, "/CPT no CPT4 map.csv"),
             row.names = F, col.names = T, sep = ",")
 
 # Script End --------------------------------------------------------------
