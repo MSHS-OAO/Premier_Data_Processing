@@ -46,7 +46,7 @@ bislr_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
   #quality check if correct file selected
 
 # Import References -------------------------------------------------------
-#delete start.end in maping file and create in script to identify which paycycles to filter on in payroll files
+#delete start.end in mapping file and create in script to identify which paycycles to filter on in payroll files
   pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR,
                                         "/Reference",
                                         "/Pay cycles uploaded_Tracker.xlsx"),
@@ -55,6 +55,7 @@ bislr_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
 msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                       "/Reference/MSUS_removal_list.xlsx"),
                                sheet = 1)
+#TBD references continued
 
 # Data Processing -----------------------------------------------------------
 
