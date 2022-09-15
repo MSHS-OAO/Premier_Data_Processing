@@ -32,12 +32,30 @@ productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
                        format = '%m_%d_%Y')
   File.Table <<- data.table::data.table(File.Name, File.Date, File.Path) %>%
     arrange(desc(File.Date))
+  #Quality Check - Confirming Upload File
+  cat('File selected is ',
+      File.Table$File.Name[place],
+      ". Is this the correct file?")
+  answer <- select.list(choices = c("Yes", "No"),
+                        preselect = "Yes",
+                        multiple = F,
+                        title = "Correct File?",
+                        graphics = T)
+  if (answer == "No") {
+    user_selected_file <- select.list(choices = File.Table$File.Name,
+                                multiple = F,
+                                title = "Select the correct file",
+                                graphics = T)
+    place <- grep(user_selected_file, File.Table$File.Name)
+
+  }
   #Importing Data 
   data_recent <- read.table(File.Table$File.Path[place],
                             header = T,
                             as.is = T,
                             sep = '~',
                             fill = T)
+  cat('File selected is ', File.Table$File.Name[place])
   return(data_recent)
   }
 
