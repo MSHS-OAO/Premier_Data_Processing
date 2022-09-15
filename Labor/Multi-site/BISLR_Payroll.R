@@ -79,7 +79,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                       "/Mapping/MSHS_Reporting_Definition_Mapping.xlsx"),
                                sheet = 1)
 
-## Premier Reference Files -------------------------------------------------
+  ## Premier Reference Files -------------------------------------------------
   dict_premier_dpt <- read.table(paste0(dir_universal,
                                         "/Premier/Dictionary Exports",
                                         "/DepartmentDictionary.csv"),
@@ -128,7 +128,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                     sep = ",",
                                     fill = T)
 
-  
 # Data Processing -----------------------------------------------------------
 
 
