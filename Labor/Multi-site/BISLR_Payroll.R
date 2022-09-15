@@ -15,6 +15,8 @@ map_effective_date <- as.Date('2022-01-01') #is this date ok?
 accural_legacy_cc <- c(1109008600, 1109028600, 4409008600, 6409008600) #add other 8600, make quality check for new 8600, id errors non accural oracle but backmapped accural
 productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
                         'OTHER_WORKED', 'AGENCY')
+# general improvement opportunity:
+# can we update the paycode mapping file to indicate productive vs. non-prod?
 
   ## Premier Formatting ------------------------------------------------------
   char_len_dpt <- 15
@@ -38,6 +40,18 @@ productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
                             as.is = T,
                             sep = '~',
                             fill = T)
+                            # colClasses = "character")
+                            # Home dept came in as numeric and was displaying
+                            # as scientific, so tried bringing in as text
+                            # since all other columns were text.
+                            # Also found that some values are not including
+                            # location and dept code
+
+  # Also seeing:  
+  # Warning message:
+  #   In scan(file = file, what = what, sep = sep, quote = quote, dec = dec,  :
+  #             EOF within quoted string
+
   return(data_recent)
   }
 
