@@ -47,15 +47,13 @@ productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
                                 title = "Select the correct file",
                                 graphics = T)
     place <- grep(user_selected_file, File.Table$File.Name)
-
+    cat('File selected is ', File.Table$File.Name[place])
   }
   #Importing Data 
-  data_recent <- read.table(File.Table$File.Path[place],
+  data_recent <- read.csv(File.Table$File.Path[place],
                             header = T,
-                            as.is = T,
                             sep = '~',
                             fill = T)
-  cat('File selected is ', File.Table$File.Name[place])
   return(data_recent)
   }
 
