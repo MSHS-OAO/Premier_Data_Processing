@@ -130,6 +130,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
 # Data Processing -----------------------------------------------------------
 
+  ## References --------------------------------------------------------------
+  pay_cycles_uploaded <- pay_cycles_uploaded %>%
+    mutate(Start_End = paste0(Start.Date, '-', End.Date))
+
 
 # Creating Outputs --------------------------------------------------------
 
