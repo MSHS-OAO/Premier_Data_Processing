@@ -61,7 +61,6 @@ productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
 
 # Import Data -------------------------------------------------------------
 bislr_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
-  #quality check if correct file selected
 
 # Import References -------------------------------------------------------
 pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR,
