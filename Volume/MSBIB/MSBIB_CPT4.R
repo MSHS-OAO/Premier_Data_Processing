@@ -1,6 +1,5 @@
 # Libraries ---------------------------------------------------------------
 
-# library(tidyverse)
 library(dplyr)
 library(data.table)
 library(xlsx)
@@ -34,33 +33,13 @@ dict_pay_cycles <- read_xlsx(
   col_types = c("guess", "guess", "guess", "text")
 )
 
-# dates originally come in as POSIXct, so they're being converted to Date
-# dict_pay_cycles <- dict_pay_cycles %>%
-#   mutate(DATE = format(as.Date(DATE), "%m/%d/%Y"),
-#          START.DATE = format(as.Date(START.DATE), "%m/%d/%Y"),
-#          END.DATE = format(as.Date(END.DATE), "%m/%d/%Y"))
 
-# path_dict_pay_cycles <- choose.files(default = map_file_folder,
-#                                            caption = "Select Pay Cycles File",
-#                                            multi = F)
-# dictionary_pay_cycles <- read_xlsx(path_dict_pay_cycles,
-#                                    sheet = 1,
-#                                    col_types = c("date", "skip", "skip", "skip",
-#                                                  "skip", "skip", "skip", "skip",
-#                                                  "skip", "skip", "date", "date",
-#                                                  "skip"))
-# dictionary_pay_cycles$Date <- as.Date(dictionary_pay_cycles$Date)
-# dictionary_pay_cycles$`Start Date` <- as.Date(
-#   dictionary_pay_cycles$`Start Date`)
-# dictionary_pay_cycles$`End Date` <- as.Date(dictionary_pay_cycles$`End Date`)
-
-
-## cdm ---------------------------------------------------------------------
+## CDM ---------------------------------------------------------------------
 
 cdm_file_path <- choose.files(
   default = paste0(j_drive, "/SixSigma/MSHS Productivity/Productivity/",
                    "Volume - Data/cdms/BIB/*"),
-  caption = "Select cdm File",
+  caption = "Select CDM File",
   multi = F)
 cdm <- read_xlsx(cdm_file_path, sheet = 1)
 cdm_slim <- cdm %>%
@@ -81,13 +60,10 @@ cc_xwalk_file_path <- choose.files(
                    "Volume - Data/MSBI Data/Charge Detail/Instruction Files/",
                    "*"),
   caption = "Select Crosswalk File", multi = F)
-cc_xwalk <- read_xlsx(cc_xwalk_file_path, sheet = 1, 
+cc_xwalk <- read_xlsx(cc_xwalk_file_path, sheet = 1,
                       col_types = c("guess", rep("text", 8), "skip"))
   
-# cc_xwalk <- cc_xwalk %>%
-#   mutate(`EPSI Revenue Department` = as.character(`EPSI Revenue Department`))
-# cc_xwalk$`EPSI Revenue Department` <- as.character(
-#   cc_xwalk$`EPSI Revenue Department`)
+# make this a static file location instead of user choosing
 
 
 ## CPT Count/RVU map ------------------------------------------------------
@@ -109,7 +85,7 @@ cpt_ref_slim <- cpt_ref %>%
   select(`Effective Year/Quarter`, `CPT/HCPCS Code`, `Modifier Code`,
          `Worked RVU Factor`, `CPT Procedure Count`, `Short Description`,
          `Long Description`) %>%
-  filter(`Effective Year/Quarter` == 
+  filter(`Effective Year/Quarter` ==
            unique(cpt_ref$`Effective Year/Quarter`)[1])
 
 rm(cpt_ref)
@@ -238,7 +214,7 @@ write_path <- choose.dir(default = work_path,
                        caption = "Select folder to store consolidated raw data"
                        )
 
-# this needs to be improved because the default doesn't go to the desired path.
+# this can be improved because the default doesn't go to the desired path.
 # it seems like the default path isn't in the My Computer directory to select
 
 saveRDS(raw_data,
@@ -257,6 +233,9 @@ write.table(raw_data,
 # could make this an if statement earlier in the process
 # and prompt user about data import process
 
+# but this is so rarely done that user can uncomment and run function
+# on their own if desired
+
 
 ## remove unneeded data ---------------------------------------------------
 
@@ -270,9 +249,6 @@ processed_data <- raw_data
 processed_data <- processed_data %>%
   mutate(TransDate = as.Date(TransDate, format = "%m/%d/%Y"),
          ChargeCode = str_trim(ChargeCode))
-
-# all_result <- all_result %>%
-#   filter(EntityId == "MSBI" | EntityId == "MSCCW")
 
 # join pay cycle info, cc_xwalk, cdm, and Premier CPT counter
 processed_data <- processed_data %>%
@@ -294,6 +270,18 @@ processed_data <- processed_data %>%
             all.x = T)
 
 charge_summary <- processed_data %>%
+  # filter(`Published Report` == "yes") %>%
+  # filter(OPTB_cpt4 != "#N/A") %>%
+  # filter(OPTB_cpt4 != "0") %>%
+  # filter(OPTB_cpt4 != "99999") %>%
+  # filter(!is.na(OPTB_cpt4)) %>%
+  # filter(START.DATE >= date_start &
+  #          END.DATE <= dist_date) %>%
+  # group_by(`Labor Department`, START.DATE, END.DATE, OPTB_cpt4) %>%
+  # summarise(Vol = sum(Qty)) %>%
+  # ungroup()
+  # if the above is uncommented, then the data formatting of charge_summary
+  # below would need to be modified
   group_by(`Labor Department`, TransDate, OPTB_cpt4) %>%
   summarise(Vol = sum(Qty)) %>%
   ungroup() %>%
@@ -321,6 +309,8 @@ charge_summary <- charge_summary %>%
 # can this be modified to make the start date the pay cycle start
 # and the end date the pay cycle end?
 # this would reduce the upload size significantly
+# (some code for the initial charge_summary creation has already been
+# put in place)
 
 # Quality Checks ----------------------------------------------------------
 
@@ -331,7 +321,7 @@ charge_summary_qc <- processed_data %>%
   mutate(prem_vol = case_when(
     `Report Metric Type` == "RVU" ~ Qty * `Worked RVU Factor`,
     `Report Metric Type` == "CPT" ~ Qty * `CPT Procedure Count`)) %>%
-  group_by(`Report ID`,`Report Name`, `Report Metric`, `Report Metric Type`,
+  group_by(`Report ID`, `Report Name`, `Report Metric`, `Report Metric Type`,
            START.DATE, END.DATE, ) %>%
   summarize(Vol = sum(prem_vol)) %>%
   ungroup()
@@ -347,7 +337,7 @@ na_cc_summary <- processed_data %>%
 
 View(na_cc_summary)
 
-# could improve this by considering how many of these are in 
+# could improve this by considering how many of these are in
 # depts that are used for premier reports and having that be in another column
 na_cpt4_summary <- processed_data %>%
   filter(OPTB_cpt4 == "#N/A" | OPTB_cpt4 == 0 |
@@ -362,7 +352,7 @@ na_cpt4_pub_report_summary <- processed_data %>%
   filter(OPTB_cpt4 == "#N/A" | OPTB_cpt4 == 0 |
            OPTB_cpt4 == 99999 | is.na(OPTB_cpt4)) %>%
   filter(END.DATE > date_start & START.DATE < dist_date) %>%
-  group_by(`Report ID`,`Report Name`, `Report Metric`, `Report Metric Type`,
+  group_by(`Report ID`, `Report Name`, `Report Metric`, `Report Metric Type`,
            START.DATE, END.DATE, ChargeCode, OPTB_cpt4) %>%
   summarise(vol = sum(Qty)) %>%
   ungroup()
@@ -388,11 +378,11 @@ write.table(na_cpt4_summary,
             row.names = F, col.names = T, sep = ",")
 write.table(na_cpt4_pub_report_summary,
             file = paste0(write_path, "/Charge no CPT4 map Prem Pub ",
-                          date_start_char," to ", date_dist_char, ".csv"),
+                          date_start_char, " to ", date_dist_char, ".csv"),
             row.names = F, col.names = T, sep = ",")
 write.table(charge_summary_qc,
             file = paste0(write_path, "/charge reports prem vol ",
-                          date_start_char," to ", date_dist_char, ".csv"),
+                          date_start_char, " to ", date_dist_char, ".csv"),
             row.names = F, col.names = T, sep = ",")
 
 # Script End --------------------------------------------------------------
