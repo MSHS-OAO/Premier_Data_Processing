@@ -82,7 +82,8 @@ cc_xwalk_file_path <- choose.files(
                    "*"),
   caption = "Select Crosswalk File", multi = F)
 cc_xwalk <- read_xlsx(cc_xwalk_file_path, sheet = 1, 
-                      col_types = c("guess", rep("text", 7)))
+                      col_types = c("guess", rep("text", 8), "skip"))
+  
 # cc_xwalk <- cc_xwalk %>%
 #   mutate(`EPSI Revenue Department` = as.character(`EPSI Revenue Department`))
 # cc_xwalk$`EPSI Revenue Department` <- as.character(
@@ -166,7 +167,7 @@ date_start <- prev_dist + days(1)
 # select where the monthly data is pulled from
 # this is typically on a hard-drive to expedite the processing time
 # but default is set to the shared drive location
-work_path <- choose.dir(
+raw_path <- choose.dir(
   default = paste0(j_drive, "/SixSigma/MSHS Productivity/Productivity",
                    "/Volume - Data/MSBI Data/Charge Detail"),
   caption = "Select folder above all data files")
@@ -174,7 +175,7 @@ work_path <- choose.dir(
 # get file paths
 all_folders <-
   list.dirs(
-    path = work_path,
+    path = raw_path,
     full.names = TRUE
   )
 
@@ -233,7 +234,7 @@ raw_data <- raw_data %>%
 
 ## save merged files for reference -----------------------------------------
 
-raw_path <- choose.dir(default = work_path,
+write_path <- choose.dir(default = work_path,
                        caption = "Select folder to store consolidated raw data"
                        )
 
@@ -241,10 +242,10 @@ raw_path <- choose.dir(default = work_path,
 # it seems like the default path isn't in the My Computer directory to select
 
 saveRDS(raw_data,
-        file = paste0(raw_path, "/all_merged_", date_start, "_to_", dist_date,
+        file = paste0(write_path, "/all_merged_", date_start, "_to_", dist_date,
                                   ".rds"))
 write.table(raw_data,
-            file = paste0(raw_path, "/all_merged_", date_start, "_to_",
+            file = paste0(write_path, "/all_merged_", date_start, "_to_",
                           dist_date, ".csv"),
             row.names = F, col.names = T, sep = ",")
 
@@ -324,19 +325,17 @@ charge_summary <- charge_summary %>%
 # Quality Checks ----------------------------------------------------------
 
 charge_summary_qc <- processed_data %>%
-  group_by(`Labor Department`, START.DATE, END.DATE, OPTB_cpt4) %>%
-  summarise(Vol = sum(Qty)) %>%
-  ungroup() %>%
+  filter(`Published Report` == "yes") %>%
   filter(END.DATE >= date_start &
            START.DATE <= dist_date) %>%
-  filter(!is.na(`Labor Department`)) %>%
-  filter(!is.na(OPTB_cpt4)) %>%
-  filter(OPTB_cpt4 != "#N/A") %>%
-  filter(OPTB_cpt4 != "0") %>%
-  filter(OPTB_cpt4 != "99999") %>%
-  filter(!str_detect(`Labor Department`, "NOMAP"))
-# join the premier report info
-
+  mutate(prem_vol = case_when(
+    `Report Metric Type` == "RVU" ~ Qty * `Worked RVU Factor`,
+    `Report Metric Type` == "CPT" ~ Qty * `CPT Procedure Count`)) %>%
+  group_by(`Report ID`,`Report Name`, `Report Metric`, `Report Metric Type`,
+           START.DATE, END.DATE, ) %>%
+  summarize(Vol = sum(prem_vol)) %>%
+  ungroup()
+  
 na_cc_summary <- processed_data %>%
   filter(is.na(`Labor Department`) |
            str_detect(`Labor Department`, "NOMAP")) %>%
@@ -358,15 +357,42 @@ na_cpt4_summary <- processed_data %>%
   summarise(vol = sum(Qty)) %>%
   ungroup()
 
+na_cpt4_pub_report_summary <- processed_data %>%
+  filter(`Published Report` == "yes") %>%
+  filter(OPTB_cpt4 == "#N/A" | OPTB_cpt4 == 0 |
+           OPTB_cpt4 == 99999 | is.na(OPTB_cpt4)) %>%
+  filter(END.DATE > date_start & START.DATE < dist_date) %>%
+  group_by(`Report ID`,`Report Name`, `Report Metric`, `Report Metric Type`,
+           START.DATE, END.DATE, ChargeCode, OPTB_cpt4) %>%
+  summarise(vol = sum(Qty)) %>%
+  ungroup()
+
 View(na_cpt4_summary)
 
 # File Saving -------------------------------------------------------------
 
-write.table(charge_summary, file = paste0(month_dir, "/CPT upload.csv"),
+date_start_char <- format(as.Date(date_start, "%m/%d/%Y"), "%Y-%m-%d")
+date_dist_char <- format(as.Date(dist_date, "%m/%d/%Y"), "%Y-%m-%d")
+
+write.table(charge_summary,
+            file = paste0(write_path, "/MSBIB CPT Vol ", date_start_char,
+                          " to ", date_dist_char, ".csv"),
             row.names = F, col.names = F, sep = ",")
-write.table(na_cc_result, file = paste0(month_dir, "/CPT no CC.csv"),
+write.table(na_cc_summary,
+            file = paste0(write_path, "/CPT no CC ", date_start_char,
+                          " to ", date_dist_char, ".csv"),
             row.names = F, col.names = T, sep = ",")
-write.table(na_cpt4_result, file = paste0(month_dir, "/CPT no CPT4 map.csv"),
+write.table(na_cpt4_summary,
+            file = paste0(write_path, "/Charge no CPT4 map ", date_start_char,
+                          " to ", date_dist_char, ".csv"),
+            row.names = F, col.names = T, sep = ",")
+write.table(na_cpt4_pub_report_summary,
+            file = paste0(write_path, "/Charge no CPT4 map Prem Pub ",
+                          date_start_char," to ", date_dist_char, ".csv"),
+            row.names = F, col.names = T, sep = ",")
+write.table(charge_summary_qc,
+            file = paste0(write_path, "/charge reports prem vol ",
+                          date_start_char," to ", date_dist_char, ".csv"),
             row.names = F, col.names = T, sep = ",")
 
 # Script End --------------------------------------------------------------
