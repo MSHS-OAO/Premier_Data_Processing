@@ -77,9 +77,6 @@ bislr_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
 
 ## Wide Pivot Check -------------------------------------------------------
 
-# the imported data having an unresolved issue leads to this table having
-# some incorrect values
-  
 # will date ranges need to be confirmed by the user earlier?
 # or do we just look at all dates in the data?
 dist_prev <- as.Date("2022-07-02")
@@ -94,9 +91,12 @@ piv_wide_check <- bislr_payroll %>%
   arrange(as.Date(End.Date, "%m/%d/%Y"),
           Facility.Hospital.Id_Worked, Payroll.Name) %>%
   pivot_wider(names_from = End.Date,
-             values_from = Hours)
+             values_from = Hours) %>%
+  bind_rows(summarize(., 
+                      across(where(is.numeric), sum, na.rm=TRUE),
+                      across(where(is.character), ~"TOTAL")))
 
-piv_wide_check2 <- bislr_payroll %>%
+piv_wide_check_site <- bislr_payroll %>%
   filter(as.Date(End.Date, "%m/%d/%Y") > dist_prev - 1 &
            as.Date(End.Date, "%m/%d/%Y") < dist_current + 8) %>%
   group_by(Facility.Hospital.Id_Worked, End.Date) %>%
@@ -107,14 +107,18 @@ piv_wide_check2 <- bislr_payroll %>%
   pivot_wider(names_from = End.Date,
               values_from = Hours)
 
-piv_wide_check3 <- bind_rows(piv_wide_check, piv_wide_check2) %>%
+piv_wide_check <- bind_rows(piv_wide_check, piv_wide_check_site) %>%
   mutate(Payroll.Name = case_when(
     is.na(Payroll.Name) ~ "-SITE TOTAL-",
     TRUE ~ Payroll.Name)) %>%
   arrange(Facility.Hospital.Id_Worked, Payroll.Name)
-rm(piv_wide_check2)
+
+rm(piv_wide_check_site)
 
 View(piv_wide_check)
+# do we want to save this table for future output comparison?
+# could we import the previous file for quick comparisons? we'd need to take
+# months with catch-up pay cycles into consideration in comparisons
 
 # Import References -------------------------------------------------------
 pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR,
