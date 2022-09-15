@@ -34,10 +34,26 @@ productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
                        format = '%m_%d_%Y')
   File.Table <<- data.table::data.table(File.Name, File.Date, File.Path) %>%
     arrange(desc(File.Date))
+  #Quality Check - Confirming Upload File
+  cat('File selected is ',
+      File.Table$File.Name[place],
+      ". Is this the correct file?")
+  answer <- select.list(choices = c("Yes", "No"),
+                        preselect = "Yes",
+                        multiple = F,
+                        title = "Correct File?",
+                        graphics = T)
+  if (answer == "No") {
+    user_selected_file <- select.list(choices = File.Table$File.Name,
+                                multiple = F,
+                                title = "Select the correct file",
+                                graphics = T)
+    place <- grep(user_selected_file, File.Table$File.Name)
+    cat('File selected is ', File.Table$File.Name[place])
+  }
   #Importing Data 
-  data_recent <- read.table(File.Table$File.Path[place],
+  data_recent <- read.csv(File.Table$File.Path[place],
                             header = T,
-                            as.is = T,
                             sep = '~',
                             fill = T)
                             # colClasses = "character")
@@ -57,7 +73,6 @@ productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
 
 # Import Data -------------------------------------------------------------
 bislr_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
-  #quality check if correct file selected
 
 
 ## Wide Pivot Check -------------------------------------------------------
@@ -102,17 +117,74 @@ rm(piv_wide_check2)
 View(piv_wide_check)
 
 # Import References -------------------------------------------------------
-#delete start.end in mapping file and create in script to identify which paycycles to filter on in payroll files
-  pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR,
+pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR,
                                         "/Reference",
                                         "/Pay cycles uploaded_Tracker.xlsx"),
-                                 detectDates = T,
                                  sheetIndex = 1)
 msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                       "/Reference/MSUS_removal_list.xlsx"),
                                sheet = 1)
-#TBD references continued
+  ## Universal Reference Files -----------------------------------------------
+  map_uni_paycodes <- read_xlsx(paste0(dir_universal,
+                                       "/Mapping/MSHS_Paycode_Mapping.xlsx"),
+                                sheet = 1)
+  map_uni_jobcodes <- read_xlsx(paste0(dir_universal,
+                                       "/Mapping/MSHS_Jobcode_Mapping.xlsx"),
+                                sheet = 1)
+  map_uni_reports <- read_xlsx(paste0(dir_universal,
+                                      "/Mapping/MSHS_Reporting_Definition_Mapping.xlsx"),
+                               sheet = 1)
 
+## Premier Reference Files -------------------------------------------------
+  dict_premier_dpt <- read.table(paste0(dir_universal,
+                                        "/Premier/Dictionary Exports",
+                                        "/DepartmentDictionary.csv"),
+                                 col.names = c('Corporation.Code',
+                                               'Site',
+                                               'Cost.Center',
+                                               'Cost.Center.Description'),
+                                 sep = ",")
+  map_premier_dpt <- read.table(paste0(dir_universal,
+                                       "/Premier/Mapping Exports",
+                                       "/DepartmentMapping.csv"),
+                                col.names = c('Effective.Date',
+                                              'Corporation.Code',
+                                              'Site',
+                                              'Cost.Center',
+                                              'Cost.Center.Map'),
+                                sep = ",")
+  dict_premier_jobcode <- read.table(paste0(dir_universal,
+                                            "/Premier/Dictionary Exports",
+                                            "/DepartmentDictionary.csv"),
+                                     col.names = c('Corporation.Code',
+                                                   'Site',
+                                                   'Cost.Center',
+                                                   'Cost.Center.Description'),
+                                     sep = ",")
+  dict_premier_report <- read.table(paste0(dir_universal,
+                                           "/Premier/Dictionary Exports",
+                                           "/DepartmentDef.csv"),
+                                    col.names = c('Corporation.Code',
+                                                  'Site',
+                                                  'Report.Name',
+                                                  'Report.ID',
+                                                  'Cost.Center',
+                                                  'Report.Type',
+                                                  'Threshold.Type',
+                                                  'Target.Type',
+                                                  'Exclude.Report.Rollup',
+                                                  'Effective.Date',
+                                                  'Paycycle.Type',
+                                                  'Exclude.Admin.Rollup',
+                                                  'Exclude.Action.Plan',
+                                                  'blank14',
+                                                  'blank15',
+                                                  'blank16',
+                                                  'blank17'), 
+                                    sep = ",",
+                                    fill = T)
+
+  
 # Data Processing -----------------------------------------------------------
 
 
