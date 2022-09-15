@@ -99,11 +99,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                               sep = ',')
   dict_premier_jobcode <- read.csv(paste0(dir_universal,
                                           '/Premier/Dictionary Exports',
-                                          '/DepartmentDictionary.csv'),
+                                          '/DeptJobCodeDictionary.csv'),
                                    col.names = c('Corporation.Code',
                                                  'Site',
                                                  'Cost.Center',
-                                                 'Cost.Center.Description'),
+                                                 'Job.Code',
+                                                 'Job.Code.Description'),
                                    sep = ',')
   dict_premier_report <- read.csv(paste0(dir_universal,
                                          '/Premier/Dictionary Exports',
@@ -133,7 +134,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   ## References --------------------------------------------------------------
   pay_cycles_uploaded <- pay_cycles_uploaded %>%
     mutate(Start_End = paste0(Start.Date, '-', End.Date))
-
+  dict_premier_dpt <- dict_premier_dpt
 
 # Creating Outputs --------------------------------------------------------
 
