@@ -59,6 +59,48 @@ productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
 bislr_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
   #quality check if correct file selected
 
+
+## Wide Pivot Check -------------------------------------------------------
+
+# the imported data having an unresolved issue leads to this table having
+# some incorrect values
+  
+# will date ranges need to be confirmed by the user earlier?
+# or do we just look at all dates in the data?
+dist_prev <- as.Date("2022-07-02")
+dist_current <- as.Date("2022-07-30")
+
+piv_wide_check <- bislr_payroll %>%
+  filter(as.Date(End.Date, "%m/%d/%Y") >= dist_prev &
+           as.Date(End.Date, "%m/%d/%Y") <= dist_current + 7) %>%
+  group_by(Facility.Hospital.Id_Worked, Payroll.Name, End.Date) %>%
+  summarize(Hours = sum(as.numeric(Hours), na.rm = TRUE)) %>%
+  ungroup() %>%
+  arrange(as.Date(End.Date, "%m/%d/%Y"),
+          Facility.Hospital.Id_Worked, Payroll.Name) %>%
+  pivot_wider(names_from = End.Date,
+             values_from = Hours)
+
+piv_wide_check2 <- bislr_payroll %>%
+  filter(as.Date(End.Date, "%m/%d/%Y") > dist_prev - 1 &
+           as.Date(End.Date, "%m/%d/%Y") < dist_current + 8) %>%
+  group_by(Facility.Hospital.Id_Worked, End.Date) %>%
+  summarize(Hours = sum(as.numeric(Hours), na.rm = TRUE)) %>%
+  ungroup() %>%
+  arrange(as.Date(End.Date, "%m/%d/%Y"),
+          Facility.Hospital.Id_Worked) %>%
+  pivot_wider(names_from = End.Date,
+              values_from = Hours)
+
+piv_wide_check3 <- bind_rows(piv_wide_check, piv_wide_check2) %>%
+  mutate(Payroll.Name = case_when(
+    is.na(Payroll.Name) ~ "-SITE TOTAL-",
+    TRUE ~ Payroll.Name)) %>%
+  arrange(Facility.Hospital.Id_Worked, Payroll.Name)
+rm(piv_wide_check2)
+
+View(piv_wide_check)
+
 # Import References -------------------------------------------------------
 #delete start.end in mapping file and create in script to identify which paycycles to filter on in payroll files
   pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR,
