@@ -2,6 +2,7 @@
 # Libraries ---------------------------------------------------------------
 library(tidyverse)
 library(readxl)
+library(xlsx)
 
 # Directories -------------------------------------------------------------
 dir <- 'J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity'
@@ -23,26 +24,37 @@ productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
   char_len_paycode <- 15
 
 # Functions --------------------------------------------------------------
-#update read to accept txt file
   import_recent_file <- function(folder.path, place) {
   #Importing File information from Folder
   File.Name <- list.files(path = folder.path, full.names = F)
   File.Path <- list.files(path = folder.path, full.names = T)
-  File.Date <- as.Date(sapply(File.Name, function(x) substr(x,nchar(x)-19, nchar(x)-10)),format = '%m_%d_%Y')
+  File.Date <- as.Date(sapply(File.Name, function(x) substr(x,nchar(x)-14, nchar(x)-5)),
+                       format = '%m_%d_%Y')
   File.Table <<- data.table::data.table(File.Name, File.Date, File.Path) %>%
     arrange(desc(File.Date))
   #Importing Data 
-  data_recent <- read.xlsx(File.Table$File.Path[place], detectDates = T)
-  data_recent <- data_recent %>% mutate(Source = File.Table$File.Path[place]) #File Source Column for Reference
+  data_recent <- read.table(File.Table$File.Path[place],
+                            header = T,
+                            as.is = T,
+                            sep = '~',
+                            fill = T)
   return(data_recent)
-}
+  }
 
 # Import Data -------------------------------------------------------------
-  bislr_payroll <- import_recent_file(dir_BISLR, 1)
+bislr_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
   #quality check if correct file selected
 
 # Import References -------------------------------------------------------
-
+#delete start.end in maping file and create in script to identify which paycycles to filter on in payroll files
+  pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR,
+                                        "/Reference",
+                                        "/Pay cycles uploaded_Tracker.xlsx"),
+                                 detectDates = T,
+                                 sheetIndex = 1)
+msus_removal_list <- read_xlsx(paste0(dir_BISLR,
+                                      "/Reference/MSUS_removal_list.xlsx"),
+                               sheet = 1)
 
 # Data Processing -----------------------------------------------------------
 
