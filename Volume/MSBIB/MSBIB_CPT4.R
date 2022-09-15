@@ -7,6 +7,7 @@ library(xlsx)
 library(readxl)
 library(tidyr)
 library(lubridate)
+library(stringr)
 # does sequence of loading affect which functions are masked?
 
 # Assigning Directory(ies) ------------------------------------------------
@@ -30,7 +31,7 @@ dict_pay_cycles <- read_xlsx(
     j_drive, "/SixSigma/MSHS Productivity/Productivity/Universal Data/",
     "Mapping/MSHS_Pay_Cycle.xlsx"
   ),
-  col_types = c("guess", "guess", "guess", "skip")
+  col_types = c("guess", "guess", "guess", "text")
 )
 
 # dates originally come in as POSIXct, so they're being converted to Date
@@ -64,7 +65,7 @@ cdm_file_path <- choose.files(
 cdm <- read_xlsx(cdm_file_path, sheet = 1)
 cdm_slim <- cdm %>%
   select(CHARGE_CODE, CHARGE_DESC, OPTB_cpt4) %>%
-  mutate(CHARGE_CODE = stringr::str_trim(CHARGE_CODE),
+  mutate(CHARGE_CODE = str_trim(CHARGE_CODE),
          OPTB_cpt4 = case_when(
            is.na(OPTB_cpt4) ~ "0",
            TRUE ~ OPTB_cpt4
@@ -81,7 +82,7 @@ cc_xwalk_file_path <- choose.files(
                    "*"),
   caption = "Select Crosswalk File", multi = F)
 cc_xwalk <- read_xlsx(cc_xwalk_file_path, sheet = 1, 
-                      col_types = c("guess", rep("text", 7), "skip"))
+                      col_types = c("guess", rep("text", 7)))
 # cc_xwalk <- cc_xwalk %>%
 #   mutate(`EPSI Revenue Department` = as.character(`EPSI Revenue Department`))
 # cc_xwalk$`EPSI Revenue Department` <- as.character(
@@ -124,7 +125,7 @@ dist_dates <- dict_pay_cycles %>%
   drop_na() %>%
   arrange(END.DATE) %>%
   #filter only on distribution end dates
-  filter(PREMIER.DISTRIBUTION %in% c(TRUE, 1),
+  filter(PREMIER.DISTRIBUTION %in% c(TRUE, 1, "1"),
          as.POSIXct(END.DATE) < as.POSIXct(Sys.Date()))
 
 #Selecting current distribution date
@@ -267,7 +268,7 @@ processed_data <- raw_data
 
 processed_data <- processed_data %>%
   mutate(TransDate = as.Date(TransDate, format = "%m/%d/%Y"),
-         ChargeCode = stringr::str_trim(ChargeCode))
+         ChargeCode = str_trim(ChargeCode))
 
 # all_result <- all_result %>%
 #   filter(EntityId == "MSBI" | EntityId == "MSCCW")
@@ -302,7 +303,7 @@ charge_summary <- processed_data %>%
   filter(OPTB_cpt4 != "#N/A") %>%
   filter(OPTB_cpt4 != "0") %>%
   filter(OPTB_cpt4 != "99999") %>%
-  filter(!stringr::str_detect(`Labor Department`, "NOMAP"))
+  filter(!str_detect(`Labor Department`, "NOMAP"))
 
 # Data Formatting ---------------------------------------------------------
 
@@ -333,12 +334,12 @@ charge_summary_qc <- processed_data %>%
   filter(OPTB_cpt4 != "#N/A") %>%
   filter(OPTB_cpt4 != "0") %>%
   filter(OPTB_cpt4 != "99999") %>%
-  filter(!stringr::str_detect(`Labor Department`, "NOMAP"))
+  filter(!str_detect(`Labor Department`, "NOMAP"))
 # join the premier report info
 
 na_cc_summary <- processed_data %>%
   filter(is.na(`Labor Department`) |
-           stringr::str_detect(`Labor Department`, "NOMAP")) %>%
+           str_detect(`Labor Department`, "NOMAP")) %>%
   filter(END.DATE > date_start & START.DATE < dist_date) %>%
   group_by(FacilityId, RevDept, `Labor Department`, END.DATE) %>%
   summarise(vol = sum(Qty),
