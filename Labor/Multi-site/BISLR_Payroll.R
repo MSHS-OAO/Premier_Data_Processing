@@ -35,16 +35,16 @@ productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
   #Quality Check - Confirming Upload File
   cat('File selected is ',
       File.Table$File.Name[place],
-      ". Is this the correct file?")
-  answer <- select.list(choices = c("Yes", "No"),
-                        preselect = "Yes",
+      '. Is this the correct file?')
+  answer <- select.list(choices = c('Yes', 'No'),
+                        preselect = 'Yes',
                         multiple = F,
-                        title = "Correct File?",
+                        title = 'Correct File?',
                         graphics = T)
-  if (answer == "No") {
+  if (answer == 'No') {
     user_selected_file <- select.list(choices = File.Table$File.Name,
                                 multiple = F,
-                                title = "Select the correct file",
+                                title = 'Select the correct file',
                                 graphics = T)
     place <- grep(user_selected_file, File.Table$File.Name)
     cat('File selected is ', File.Table$File.Name[place])
@@ -62,52 +62,52 @@ bislr_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
 
 # Import References -------------------------------------------------------
 pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR,
-                                        "/Reference",
-                                        "/Pay cycles uploaded_Tracker.xlsx"),
+                                        '/Reference',
+                                        '/Pay cycles uploaded_Tracker.xlsx'),
                                  sheetIndex = 1)
 msus_removal_list <- read_xlsx(paste0(dir_BISLR,
-                                      "/Reference/MSUS_removal_list.xlsx"),
+                                      '/Reference/MSUS_removal_list.xlsx'),
                                sheet = 1)
   ## Universal Reference Files -----------------------------------------------
   map_uni_paycodes <- read_xlsx(paste0(dir_universal,
-                                       "/Mapping/MSHS_Paycode_Mapping.xlsx"),
+                                       '/Mapping/MSHS_Paycode_Mapping.xlsx'),
                                 sheet = 1)
   map_uni_jobcodes <- read_xlsx(paste0(dir_universal,
-                                       "/Mapping/MSHS_Jobcode_Mapping.xlsx"),
+                                       '/Mapping/MSHS_Jobcode_Mapping.xlsx'),
                                 sheet = 1)
   map_uni_reports <- read_xlsx(paste0(dir_universal,
-                                      "/Mapping/MSHS_Reporting_Definition_Mapping.xlsx"),
+                                      '/Mapping/MSHS_Reporting_Definition_Mapping.xlsx'),
                                sheet = 1)
 
   ## Premier Reference Files -------------------------------------------------
   dict_premier_dpt <- read.csv(paste0(dir_universal,
-                                      "/Premier/Dictionary Exports",
-                                      "/DepartmentDictionary.csv"),
+                                      '/Premier/Dictionary Exports',
+                                      '/DepartmentDictionary.csv'),
                                col.names = c('Corporation.Code',
                                              'Site',
                                              'Cost.Center',
                                              'Cost.Center.Description'),
-                               sep = ",")
+                               sep = ',')
   map_premier_dpt <- read.csv(paste0(dir_universal,
-                                     "/Premier/Mapping Exports",
-                                     "/DepartmentMapping.csv"),
+                                     '/Premier/Mapping Exports',
+                                     '/DepartmentMapping.csv'),
                               col.names = c('Effective.Date',
                                             'Corporation.Code',
                                             'Site',
                                             'Cost.Center',
                                             'Cost.Center.Map'),
-                              sep = ",")
+                              sep = ',')
   dict_premier_jobcode <- read.csv(paste0(dir_universal,
-                                          "/Premier/Dictionary Exports",
-                                          "/DepartmentDictionary.csv"),
+                                          '/Premier/Dictionary Exports',
+                                          '/DepartmentDictionary.csv'),
                                    col.names = c('Corporation.Code',
                                                  'Site',
                                                  'Cost.Center',
                                                  'Cost.Center.Description'),
-                                   sep = ",")
+                                   sep = ',')
   dict_premier_report <- read.csv(paste0(dir_universal,
-                                         "/Premier/Dictionary Exports",
-                                         "/DepartmentDef.csv"),
+                                         '/Premier/Dictionary Exports',
+                                         '/DepartmentDef.csv'),
                                   col.names = c('Corporation.Code',
                                                 'Site',
                                                 'Report.Name',
@@ -125,7 +125,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                                 'blank15',
                                                 'blank16',
                                                 'blank17'),
-                                  sep = ",",
+                                  sep = ',',
                                   fill = T)
 
 # Data Processing -----------------------------------------------------------
