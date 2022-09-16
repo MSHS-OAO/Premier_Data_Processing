@@ -166,16 +166,26 @@
     rename(`Charge Code` = value)
   
   rows_pre_join <- nrow(mshs_rad_data)
-#update philips charge codes to cpt codes (reference special mapping files)
+
   #Testing TBD
   rad_data_test <- mshs_rad_data %>%
     left_join(map_premier_sites) %>%
     #Add CPT code, CPT code description, and charge class
     left_join(cdm_complete_list) %>%
-    #Updating special MSBIB charge class
+    #Updating special MSBIB resource charge class
     mutate(`Charge Class` = case_when(
-      Resource %in% 
-    ))
+      (Resource %in% map_msbi_special$Resource
+       & `Charge Class` %in% map_msbi_special$Current_Charge_Class)
+      #Note the mapping file only works if they are being mapped to the same charge_class
+      ~ map_msbi_special$Charge_Class[1],
+      TRUE ~ `Charge Class`)) %>%
+    mutate(
+      `Charge Class` = case_when(
+        (Org == 'PH' & substr(`Charge Code`, 1, 2) == "99") ~ 410,
+        TRUE ~`Charge Class`),
+      `CPT Code` = case_when(
+        (Org == 'PH' & substr(`Charge Code`, 1, 2) == "99") ~ `Charge Code`,
+        TRUE ~ `CPT Code`)) %>%
     #Add PAT Type and Setting
     left_join(map_pat_setting) %>%
     mutate(Identifier = paste0(Org, "-",`Charge Class`, "-", Setting)) %>%
