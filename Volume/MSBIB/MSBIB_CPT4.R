@@ -292,7 +292,7 @@ upload <- charge_summary %>%
 
 
 non_upload_depts <- charge_summary %>%
-  filter(is.na(`Published Report`)) %>%
+  filter(is.na(`Published Report`) | `Published Report` != "yes") %>%
   mutate(EntityID = 729805,
          FacilID = 630571,
          budget = 0,
