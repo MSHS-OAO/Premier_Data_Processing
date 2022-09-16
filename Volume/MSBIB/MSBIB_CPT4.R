@@ -210,7 +210,7 @@ raw_data <- raw_data %>%
 
 ## save merged files for reference -----------------------------------------
 
-write_path <- choose.dir(default = work_path,
+write_path <- choose.dir(default = raw_path,
                        caption = "Select folder to store consolidated raw data"
                        )
 
@@ -330,7 +330,7 @@ na_cc_summary <- processed_data %>%
   filter(is.na(`Labor Department`) |
            str_detect(`Labor Department`, "NOMAP")) %>%
   filter(END.DATE > date_start & START.DATE < dist_date) %>%
-  group_by(FacilityId, RevDept, `Labor Department`, END.DATE) %>%
+  group_by(FacilityId, RevDept, `Labor Department`, START.DATE, END.DATE) %>%
   summarise(vol = sum(Qty),
             prem_cpt = sum(Qty * `CPT Procedure Count`)) %>%
   ungroup()
@@ -347,6 +347,8 @@ na_cpt4_summary <- processed_data %>%
   summarise(vol = sum(Qty)) %>%
   ungroup()
 
+View(na_cpt4_summary)
+
 na_cpt4_pub_report_summary <- processed_data %>%
   filter(`Published Report` == "yes") %>%
   filter(OPTB_cpt4 == "#N/A" | OPTB_cpt4 == 0 |
@@ -357,12 +359,12 @@ na_cpt4_pub_report_summary <- processed_data %>%
   summarise(vol = sum(Qty)) %>%
   ungroup()
 
-View(na_cpt4_summary)
+View(na_cpt4_pub_report_summary)
 
 # File Saving -------------------------------------------------------------
 
-date_start_char <- format(as.Date(date_start, "%m/%d/%Y"), "%Y-%m-%d")
-date_dist_char <- format(as.Date(dist_date, "%m/%d/%Y"), "%Y-%m-%d")
+date_start_char <- format(as.Date(date_start), "%Y-%m-%d")
+date_dist_char <- format(as.Date(dist_date), "%Y-%m-%d")
 
 write.table(charge_summary,
             file = paste0(write_path, "/MSBIB CPT Vol ", date_start_char,
