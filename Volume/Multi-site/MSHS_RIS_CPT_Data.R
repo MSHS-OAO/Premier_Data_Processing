@@ -16,13 +16,8 @@
   diagnostic_scaling <- 2.69
   
   # Import Data -------------------------------------------------------------
+  
   ## OR Data -------------------------------------------------------------
-  # mshs_or_rad_data <- read.csv(paste0(RIS_dir,"Charge Detail/OR Diagnostic/",
-  #                                     "MSH_RIS_OR Diagnostic_",
-  #                                     month_year,
-  #                                     ".csv"),
-  #                              colClasses = c(rep("character",9))) %>%
-  #   select(MRN, Name, ACC, Date, Exam, Exam.Modifier, Org, Resource)
   import_recent_OR_file <- function(folder.path, place) {
     #Importing File information from Folder
     File.Name <- list.files(path = folder.path,pattern = 'csv$', full.names = F)
@@ -69,17 +64,6 @@
   mshs_rad_data <- import_recent_RIS_files(paste0(dir_data, '/Source Data'), 1)
   cat('Data files selected for the month',
       format(unique(File.Table$File.Date), format = '%B %Y'))
-
-# list_filenames_rawdata <- list.files(
-#   path = paste0(dir_data, "/Source Data"),
-#   pattern = 
-#   full.names = T)
-#Quality Check on # of files
-# if (length(list_filenames_rawdata) %% 11 != 0) {
-#   stop("Unexpected number of files in selected folder")
-# }
-# 
-# mshs_rad_data <- lapply(list_filenames_rawdata, read_xls)
 
 # Import References -------------------------------------------------------
 
@@ -135,9 +119,10 @@ import_recent_cdm <- function(dir, site_cdm, file_type) {
 }
 
 cdm_msmsw <- import_recent_cdm(paste0(dir_cdm, "/MSMW"), "SLR", "csv")
-cat("MSMW CDM File Used:", cdm_file_import$name)
+  cat("MSMW CDM File Used:", cdm_file_import$name)
+
 cdm_msbib <- import_recent_cdm(paste0(dir_cdm, "/BIB"), "BI", "xlsx")
-cat("MSBIB CDM File Used:", cdm_file_import$name)
+  cat("MSBIB CDM File Used:", cdm_file_import$name)
 
 # Processing Data ---------------------------------------------------------
 
