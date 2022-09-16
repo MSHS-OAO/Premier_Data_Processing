@@ -77,10 +77,13 @@
   map_cc <- read_xlsx(path = paste0(dir_data,
                                     "/References/Radiology RIS Mappings.xlsx"),
                       sheet = "Cost Centers")
-  map_dpt <- read_xlsx(path = paste0(dir_data,
+  map_pat_setting <- read_xlsx(path = paste0(dir_data,
                                      "/References/Radiology RIS Mappings.xlsx"),
-                       sheet = "Departments")
-  map_mod <- read_xlsx(path = paste0(dir_data,
+                       sheet = "PAT Setting")
+  map_chargeclass <- read_xlsx(path = paste0(dir_data,
+                                     "/References/Radiology RIS Mappings.xlsx"),
+                       sheet = "Charge Class")
+  map_cpt_mod <- read_xlsx(path = paste0(dir_data,
                                      "/References/Radiology RIS Mappings.xlsx"),
                        sheet = "Select Mod")
   map_paycycle <- read_xlsx(path = paste0(dir_universal,
