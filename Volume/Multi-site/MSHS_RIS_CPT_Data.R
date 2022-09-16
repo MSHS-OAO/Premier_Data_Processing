@@ -144,6 +144,14 @@
   rename(Date = DATE, `Pay Period End Date` = END.DATE) %>%
   select(Date, `Pay Period End Date`) %>%
   drop_na()
+    
+  cdm_complete_list <- cdm_msbib %>% 
+    mutate(`Premier Site` = '630571') %>%
+    rbind(cdm_msmsw %>%
+            mutate(`Premier Site` = 'NY2162'))  %>%
+    rbind(cdm_msmsw %>%
+            mutate(`Premier Site` = 'NY2163'))
+  
 
   ## RIS Data --------------------------------------------------------------------
   mshs_rad_data <- as.data.frame(do.call(rbind, mshs_rad_data)) %>%
@@ -158,11 +166,16 @@
 #update philips charge codes to cpt codes (reference special mapping files)
   #Testing TBD
   rad_data_test <- mshs_rad_data %>%
+    left_join(map_premier_sites) %>%
     #Add CPT code, CPT code description, and charge class
-    left_join('cdm joining tbd based on site') %>%
+    left_join(cdm_complete_list) %>%
+    #Updating special MSBIB charge class
+    mutate(`Charge Class` = case_when(
+      Resource %in% 
+    ))
     #Add PAT Type and Setting
-    left_join(map_dpt) %>%
-    mutate(Identifier = paste0(Org, "-",`Charge Class`, "-",Setting)) %>%
+    left_join(map_pat_setting) %>%
+    mutate(Identifier = paste0(Org, "-",`Charge Class`, "-", Setting)) %>%
     #Add in Cost Center
     left_join(select(map_cc, Identifier, `Dummy Cost Center_Premier`,
                      `Cost Center Description`)) %>%
