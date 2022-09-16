@@ -9,8 +9,8 @@ library(xlsx)
 library(openxlsx)
 
 # User Input --------------------------------------------------------------
-pp.start <- as.Date('2022-07-03') # start date of first pay period needed
-pp.end <- as.Date('2022-07-30') # end date of the last pay period needed
+pp.start <- as.Date('2022-07-31') # start date of first pay period needed
+pp.end <- as.Date('2022-08-27') # end date of the last pay period needed
 if(pp.end < pp.start){stop('End date before Start date')} # initial QC check on date range
 warning('Update Pay Periods Start and End Dates Needed:') #reminder to update dates
 cat(paste('Pay period starting on',
