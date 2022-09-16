@@ -248,7 +248,8 @@ processed_data <- raw_data
 
 processed_data <- processed_data %>%
   mutate(TransDate = as.Date(TransDate, format = "%m/%d/%Y"),
-         ChargeCode = str_trim(ChargeCode))
+         ChargeCode = str_trim(ChargeCode),
+         `Modifier Code` = as.character(NA))
 
 # join pay cycle info, cc_xwalk, cdm, and Premier CPT counter
 processed_data <- processed_data %>%
@@ -266,7 +267,8 @@ processed_data <- processed_data %>%
     is.na(OPTB_cpt4) ~ "#N/A",
     TRUE ~ OPTB_cpt4)) %>%
   left_join(y = cpt_ref_slim,
-            by = c("OPTB_cpt4" = "CPT/HCPCS Code"),
+            by = c("OPTB_cpt4" = "CPT/HCPCS Code",
+                   "Modifier Code" = "Modifier Code"),
             all.x = T)
 
 charge_summary <- processed_data %>%
