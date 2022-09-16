@@ -1,36 +1,10 @@
-# GENERAL REMINDERS -------------------------------------------------------
-
-# 1. The outline can be customized based on project requirements.
-# 2. Sections may be added, removed, reordered, renamed, etc. as needed.
-# 3. Reference checklist for commenting and style guidelines
-# 4. Create Sections using the menu Code > Insert Section
-#    or the shortcut Ctrl+Shift+R
-# 5. Create subsections by starting a Section with two # signs (e.g. ##).
-#    - See example within this section.
-
 # Libraries ---------------------------------------------------------------
-# Include all the packages that will be used throughout the code.
-# This is where packages can be installed if the user does not have them
-# currently installed.
 
-# Ensuring the appropriate package versions are used for the project based on
-# renv usage
-# renv::restore()
-
-# Common Packages
 library(readxl)
 library(dplyr)
 library(lubridate)
 library(tidyr)
 library(stringr)
-# library(rmarkdown)
-# library(shiny)
-
-# tidyverse includes: dplyr, ggplot2, lubridate, purrr, readr, readxl,
-# reprex, stringr, tidyr...and more
-# See this link for full list: https://tidyverse.tidyverse.org/
-# library(tidyverse)
-
 
 # Assigning Directory ------------------------------------------------
 
@@ -107,6 +81,10 @@ raw_data_prev <- recent_file(path = paste0(project_path, "Source Data"),
                         desc_order = 2,
                         premier = FALSE)
 
+
+
+## column header check ----------------------------------------------------
+
 new_col <-
   colnames(raw_data)[!(colnames(raw_data) %in% colnames(raw_data_prev))]
 new_col <- new_col %>%
@@ -146,7 +124,11 @@ if (col_check_stop == "CANCEL") {
   stop("Script is discontinued by your request.")
 }
 
+## remove prev raw data ---------------------------------------------------
+
 rm(raw_data_prev)
+
+## previous upload import -------------------------------------------------
 
 #user needs most recent zero and upload files
 msbib_zero_old <- recent_file(path = paste0(project_path, "MSBIB/Zero"),
@@ -168,19 +150,16 @@ sites <- select.list(
   preselect = "MSHS"
 )
 
-#Table of distribution dates
+#Table of distribution dates earlier than the current date
 dist_dates <- pay_period_mapping %>%
   select(END.DATE, PREMIER.DISTRIBUTION) %>%
   distinct() %>%
   drop_na() %>%
   arrange(END.DATE) %>%
-  #filter only on distribution end dates
   filter(PREMIER.DISTRIBUTION %in% c(TRUE, 1),
-         #filter 2 weeks from run date (14 days) for data collection lag
-         #before run date
          END.DATE < as.POSIXct(Sys.Date()))
 
-#Selecting current distribution date
+#Selecting the most recent distribution date
 distribution_date <- dist_dates$END.DATE[nrow(dist_dates)]
 
 #Confirming distribution date which will be the max of the current upload
@@ -211,9 +190,8 @@ if (answer == "CANCEL") {
 prev_0_max_date_mshq <- max(mdy(mshq_zero_old$date.end))
 
 prev_0_max_date_msbib <- max(mdy(msbib_zero_old$date.end))
-# should we compare these to make sure we have all files needed?
 
-# need threshold for weekly hour total for an employee to highlight for review
+# need threshold for weekly hour total for an employee to flag for review
 week_reg_hr_indiv_emp_qc <- 40
 week_hr_indiv_emp_qc <- 55
 
@@ -233,7 +211,7 @@ mshq_zero_new <- mshq_upload_old %>%
   mutate(hours = "0",
          spend = "0")
 
-## Upload Preprocessing -------------------------------------------------------
+## New Upload Preprocessing --------------------------------------------------
 
 # filter raw data on date range needed for upload
 processed_data <- raw_data %>%
@@ -269,7 +247,7 @@ processed_data <- processed_data %>%
     TRUE ~ cost_center_info
   ))
 
-# join legacy departments to oracle departments for premier format
+# join to get oracle departments
 row_count <- nrow(processed_data)
 processed_data <- processed_data %>%
   left_join(select(code_conversion, COST.CENTER.LEGACY, COST.CENTER.ORACLE),
@@ -290,6 +268,7 @@ if (row_count != nrow(processed_data)) {
               " Row count has been changed by left join"))
 }
 
+# get list of legacy cost centers that are not in code conversion
 cc_map_fail <- processed_data %>%
   select(wrkd_dept_leg, Department.Billed) %>%
   filter(!(wrkd_dept_leg %in% code_conversion$COST.CENTER.LEGACY)) %>%
@@ -297,6 +276,8 @@ cc_map_fail <- processed_data %>%
   mutate(Department.Billed =
            str_sub(Department.Billed,
                    str_locate(Department.Billed, "\\*")[, 1] + 1, -1))
+
+View(cc_map_fail)
 
 ## Job Code Handling -----------------------------------------------------
 
@@ -318,11 +299,6 @@ jc_new <- processed_data %>%
 
 jobcode_list_new <- rbind(jobcode_list, jc_new)
 
-# need QC check for length of jobcode_list_new?
-# need an if statement to only create jobcode_list_new if jc_new is not
-#  0 observations or NULL?
-# need to skip writing jobcode_list_new if there are no new jobcodes?
-
 # join existing job codes
 row_count <- nrow(processed_data)
 processed_data <- processed_data %>%
@@ -339,19 +315,17 @@ if (row_count != nrow(processed_data)) {
               " Row count has been changed by left join"))
 }
 
+# jc dictionary upload for all combinations in the latest raw data file
 jc_dict_upload <- processed_data %>%
   select(hospital, wrkd_dept_oracle, jobcode, Job.Title) %>%
   mutate(system = "729805") %>%
   relocate(system, .before = hospital) %>%
   distinct()
-# this may need to be separated into each site's upload file
-# this could also be moved to be created later
+
 
 ## Summarizing Hours and Expenses-------------------------------------------
 
 # all daily hours need to be summed up
-
-# NA values must be replaced with 0 or math will result in NA
 processed_data <- processed_data %>%
   rowwise() %>%
   mutate(daily_hours =
@@ -373,7 +347,7 @@ rolled_up <- processed_data %>%
   ungroup() %>%
   rename(week_hours = daily_hours,
          week_spend = Day.Spend)
-# needs to be checked for accuracy
+
 
 # Data Formatting ---------------------------------------------------------
 
@@ -394,8 +368,6 @@ upload_new <- rolled_up %>%
          week_spend = round(week_spend, digits = 2))
 
 # Quality Checks ----------------------------------------------------------
-# Checks that are performed on the output to confirm data consistency and
-# expected outputs.
 
 ## Trend hours ------------------------------------------------------------
 
@@ -405,17 +377,19 @@ qc_hours_by_cc <- upload_new %>%
   summarise(Hours = sum(week_hours, na.rm = T)) %>%
   arrange(desc(Hours)) %>%
   arrange(mdy(Earnings.E.D)) %>%
-  left_join(distinct(select(code_conversion, 
-                            COST.CENTER.ORACLE, 
+  left_join(distinct(select(code_conversion,
+                            COST.CENTER.ORACLE,
                             COST.CENTER.DESCRIPTION.ORACLE)),
                      by = c("wrkd_dept_oracle" = "COST.CENTER.ORACLE")) %>%
   pivot_wider(id_cols = c(wrkd_dept_oracle, COST.CENTER.DESCRIPTION.ORACLE),
-              names_from = Earnings.E.D, 
-              values_from = Hours) 
+              names_from = Earnings.E.D,
+              values_from = Hours)
 
 View(qc_hours_by_cc)
 
 ## Employee check ---------------------------------------------------------
+
+### Regular hours ---------------------------------------------------------
 
 # get total regular hours in each week by employee and above regular hours
 # threshold
@@ -428,7 +402,7 @@ hrs_reg_indiv_emp <- processed_data %>%
 
 View(hrs_reg_indiv_emp)
 
-# filter process_data down to the employees with high hours that are in
+# filter process_data down to the employees with high reg hours that are in
 # Premier reports
 high_hr_reg_emp <- processed_data %>%
   left_join(
@@ -444,6 +418,8 @@ high_hr_reg_emp <- processed_data %>%
 
 View(high_hr_reg_emp)
 
+### Total hours ---------------------------------------------------------
+
 # get total hours in each week by employee and filter above threshold
 hrs_indiv_emp <- processed_data %>%
   group_by(Worker.Name, Earnings.E.D) %>%
@@ -454,7 +430,7 @@ hrs_indiv_emp <- processed_data %>%
 
 View(hrs_indiv_emp)
 
-# filter process_data down to the employees with high hours that are in
+# filter process_data down to the employees with high total hours that are in
 # Premier reports
 high_hr_emp <- processed_data %>%
   left_join(
@@ -470,13 +446,6 @@ high_hr_emp <- processed_data %>%
 
 View(high_hr_emp)
 
-# Visualization -----------------------------------------------------------
-# How the data will be plotted or how the data table will look including axis
-# titles, scales, and color schemes of graphs or data tables.
-# (This section may be combined with the Data Formatting section.)
-
-# For Matt & Greg - perhaps there's a quick plot that can be used as a quality
-# check.
 
 # File Saving -------------------------------------------------------------
 
