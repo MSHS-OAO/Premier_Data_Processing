@@ -86,6 +86,9 @@
   map_cpt_mod <- read_xlsx(path = paste0(dir_data,
                                      "/References/Radiology RIS Mappings.xlsx"),
                        sheet = "Select Mod")
+  map_msbi_special <- read_xlsx(path = paste0(dir_data,
+                                         "/References/Radiology RIS Mappings.xlsx"),
+                           sheet = "MSBI Update Charge Class")
   map_paycycle <- read_xlsx(path = paste0(dir_universal,
                                           "/Mapping/MSHS_Pay_Cycle.xlsx"))
   map_report <- read_xlsx(path = paste0(dir_universal,
