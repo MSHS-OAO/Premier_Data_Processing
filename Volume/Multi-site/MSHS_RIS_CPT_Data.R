@@ -166,19 +166,20 @@
     rename(`Charge Code` = value)
   
   rows_pre_join <- nrow(mshs_rad_data)
-
-  #Testing TBD
-  rad_data_test <- mshs_rad_data %>%
+  
+  mshs_rad_data <- mshs_rad_data %>%
     left_join(map_premier_sites) %>%
     #Add CPT code, CPT code description, and charge class
     left_join(cdm_complete_list) %>%
     #Updating special MSBIB resource charge class
-    mutate(`Charge Class` = case_when(
-      (Resource %in% map_msbi_special$Resource
-       & `Charge Class` %in% map_msbi_special$Current_Charge_Class)
-      #Note the mapping file only works if they are being mapped to the same charge_class
-      ~ map_msbi_special$Charge_Class[1],
-      TRUE ~ `Charge Class`)) %>%
+    mutate(
+      `Charge Class` = case_when(
+        (Resource %in% map_msbi_special$Resource
+         & `Charge Class` %in% map_msbi_special$Current_Charge_Class)
+        #Note the mapping file only works if they are being mapped to the same charge_class
+        ~ map_msbi_special$Charge_Class[1],
+        TRUE ~ `Charge Class`)) %>%
+    #Updating Phillips missing cpt codes
     mutate(
       `Charge Class` = case_when(
         (Org == 'PH' & substr(`Charge Code`, 1, 2) == "99") ~ 410,
@@ -190,15 +191,15 @@
     left_join(map_pat_setting) %>%
     mutate(Identifier = paste0(Org, "-",`Charge Class`, "-", Setting)) %>%
     #Add in Cost Center
-    left_join(select(map_cc, Identifier, `Dummy Cost Center_Premier`,
+    left_join(select(map_cost_centers, Identifier, `Dummy Cost Center`,
                      `Cost Center Description`)) %>%
-    rename(`Cost Center` = `Dummy Cost Center_Premier`) %>%
+    rename(`Cost Center` = `Dummy Cost Center`) %>%
     #Add select modifiers to end of CPT code
     mutate(`CPT Code & Mod` = case_when(
-      `Charge Mod 1` %in% map_mod$`Select Modifiers` ~ paste0(`CPT Code`, `Charge Mod 1`),
-      `Charge Mod 2` %in% map_mod$`Select Modifiers` ~ paste0(`CPT Code`, `Charge Mod 2`),
-      `Charge Mod 3` %in% map_mod$`Select Modifiers` ~ paste0(`CPT Code`, `Charge Mod 3`),
-      `Charge Mod 4` %in% map_mod$`Select Modifiers` ~ paste0(`CPT Code`, `Charge Mod 4`),
+      `Charge Mod 1` %in% map_cpt_mod$`Select Modifiers` ~ paste0(`CPT Code`, `Charge Mod 1`),
+      `Charge Mod 2` %in% map_cpt_mod$`Select Modifiers` ~ paste0(`CPT Code`, `Charge Mod 2`),
+      `Charge Mod 3` %in% map_cpt_mod$`Select Modifiers` ~ paste0(`CPT Code`, `Charge Mod 3`),
+      `Charge Mod 4` %in% map_cpt_mod$`Select Modifiers` ~ paste0(`CPT Code`, `Charge Mod 4`),
       TRUE ~ `CPT Code`),
       #Formatting date to remove timestamp
       Date = as.Date(Date, format = "%Y-%m-%d")) %>%
@@ -208,7 +209,6 @@
   #quality check on number of rows from left join
   if(rows_pre_join != nrow(mshs_rad_data)){
     stop('Duplicate rows created! Check Dictionaries for duplicates.')}
-  
 
 # Creating Outputs --------------------------------------------------------
 
