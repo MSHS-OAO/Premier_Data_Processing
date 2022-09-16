@@ -13,7 +13,11 @@
                           '/Productivity/Universal Data')
   
   # Constants ---------------------------------------------------------------
-  premier_corp <- 729805
+  #Dates needed for Premier Upload
+  selected_start_date <- as.Date('2022-07-03')
+  selected_end_date <- as.Date('2022-07-30')
+  
+  premier_corp <- '729805'
   premier_budget <- 0
   
   diagnostic_scaling <- 2.69
@@ -213,6 +217,38 @@
 # Creating Outputs --------------------------------------------------------
 
   ## Premier Upload Files ----------------------------------------------------
-
+  create_premier_upload <- function(df, selected_sites, start_date, end_date){
+    return_df <- df %>% 
+      select(`Premier Site`, `Cost Center`, Date, `CPT Code & Mod`) %>%
+      mutate(Volume = 1) %>%
+      #Filtering on dates needed for upload
+      filter(`Premier Site`%in% selected_sites,
+             Date <= end_date,
+             Date >= start_date) %>%
+      #Dropping blank CPT codes and unmapped Cost Centers
+      drop_na(`Cost Center`,`CPT Code & Mod`) %>%
+      #Summing up all the charges by date, cost center, and cpt code
+      group_by(`Premier Site`, `Cost Center`, Date, `CPT Code & Mod`) %>%
+      summarise(Volume = sum(Volume)) %>%
+      #Creating columns needed
+      mutate(Corp = premier_corp,
+             Bud = premier_budget,
+             `Start Date` = format(as.Date(Date, format = "%Y-%m-%d"),
+                                   format = "%m/%d/%Y"),
+             `End Date` = `Start Date`) %>%
+      #Selecting and arranging columns in Premier format
+      ungroup() %>%
+      select(Corp, `Premier Site`, `Cost Center`,`Start Date`, `End Date`,
+             `CPT Code & Mod`, Volume, Bud)
+  }
+  msmw_upload <- create_premier_upload(df = mshs_rad_data,
+                                       selected_sites = c('NY2162', 'NY2163'),
+                                       start_date = selected_start_date,
+                                       end_date = selected_end_date)
+  msbib_upload <- create_premier_upload(df = mshs_rad_data,
+                                       selected_sites = c('630571'),
+                                       start_date = selected_start_date,
+                                       end_date = selected_end_date)
+  
   ## Quality Charts ----------------------------------------------------------
 
