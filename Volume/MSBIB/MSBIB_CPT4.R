@@ -58,13 +58,11 @@ rm(cdm)
 cc_xwalk_file_path <- choose.files(
   default = paste0(j_drive, "/SixSigma/MSHS Productivity/Productivity/",
                    "Volume - Data/MSBI Data/Charge Detail/Instruction Files/",
-                   "*"),
+                   "MSBIB Charge Detail Rev to Labor Dept Crosswalk.xlsx"),
   caption = "Select Crosswalk File", multi = F)
 cc_xwalk <- read_xlsx(cc_xwalk_file_path, sheet = 1,
                       col_types = c("guess", rep("text", 8), "skip"))
   
-# make this a static file location instead of user choosing
-
 
 ## CPT Count/RVU map ------------------------------------------------------
 
@@ -83,8 +81,8 @@ cpt_ref <- read_xlsx(
 
 cpt_ref_slim <- cpt_ref %>%
   select(`Effective Year/Quarter`, `CPT/HCPCS Code`, `Modifier Code`,
-         `Worked RVU Factor`, `CPT Procedure Count`, `Short Description`,
-         `Long Description`) %>%
+         `Facility Practice Expense RVU Factor`, `CPT Procedure Count`,
+         `Short Description`, `Long Description`) %>%
   filter(`Effective Year/Quarter` ==
            unique(cpt_ref$`Effective Year/Quarter`)[1])
 
@@ -105,10 +103,10 @@ dist_dates <- dict_pay_cycles %>%
   filter(PREMIER.DISTRIBUTION %in% c(TRUE, 1, "1"),
          as.POSIXct(END.DATE) < as.POSIXct(Sys.Date()))
 
-#Selecting current distribution date
+# Selecting current distribution date
 dist_date <- dplyr::last(dist_dates$END.DATE)
-  
-#Confirming distribution date which will be the max of the current upload
+ 
+# Confirming distribution date which will be the max of the current upload
 answer <- winDialog(
   message = paste0(
     "Current distribution will be ", dist_date, "\r\r",
@@ -141,7 +139,7 @@ date_start <- prev_dist + days(1)
 # Data Import -------------------------------------------------------------
 
 # select where the monthly data is pulled from
-# this is typically on a hard-drive to expedite the processing time
+# this is typically on a hard-drive to expedite the import time
 # but default is set to the shared drive location
 raw_path <- choose.dir(
   default = paste0(j_drive, "/SixSigma/MSHS Productivity/Productivity",
@@ -204,10 +202,6 @@ raw_data <- rbindlist(all_lists, fill = T)
 raw_data <- raw_data %>%
   rename(file_path = V1)
 
-## confirm date range of data ----------------------------------------------
-
-## TBD
-
 ## save merged files for reference -----------------------------------------
 
 write_path <- choose.dir(default = raw_path,
@@ -215,7 +209,8 @@ write_path <- choose.dir(default = raw_path,
                        )
 
 # this can be improved because the default doesn't go to the desired path.
-# it seems like the default path isn't in the My Computer directory to select
+# it seems like the default path isn't in the My Computer directory
+# so the function doesn't recognize it
 
 saveRDS(raw_data,
         file = paste0(write_path, "/all_merged_", date_start, "_to_", dist_date,
@@ -226,15 +221,12 @@ write.table(raw_data,
             row.names = F, col.names = T, sep = ",")
 
 
-## import rds if preferred ------------------------------------------------
+## alternative to import raw data rds --------------------------------------
+
+# this is rarely done so user can uncomment and run function
+# on their own if desired
 
 # raw_data <- readRDS(file = choose.files()))
-
-# could make this an if statement earlier in the process
-# and prompt user about data import process
-
-# but this is so rarely done that user can uncomment and run function
-# on their own if desired
 
 
 ## remove unneeded data ---------------------------------------------------
@@ -272,19 +264,7 @@ processed_data <- processed_data %>%
             all.x = T)
 
 charge_summary <- processed_data %>%
-  # filter(`Published Report` == "yes") %>%
-  # filter(OPTB_cpt4 != "#N/A") %>%
-  # filter(OPTB_cpt4 != "0") %>%
-  # filter(OPTB_cpt4 != "99999") %>%
-  # filter(!is.na(OPTB_cpt4)) %>%
-  # filter(START.DATE >= date_start &
-  #          END.DATE <= dist_date) %>%
-  # group_by(`Labor Department`, START.DATE, END.DATE, OPTB_cpt4) %>%
-  # summarise(Vol = sum(Qty)) %>%
-  # ungroup()
-  # if the above is uncommented, then the data formatting of charge_summary
-  # below would need to be modified
-  group_by(`Labor Department`, TransDate, OPTB_cpt4) %>%
+  group_by(`Labor Department`, TransDate, OPTB_cpt4, `Published Report`) %>%
   summarise(Vol = sum(Qty)) %>%
   ungroup() %>%
   filter(TransDate >= date_start &
@@ -298,7 +278,8 @@ charge_summary <- processed_data %>%
 
 # Data Formatting ---------------------------------------------------------
 
-charge_summary <- charge_summary %>%
+upload <- charge_summary %>%
+  filter(`Published Report` == "yes") %>%
   mutate(EntityID = 729805,
          FacilID = 630571,
          budget = 0,
@@ -308,26 +289,41 @@ charge_summary <- charge_summary %>%
          EndDate = format(EndDate, "%m/%d/%Y")) %>%
   select(EntityID, FacilID, `Labor Department`, StartDate, EndDate,
          OPTB_cpt4, Vol, budget)
-# can this be modified to make the start date the pay cycle start
-# and the end date the pay cycle end?
-# this would reduce the upload size significantly
-# (some code for the initial charge_summary creation has already been
-# put in place)
+
+
+non_upload_depts <- charge_summary %>%
+  filter(is.na(`Published Report`)) %>%
+  mutate(EntityID = 729805,
+         FacilID = 630571,
+         budget = 0,
+         EndDate = TransDate) %>%
+  rename(StartDate = TransDate) %>%
+  mutate(StartDate = format(StartDate, "%m/%d/%Y"),
+         EndDate = format(EndDate, "%m/%d/%Y")) %>%
+  select(EntityID, FacilID, `Labor Department`, StartDate, EndDate,
+         OPTB_cpt4, Vol, budget)
 
 # Quality Checks ----------------------------------------------------------
 
+
+## volumes in Premier published reports -----------------------------------
 charge_summary_qc <- processed_data %>%
   filter(`Published Report` == "yes") %>%
   filter(END.DATE >= date_start &
            START.DATE <= dist_date) %>%
   mutate(prem_vol = case_when(
-    `Report Metric Type` == "RVU" ~ Qty * `Worked RVU Factor`,
+    `Report Metric Type` == "RVU" ~ 
+      Qty * `Facility Practice Expense RVU Factor`,
     `Report Metric Type` == "CPT" ~ Qty * `CPT Procedure Count`)) %>%
   group_by(`Report ID`, `Report Name`, `Report Metric`, `Report Metric Type`,
            START.DATE, END.DATE, ) %>%
   summarize(Vol = sum(prem_vol)) %>%
   ungroup()
-  
+
+View(charge_summary_qc)
+
+## rev dept not mapped ----------------------------------------------------
+
 na_cc_summary <- processed_data %>%
   filter(is.na(`Labor Department`) |
            str_detect(`Labor Department`, "NOMAP")) %>%
@@ -339,8 +335,8 @@ na_cc_summary <- processed_data %>%
 
 View(na_cc_summary)
 
-# could improve this by considering how many of these are in
-# depts that are used for premier reports and having that be in another column
+## charge not mapped to a CPT --------------------------------------------
+
 na_cpt4_summary <- processed_data %>%
   filter(OPTB_cpt4 == "#N/A" | OPTB_cpt4 == 0 |
            OPTB_cpt4 == 99999 | is.na(OPTB_cpt4)) %>%
@@ -350,6 +346,8 @@ na_cpt4_summary <- processed_data %>%
   ungroup()
 
 View(na_cpt4_summary)
+
+## charge not mapped to CPT for published report ---------------------------
 
 na_cpt4_pub_report_summary <- processed_data %>%
   filter(`Published Report` == "yes") %>%
@@ -368,10 +366,15 @@ View(na_cpt4_pub_report_summary)
 date_start_char <- format(as.Date(date_start), "%Y-%m-%d")
 date_dist_char <- format(as.Date(dist_date), "%Y-%m-%d")
 
-write.table(charge_summary,
+write.table(upload,
             file = paste0(write_path, "/MSBIB CPT Vol ", date_start_char,
                           " to ", date_dist_char, ".csv"),
             row.names = F, col.names = F, sep = ",")
+write.table(non_upload_depts,
+            file = paste0(write_path, "/MSBIB CPT Vol - depts not pub ",
+                          date_start_char, " to ", date_dist_char, ".csv"),
+            row.names = F, col.names = F, sep = ",")
+
 write.table(na_cc_summary,
             file = paste0(write_path, "/CPT no CC ", date_start_char,
                           " to ", date_dist_char, ".csv"),
