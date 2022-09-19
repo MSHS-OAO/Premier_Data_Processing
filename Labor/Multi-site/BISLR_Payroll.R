@@ -133,16 +133,11 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
   ## References --------------------------------------------------------------
   pay_cycles_uploaded <- pay_cycles_uploaded %>%
-    mutate(Start_End = paste0(Start.Date, '-', End.Date),
-           Pay_Cycle_Uploaded = 'yes')
+    mutate(Pay_Cycle_Uploaded = 'yes')
   dict_premier_dpt <- dict_premier_dpt %>%
-    mutate(Site_Dpt = paste0(Site, '-', Cost.Center),
-           Dpt_in_Dict = 'yes')
-  map_premier_dpt <- map_premier_dpt %>%
-    mutate(Site_Dpt = paste0(Site, '-', Cost.Center))
+    mutate(Dpt_in_Dict = 'yes')
   dict_premier_jobcode <- dict_premier_jobcode %>%
-    mutate(Site_Dpt_JC = paste0(Site, '-', Cost.Center, '-', Job.Code),
-           JC_in_Dict = 'yes')
+    mutate(JC_in_Dict = 'yes')
   #TBD
   # dict_premier_report <- dict_premier_report %>%
   #   pivot_longer()
@@ -163,14 +158,19 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            DPT.HOME.LEGACY = paste0(substr(Reverse.Map.for.Home, 1, 4),
                                     substr(Reverse.Map.for.Home, 13, 14),
                                     substr(Reverse.Map.for.Home, 16, 19)),
-           Start_End = paste0(Start.Date, '-', End.Date),
+           Start.Date = as.Date(Start.Date, format = '%m/%d/%Y'),
+           End.Date = as.Date(End.Date, format = '%m/%d/%Y'),
            Employee.Name = substr(Employee.Name, 1, 30),
            Approved.Hours.per.Pay.Period = round(Approved.Hours.per.Pay.Period,
                                                  digits = 0)) %>%
     mutate(DPT.WRKD = case_when(
       DPT.WRKD.LEGACY %in% accural_legacy_cc ~ DPT.WRKD.LEGACY,
       TRUE ~ DPT.WRKD)) %>%
-    left_join(pay_cycles_uploaded)
+    left_join(pay_cycles_uploaded) %>%
+    left_join(map_uni_jobcodes %>%
+                filter(PAYROLL == 'BISLR') %>%
+                select(J.C, PROVIDER) %>%
+                rename(Job.Code = J.C))
 
 # Creating Outputs --------------------------------------------------------
 
