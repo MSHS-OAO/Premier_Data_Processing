@@ -78,6 +78,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   map_uni_reports <- read_xlsx(paste0(dir_universal,
                                       '/Mapping/MSHS_Reporting_Definition_Mapping.xlsx'),
                                sheet = 1)
+  map_uni_paycycles <- read_xlsx(paste0(dir_universal,
+                                        '/Mapping/MSHS_Pay_Cycle.xlsx'),
+                                 sheet = 1)
 
   ## Premier Reference Files -------------------------------------------------
   dict_premier_dpt <- read.csv(paste0(dir_universal,
