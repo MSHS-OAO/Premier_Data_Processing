@@ -78,34 +78,6 @@ productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
 bislr_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
 
 
-## Wide Pivot Check -------------------------------------------------------
-
-# will date ranges need to be confirmed by the user earlier?
-# or do we just look at all dates in the data?
-dist_prev <- as.Date("2022-07-02")
-dist_current <- as.Date("2022-07-30")
-
-piv_wide_check <- bislr_payroll %>%
-  filter(as.Date(End.Date, "%m/%d/%Y") >= dist_prev &
-           as.Date(End.Date, "%m/%d/%Y") <= dist_current + 7) %>%
-  group_by(Facility.Hospital.Id_Worked, Payroll.Name, End.Date) %>%
-  summarize(Hours = sum(as.numeric(Hours), na.rm = TRUE)) %>%
-  ungroup() %>%
-  arrange(as.Date(End.Date, "%m/%d/%Y"),
-          Facility.Hospital.Id_Worked, Payroll.Name) %>%
-  bind_rows(summarize(group_by(., Facility.Hospital.Id_Worked, End.Date, .drop = FALSE),
-                      Hours = sum(Hours, na.rm = TRUE),
-                      Payroll.Name = "-SITE TOTAL-")) %>%
-  bind_rows(summarize(group_by(filter(., Payroll.Name == "-SITE TOTAL-"), End.Date, .drop = FALSE),
-                      Hours = sum(Hours, na.rm = TRUE),
-                      across(where(is.character), ~"TOTAL"))) %>%
-  arrange(Facility.Hospital.Id_Worked, Payroll.Name,
-          as.Date(End.Date, "%m/%d/%Y")) %>%
-  pivot_wider(names_from = End.Date,
-              values_from = Hours)
-
-View(piv_wide_check)
-
 # Import References -------------------------------------------------------
 pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR,
                                         '/Reference',
@@ -194,6 +166,72 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   # dict_premier_report <- dict_premier_report %>%
   #   pivot_longer()
 
+  ## Distribution Dates -----------------------------------------------------
+  
+  dist_dates <- map_uni_paycycles %>%
+    select(END.DATE, PREMIER.DISTRIBUTION) %>%
+    distinct() %>%
+    drop_na() %>%
+    arrange(END.DATE) %>%
+    filter(PREMIER.DISTRIBUTION %in% c(TRUE, 1),
+           END.DATE < max(
+             as.POSIXct(bislr_payroll$End.Date, format = "%m/%d/%Y")))
+  
+  #Selecting the most recent distribution date
+  distribution_date <- dist_dates$END.DATE[nrow(dist_dates)]
+  
+  #Confirming distribution date which will be the max of the current upload
+  answer <- winDialog(
+    message = paste0(
+      "Current distribution will be ", distribution_date, "\r\r",
+      "If this is correct, press OK\r\r",
+      "If this is not correct, press Cancel and\r",
+      "you will be prompted to select the correct\r",
+      "distribution date."
+    ),
+    type = "okcancel"
+  )
+  
+  if (answer == "CANCEL") {
+    distribution_date <- select.list(
+      choices =
+        format(sort.POSIXlt(dist_dates$END.DATE, decreasing = T), "%m/%d/%Y"),
+      multiple = F,
+      title = "Select current distribution",
+      graphics = T,
+      preselect = format(sort.POSIXlt(dist_dates$END.DATE, decreasing = T),
+                         "%m/%d/%Y")[2]
+    )
+    distribution_date <- mdy(distribution_date)
+  }
+  
+  ## Wide Pivot Check -------------------------------------------------------
+  
+  dist_prev <- dist_dates$END.DATE[
+    which(dist_dates$END.DATE == distribution_date) - 1]
+
+  piv_wide_check <- bislr_payroll %>%
+    filter(as.Date(End.Date, "%m/%d/%Y") >= dist_prev &
+             as.Date(End.Date, "%m/%d/%Y") <= distribution_date + lubridate::days(7)) %>%
+    group_by(Facility.Hospital.Id_Worked, Payroll.Name, End.Date) %>%
+    summarize(Hours = sum(as.numeric(Hours), na.rm = TRUE)) %>%
+    ungroup() %>%
+    arrange(as.Date(End.Date, "%m/%d/%Y"),
+            Facility.Hospital.Id_Worked, Payroll.Name) %>%
+    bind_rows(summarize(group_by(., Facility.Hospital.Id_Worked, End.Date, .drop = FALSE),
+                        Hours = sum(Hours, na.rm = TRUE),
+                        Payroll.Name = "-SITE TOTAL-")) %>%
+    bind_rows(summarize(group_by(filter(., Payroll.Name == "-SITE TOTAL-"), End.Date, .drop = FALSE),
+                        Hours = sum(Hours, na.rm = TRUE),
+                        across(where(is.character), ~"TOTAL"))) %>%
+    arrange(Facility.Hospital.Id_Worked, Payroll.Name,
+            as.Date(End.Date, "%m/%d/%Y")) %>%
+    mutate(Hours = prettyNum(Hours, big.mark = ",")) %>%
+    pivot_wider(names_from = End.Date,
+                values_from = Hours)
+  
+  View(piv_wide_check)
+  
   ## Data Preprocess --------------------------------------------------------------------
   test_data <- bislr_payroll %>%
     mutate(DPT.WRKD = paste0(substr(Full.COA.for.Worked,1,3),
