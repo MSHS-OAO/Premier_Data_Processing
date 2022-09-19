@@ -210,7 +210,16 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     ### Update Reference Files --------------------------------------------------
     #update universal job codes
     if (NA %in% unique(test_data$JC_in_UnivseralFile)) {
-      #create list of new code and suggested mappings
+      new_jobcodes <- test_data %>%
+        filter(is.na(JC_in_UnivseralFile)) %>%
+        select(Job.Code, Position.Code.Description) %>%
+        unique() %>%
+        left_join(map_uni_jobcodes %>%
+                    filter(PAYROLL == 'MSHQ') %>%
+                    select(J.C.DESCRIPTION, PROVIDER, PREMIER.J.C,
+                           PREMIER.J.C.DESCRIPTION) %>%
+                    rename(Position.Code.Description = J.C.DESCRIPTION))
+      View(new_jobcodes)
       stop('New job codes detected, update universal job code dictionary')
     }
     #update universal pay codes
