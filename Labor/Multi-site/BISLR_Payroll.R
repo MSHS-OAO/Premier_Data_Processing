@@ -133,11 +133,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
   ## References --------------------------------------------------------------
   pay_cycles_uploaded <- pay_cycles_uploaded %>%
-    mutate(Pay_Cycle_Uploaded = 'yes')
+    mutate(Pay_Cycle_Uploaded = 1)
   dict_premier_dpt <- dict_premier_dpt %>%
-    mutate(Dpt_in_Dict = 'yes')
+    mutate(Cost.Center = as.character(Cost.Center),
+           Dpt_in_Dict = 1)
   dict_premier_jobcode <- dict_premier_jobcode %>%
-    mutate(JC_in_Dict = 'yes')
+    mutate(JC_in_Dict = 1)
   #TBD
   # dict_premier_report <- dict_premier_report %>%
   #   pivot_longer()
@@ -170,7 +171,17 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     left_join(map_uni_jobcodes %>%
                 filter(PAYROLL == 'BISLR') %>%
                 select(J.C, PROVIDER) %>%
-                rename(Job.Code = J.C))
+                rename(Job.Code = J.C)) %>%
+    left_join(dict_premier_dpt %>%
+                select(Site, Cost.Center, Dpt_in_Dict) %>%
+                rename(Home.FacilityOR.Hospital.ID = Site,
+                       DPT.HOME = Cost.Center,
+                       HomeDpt_in_Dict = Dpt_in_Dict)) %>%
+    left_join(dict_premier_dpt %>%
+                select(Site, Cost.Center, Dpt_in_Dict) %>%
+                rename(Facility.Hospital.Id_Worked = Site,
+                       DPT.WRKD = Cost.Center,
+                       WRKDpt_in_Dict = Dpt_in_Dict))
 
 # Creating Outputs --------------------------------------------------------
 
