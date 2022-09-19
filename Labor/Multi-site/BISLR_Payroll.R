@@ -134,7 +134,19 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   ## References --------------------------------------------------------------
   pay_cycles_uploaded <- pay_cycles_uploaded %>%
     mutate(Start_End = paste0(Start.Date, '-', End.Date))
-  dict_premier_dpt <- dict_premier_dpt
+  dict_premier_dpt <- dict_premier_dpt %>%
+    mutate(Site_Dpt = paste0(Site, '-', Cost.Center))
+  map_premier_dpt <- map_premier_dpt %>%
+    mutate(Site_Dpt = paste0(Site, '-', Cost.Center))
+  dict_premier_jobcode <- dict_premier_jobcode %>%
+    mutate(Site_Dpt_JC = paste0(Site, '-', Cost.Center, '-', Job.Code))
+  #TBD
+  # dict_premier_report <- dict_premier_report %>%
+  #   pivot_longer()
+
+  ## Data --------------------------------------------------------------------
+
+  
 
 # Creating Outputs --------------------------------------------------------
 
