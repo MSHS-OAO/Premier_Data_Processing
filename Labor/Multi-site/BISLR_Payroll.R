@@ -3,6 +3,7 @@
 library(tidyverse)
 library(readxl)
 library(xlsx)
+library(rstudioapi)
 
 # Directories -------------------------------------------------------------
 dir <- 'J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity'
@@ -28,20 +29,22 @@ productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
   #Importing File information from Folder
   File.Name <- list.files(path = folder.path, full.names = F)
   File.Path <- list.files(path = folder.path, full.names = T)
-  File.Date <- as.Date(sapply(File.Name, function(x) substr(x,nchar(x)-14, nchar(x)-5)),
+  File.Date <- as.Date(sapply(File.Name,
+                              function(x)
+                                if(substr(File.Name[1], nchar(File.Name[1])-3, nchar(File.Name[1])) == 'txt'){
+                                  substr(x,nchar(x)-17, nchar(x)-8)
+                                }else(substr(x,nchar(x)-14, nchar(x)-5))),
                        format = '%m_%d_%Y')
   File.Table <<- data.table::data.table(File.Name, File.Date, File.Path) %>%
     arrange(desc(File.Date))
   #Quality Check - Confirming Upload File
-  cat('File selected is ',
-      File.Table$File.Name[place],
-      '. Is this the correct file?')
-  answer <- select.list(choices = c('Yes', 'No'),
-                        preselect = 'Yes',
-                        multiple = F,
-                        title = 'Correct File?',
-                        graphics = T)
-  if (answer == 'No') {
+  answer <- showQuestion(title = 'Question',
+                         message = paste0('File selected is: \n',
+                                          File.Table$File.Name[place],
+                                          '. \nIs this the correct file?'),
+                         ok = 'Yes',
+                         cancel = 'No')
+  if (answer == F) {
     user_selected_file <- select.list(choices = File.Table$File.Name,
                                 multiple = F,
                                 title = 'Select the correct file',
