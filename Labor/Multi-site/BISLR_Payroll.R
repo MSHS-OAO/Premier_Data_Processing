@@ -31,8 +31,8 @@ productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
   File.Path <- list.files(path = folder.path, full.names = T)
   File.Date <- as.Date(sapply(File.Name,
                               function(x)
-                                if(substr(File.Name[1], nchar(File.Name[1])-3, nchar(File.Name[1])) == 'txt'){
-                                  substr(x,nchar(x)-17, nchar(x)-8)
+                                if(substr(x, nchar(x)-3, nchar(x)) == '.txt'){
+                                  substr(x,nchar(x)-18, nchar(x)-9)
                                 }else(substr(x,nchar(x)-14, nchar(x)-5))),
                        format = '%m_%d_%Y')
   File.Table <<- data.table::data.table(File.Name, File.Date, File.Path) %>%
