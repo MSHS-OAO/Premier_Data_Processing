@@ -138,6 +138,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 # Data Processing -----------------------------------------------------------
 
   ## References --------------------------------------------------------------
+  map_uni_jobcodes <- map_uni_jobcodes %>%
+    mutate(JC_in_UnivseralFile = 1)
   pay_cycles_uploaded <- pay_cycles_uploaded %>%
     mutate(Pay_Cycle_Uploaded = 1)
   dict_premier_dpt <- dict_premier_dpt %>%
@@ -172,11 +174,17 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                                  digits = 0)) %>%
     mutate(DPT.WRKD = case_when(
       DPT.WRKD.LEGACY %in% accural_legacy_cc ~ DPT.WRKD.LEGACY,
-      TRUE ~ DPT.WRKD)) %>% #msus jobcode updates
+      TRUE ~ DPT.WRKD),
+      Job.Code = case_when(
+        paste0(DPT.WRKD, '-', Employee.Name) %in%
+          paste0(msus_removal_list$`Department IdWHERE Worked`,
+                 '-', msus_removal_list$`Employee Name`)
+        ~ unique(msus_removal_list$`New Job Code`),
+        TRUE ~ Job.Code)) %>% 
     left_join(pay_cycles_uploaded) %>%
-    left_join(map_uni_jobcodes %>% #dont bring in providers yet, check if in universal mapping file first
+    left_join(map_uni_jobcodes %>% 
                 filter(PAYROLL == 'BISLR') %>%
-                select(J.C, PROVIDER) %>%
+                select(J.C, JC_in_UnivseralFile) %>%
                 rename(Job.Code = J.C)) %>%
     left_join(dict_premier_dpt %>%
                 select(Site, Cost.Center, Dpt_in_Dict) %>%
@@ -201,7 +209,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
     ### Update Reference Files --------------------------------------------------
     #update universal job codes
-    if (is.na(unique(test_data$PROVIDER))) {
+    if (NA %in% unique(test_data$JC_in_UnivseralFile)) {
       #create list of new code and suggested mappings
       stop('New job codes detected, update universal job code dictionary')
     }
