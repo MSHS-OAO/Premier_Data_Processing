@@ -143,7 +143,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   # dict_premier_report <- dict_premier_report %>%
   #   pivot_longer()
 
-  ## Data --------------------------------------------------------------------
+  ## Data Preprocess --------------------------------------------------------------------
   test_data <- bislr_payroll %>%
     mutate(DPT.WRKD = paste0(substr(Full.COA.for.Worked,1,3),
                              substr(Full.COA.for.Worked,41,44),
@@ -166,9 +166,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                                  digits = 0)) %>%
     mutate(DPT.WRKD = case_when(
       DPT.WRKD.LEGACY %in% accural_legacy_cc ~ DPT.WRKD.LEGACY,
-      TRUE ~ DPT.WRKD)) %>%
+      TRUE ~ DPT.WRKD)) %>% #msus jobcode updates
     left_join(pay_cycles_uploaded) %>%
-    left_join(map_uni_jobcodes %>%
+    left_join(map_uni_jobcodes %>% #dont bring in providers yet, check if in universal mapping file first
                 filter(PAYROLL == 'BISLR') %>%
                 select(J.C, PROVIDER) %>%
                 rename(Job.Code = J.C)) %>%
@@ -181,8 +181,35 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                 select(Site, Cost.Center, Dpt_in_Dict) %>%
                 rename(Facility.Hospital.Id_Worked = Site,
                        DPT.WRKD = Cost.Center,
-                       WRKDpt_in_Dict = Dpt_in_Dict))
+                       WRKDpt_in_Dict = Dpt_in_Dict)) %>%
+    left_join(dict_premier_jobcode %>%
+                select(Site, Cost.Center, Job.Code, JC_in_Dict) %>%
+                rename(Home.FacilityOR.Hospital.ID = Site,
+                       DPT.HOME = Cost.Center,
+                       HOMEJC_in_Dict = JC_in_Dict)) %>%
+    left_join(dict_premier_jobcode %>%
+                select(Site, Cost.Center, Job.Code, JC_in_Dict) %>%
+                rename(Facility.Hospital.Id_Worked = Site,
+                       DPT.WRKD = Cost.Center,
+                       WRKJC_in_Dict = JC_in_Dict))
 
+    ### Update Reference Files --------------------------------------------------
+    #update universal job codes
+    if (is.na(unique(test_data$PROVIDER))) {
+      #create list of new code and suggested mappings
+      stop('New job codes detected, update universal job code dictionary')
+    }
+    #update universal pay codes
+    #update dpt dict
+    #update dpt map
+    #update dpt job code dict
+    #update dpt job code map
+
+## Data Processing ---------------------------------------------------------
+
+  
+  
+  
 # Creating Outputs --------------------------------------------------------
 
 
