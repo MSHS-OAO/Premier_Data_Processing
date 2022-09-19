@@ -145,8 +145,24 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   #   pivot_longer()
 
   ## Data --------------------------------------------------------------------
-
-  
+  test_data <- bislr_payroll %>%
+    mutate(DPT.WRKD = paste0(substr(Full.COA.for.Worked,1,3),
+                             substr(Full.COA.for.Worked,41,44),
+                             substr(Full.COA.for.Worked,5,7),
+                             substr(Full.COA.for.Worked,12,16)),
+           DPT.HOME = paste0(substr(Full.COA.for.Home,1,3),
+                             substr(Full.COA.for.Home,41,44),
+                             substr(Full.COA.for.Home,5,7),
+                             substr(Full.COA.for.Home,12,16)),
+           DPT.WRKD.LEGACY = paste0(substr(Reverse.Map.for.Worked, 1, 4),
+                                    substr(Reverse.Map.for.Worked, 13, 14),
+                                    substr(Reverse.Map.for.Worked, 16, 19)),
+           DPT.HOME.LEGACY = paste0(substr(Reverse.Map.for.Home, 1, 4),
+                                    substr(Reverse.Map.for.Home, 13, 14),
+                                    substr(Reverse.Map.for.Home, 16, 19)),
+           Employee.Name = substr(Employee.Name, 1, 30),
+           Approved.Hours.per.Pay.Period = round(Approved.Hours.per.Pay.Period,
+                                                 digits = 0))
 
 # Creating Outputs --------------------------------------------------------
 
