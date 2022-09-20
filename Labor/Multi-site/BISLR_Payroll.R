@@ -186,6 +186,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                 filter(PAYROLL == 'BISLR') %>%
                 select(J.C, JC_in_UnivseralFile) %>%
                 rename(Job.Code = J.C)) %>%
+    left_join(map_uni_paycodes %>% 
+                select(RAW.PAY.CODE) %>%
+                mutate(Paycode_in_Universal = 1) %>%
+                rename(Pay.Code = RAW.PAY.CODE)) %>%
     left_join(dict_premier_dpt %>%
                 select(Site, Cost.Center, Dpt_in_Dict) %>%
                 rename(Home.FacilityOR.Hospital.ID = Site,
@@ -220,13 +224,19 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                            PREMIER.J.C.DESCRIPTION) %>%
                     rename(Position.Code.Description = J.C.DESCRIPTION))
       View(new_jobcodes)
+      write.csv(new_jobcodes, 'New Job Codes for Universal File.csv')
       stop('New job codes detected, update universal job code dictionary')
     }
     #update universal pay codes
-    #update dpt dict
-    #update dpt map
-    #update dpt job code dict
-    #update dpt job code map
+    if (NA %in% unique(test_data$Paycode_in_Universal)) {
+      new_paycodes <- test_data %>%
+        filter(is.na(Paycode_in_Universal)) %>%
+        select(Facility.Hospital.Id_Worked, Pay.Code) %>%
+        unique() %>%
+      View(new_paycodes)
+      write.csv(new_jobcodes, 'New Pay Codes for Universal File.csv')
+      stop('New pay codes detected, update universal job code dictionary')
+    }
 
 ## Data Processing ---------------------------------------------------------
 
@@ -234,6 +244,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   
 # Creating Outputs --------------------------------------------------------
+
+  ## Premier Reference Files -------------------------------------------------
+  #update dpt dict
+  #update dpt map
+  #update dpt job code dict
+  #update dpt job code map
 
 
 # Quality Checks -------------------------------------------------------
