@@ -211,8 +211,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                        DPT.WRKD = Cost.Center,
                        WRKJC_in_Dict = JC_in_Dict))
 
-    ### Update Reference Files --------------------------------------------------
-    #update universal job codes
+    ## Update Universal Files --------------------------------------------------
     if (NA %in% unique(test_data$JC_in_UnivseralFile)) {
       new_jobcodes <- test_data %>%
         filter(is.na(JC_in_UnivseralFile)) %>%
@@ -227,7 +226,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       write.csv(new_jobcodes, 'New Job Codes for Universal File.csv')
       stop('New job codes detected, update universal job code dictionary')
     }
-    #update universal pay codes
+  
     if (NA %in% unique(test_data$Paycode_in_Universal)) {
       new_paycodes <- test_data %>%
         filter(is.na(Paycode_in_Universal)) %>%
@@ -238,19 +237,21 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       stop('New pay codes detected, update universal job code dictionary')
     }
 
-## Data Processing ---------------------------------------------------------
 
-  
-  
-  
 # Creating Outputs --------------------------------------------------------
+
+  ## Premier Payroll File ----------------------------------------------------
+  
 
   ## Premier Reference Files -------------------------------------------------
   #update dpt dict
   #update dpt map
   #update dpt job code dict
   #update dpt job code map
-
+  #update dpt pay code dict /map
+  if(exists(new_paycodes)){
+    
+  }
 
 # Quality Checks -------------------------------------------------------
 
