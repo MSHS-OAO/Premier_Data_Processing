@@ -152,7 +152,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   #   pivot_longer()
 
   ## Data Preprocess --------------------------------------------------------------------
-  test_data <- bislr_payroll %>%
+  bislr_payroll <- bislr_payroll %>%
     mutate(DPT.WRKD = paste0(substr(Full.COA.for.Worked,1,3),
                              substr(Full.COA.for.Worked,41,44),
                              substr(Full.COA.for.Worked,5,7),
@@ -212,8 +212,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                        WRKJC_in_Dict = JC_in_Dict))
 
     ## Update Universal Files --------------------------------------------------
-    if (NA %in% unique(test_data$JC_in_UnivseralFile)) {
-      new_jobcodes <- test_data %>%
+    if (NA %in% unique(bislr_payroll$JC_in_UnivseralFile)) {
+      new_jobcodes <- bislr_payroll %>%
         filter(is.na(JC_in_UnivseralFile)) %>%
         select(Job.Code, Position.Code.Description) %>%
         unique() %>%
@@ -227,8 +227,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       stop('New job codes detected, update universal job code dictionary')
     }
   
-    if (NA %in% unique(test_data$Paycode_in_Universal)) {
-      new_paycodes <- test_data %>%
+    if (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
+      new_paycodes <- bislr_payroll %>%
         filter(is.na(Paycode_in_Universal)) %>%
         select(Facility.Hospital.Id_Worked, Pay.Code) %>%
         unique() %>%
