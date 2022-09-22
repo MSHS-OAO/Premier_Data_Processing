@@ -212,16 +212,19 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   piv_wide_check <- bislr_payroll %>%
     filter(as.Date(End.Date, "%m/%d/%Y") >= dist_prev &
-             as.Date(End.Date, "%m/%d/%Y") <= distribution_date + lubridate::days(7)) %>%
+             as.Date(End.Date, "%m/%d/%Y") <= distribution_date +
+             lubridate::days(7)) %>%
     group_by(Facility.Hospital.Id_Worked, Payroll.Name, End.Date) %>%
     summarize(Hours = sum(as.numeric(Hours), na.rm = TRUE)) %>%
     ungroup() %>%
     arrange(as.Date(End.Date, "%m/%d/%Y"),
             Facility.Hospital.Id_Worked, Payroll.Name) %>%
-    bind_rows(summarize(group_by(., Facility.Hospital.Id_Worked, End.Date, .drop = FALSE),
+    bind_rows(summarize(group_by(., Facility.Hospital.Id_Worked, End.Date,
+                                 .drop = FALSE),
                         Hours = sum(Hours, na.rm = TRUE),
                         Payroll.Name = "-SITE TOTAL-")) %>%
-    bind_rows(summarize(group_by(filter(., Payroll.Name == "-SITE TOTAL-"), End.Date, .drop = FALSE),
+    bind_rows(summarize(group_by(filter(., Payroll.Name == "-SITE TOTAL-"),
+                                 End.Date, .drop = FALSE),
                         Hours = sum(Hours, na.rm = TRUE),
                         across(where(is.character), ~"TOTAL"))) %>%
     arrange(Facility.Hospital.Id_Worked, Payroll.Name,
