@@ -166,8 +166,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   # dict_premier_report <- dict_premier_report %>%
   #   pivot_longer()
 
-  ## Distribution Dates -----------------------------------------------------
-  
   dist_dates <- map_uni_paycycles %>%
     select(END.DATE, PREMIER.DISTRIBUTION) %>%
     distinct() %>%
@@ -178,37 +176,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
              as.POSIXct(bislr_payroll$End.Date, format = "%m/%d/%Y")))
   
   #Selecting the most recent distribution date
-  distribution_date <- dist_dates$END.DATE[nrow(dist_dates)]
-  
-  #Confirming distribution date which will be the max of the current upload
-  answer <- winDialog(
-    message = paste0(
-      "Current distribution will be ", distribution_date, "\r\r",
-      "If this is correct, press OK\r\r",
-      "If this is not correct, press Cancel and\r",
-      "you will be prompted to select the correct\r",
-      "distribution date."
-    ),
-    type = "okcancel"
-  )
-  
-  if (answer == "CANCEL") {
-    distribution_date <- select.list(
-      choices =
-        format(sort.POSIXlt(dist_dates$END.DATE, decreasing = T), "%m/%d/%Y"),
-      multiple = F,
-      title = "Select current distribution",
-      graphics = T,
-      preselect = format(sort.POSIXlt(dist_dates$END.DATE, decreasing = T),
-                         "%m/%d/%Y")[2]
-    )
-    distribution_date <- mdy(distribution_date)
-  }
+  distribution_date <- max(as.POSIXct(dist_dates$END.DATE))
   
   dist_prev <- dist_dates$END.DATE[
     which(dist_dates$END.DATE == distribution_date) - 1]
   
-  ## Wide Pivot Check -------------------------------------------------------
+  ## Site Hours Quality Check ------------------------------------------------
   
   piv_wide_check <- bislr_payroll %>%
     filter(as.Date(End.Date, "%m/%d/%Y") >= dist_prev &
@@ -219,12 +192,11 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     ungroup() %>%
     arrange(as.Date(End.Date, "%m/%d/%Y"),
             Facility.Hospital.Id_Worked, Payroll.Name) %>%
-    bind_rows(summarize(group_by(., Facility.Hospital.Id_Worked, End.Date,
-                                 .drop = FALSE),
+    bind_rows(summarize(group_by(., Facility.Hospital.Id_Worked, End.Date),
                         Hours = sum(Hours, na.rm = TRUE),
                         Payroll.Name = "-SITE TOTAL-")) %>%
     bind_rows(summarize(group_by(filter(., Payroll.Name == "-SITE TOTAL-"),
-                                 End.Date, .drop = FALSE),
+                                 End.Date),
                         Hours = sum(Hours, na.rm = TRUE),
                         across(where(is.character), ~"TOTAL"))) %>%
     arrange(Facility.Hospital.Id_Worked, Payroll.Name,
@@ -310,6 +282,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
 # Creating Outputs --------------------------------------------------------
 
+  # create Site Hours Quality Check output
 
 # Quality Checks -------------------------------------------------------
 
