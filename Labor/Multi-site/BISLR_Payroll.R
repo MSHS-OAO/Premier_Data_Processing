@@ -312,7 +312,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     select(Start.Date, End.Date) %>%
     unique() %>%
     arrange(Start.Date) %>%
-    filter(End.Date > dist_prev)
+    filter(End.Date > dist_prev,
+           !Start.Date > distribution_date)
 
 # Formatting Outputs ---------------------------------------------------------
 
