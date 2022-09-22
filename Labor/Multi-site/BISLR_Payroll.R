@@ -18,7 +18,12 @@ map_effective_date <- as.Date('2022-01-01') #is this date ok?
 accural_legacy_cc <- c(1109008600, 1109028600, 4409008600, 6409008600) #add other 8600, make quality check for new 8600, id errors non accural oracle but backmapped accural
 productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
                         'OTHER_WORKED', 'AGENCY')
+
+# general improvement opportunity:
+# can we update the paycode mapping file to indicate productive vs. non-prod?
+
 dummy_report_ids <- c('DNU_000', 'DNU_MSM000', 'DNU_MSW000')
+
 
   ## Premier Formatting ------------------------------------------------------
   char_len_dpt <- 15
@@ -60,11 +65,24 @@ dummy_report_ids <- c('DNU_000', 'DNU_MSM000', 'DNU_MSW000')
                             header = T,
                             sep = '~',
                             fill = T)
+                            # colClasses = "character")
+                            # Home dept came in as numeric and was displaying
+                            # as scientific, so tried bringing in as text
+                            # since all other columns were text.
+                            # Also found that some values are not including
+                            # location and dept code
+
+  # Also seeing:  
+  # Warning message:
+  #   In scan(file = file, what = what, sep = sep, quote = quote, dec = dec,  :
+  #             EOF within quoted string
+
   return(data_recent)
   }
 
 # Import Data -------------------------------------------------------------
 bislr_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
+
 
 # Import References -------------------------------------------------------
 pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR,
@@ -161,6 +179,47 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   # #                       pattern = ':', simplify = T)
   # test_var <- stri_split_fixed(str = 'Cost.Center', pattern = ':')
 
+  dist_dates <- map_uni_paycycles %>%
+    select(END.DATE, PREMIER.DISTRIBUTION) %>%
+    distinct() %>%
+    drop_na() %>%
+    arrange(END.DATE) %>%
+    filter(PREMIER.DISTRIBUTION %in% c(TRUE, 1),
+           END.DATE < max(
+             as.POSIXct(bislr_payroll$End.Date, format = "%m/%d/%Y")))
+  
+  #Selecting the most recent distribution date
+  distribution_date <- max(as.POSIXct(dist_dates$END.DATE))
+  
+  dist_prev <- dist_dates$END.DATE[
+    which(dist_dates$END.DATE == distribution_date) - 1]
+  
+  ## Site Hours Quality Check ------------------------------------------------
+  
+  piv_wide_check <- bislr_payroll %>%
+    filter(as.Date(End.Date, "%m/%d/%Y") >= dist_prev &
+             as.Date(End.Date, "%m/%d/%Y") <= distribution_date +
+             lubridate::days(7)) %>%
+    group_by(Facility.Hospital.Id_Worked, Payroll.Name, End.Date) %>%
+    summarize(Hours = sum(as.numeric(Hours), na.rm = TRUE)) %>%
+    ungroup() %>%
+    arrange(as.Date(End.Date, "%m/%d/%Y"),
+            Facility.Hospital.Id_Worked, Payroll.Name) %>%
+    bind_rows(summarize(group_by(., Facility.Hospital.Id_Worked, End.Date),
+                        Hours = sum(Hours, na.rm = TRUE),
+                        Payroll.Name = "-SITE TOTAL-")) %>%
+    bind_rows(summarize(group_by(filter(., Payroll.Name == "-SITE TOTAL-"),
+                                 End.Date),
+                        Hours = sum(Hours, na.rm = TRUE),
+                        across(where(is.character), ~"TOTAL"))) %>%
+    arrange(Facility.Hospital.Id_Worked, Payroll.Name,
+            as.Date(End.Date, "%m/%d/%Y")) %>%
+    mutate(Hours = prettyNum(Hours, big.mark = ",")) %>%
+    pivot_wider(names_from = End.Date,
+                values_from = Hours)
+  
+  View(piv_wide_check)
+  
   ## Data Preprocess --------------------------------------------------------------------
   bislr_payroll <- bislr_payroll %>%
     mutate(DPT.WRKD = paste0(substr(Full.COA.for.Worked,1,3),
@@ -252,7 +311,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
   ## Premier Payroll File ----------------------------------------------------
   
-
   ## Premier Reference Files -------------------------------------------------
   #update dpt dict
   #update dpt map
@@ -271,5 +329,5 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
 # Exporting Data ----------------------------------------------------------
 
-
+  # remember to output Site Hours Quality Check
 
