@@ -4,6 +4,8 @@ library(tidyverse)
 library(readxl)
 library(xlsx)
 library(rstudioapi)
+library(stringr)
+library(stringi)
 
 # Directories -------------------------------------------------------------
 dir <- 'J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity'
@@ -16,8 +18,12 @@ map_effective_date <- as.Date('2022-01-01') #is this date ok?
 accural_legacy_cc <- c(1109008600, 1109028600, 4409008600, 6409008600) #add other 8600, make quality check for new 8600, id errors non accural oracle but backmapped accural
 productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
                         'OTHER_WORKED', 'AGENCY')
+
 # general improvement opportunity:
 # can we update the paycode mapping file to indicate productive vs. non-prod?
+
+dummy_report_ids <- c('DNU_000', 'DNU_MSM000', 'DNU_MSW000')
+
 
   ## Premier Formatting ------------------------------------------------------
   char_len_dpt <- 15
@@ -163,8 +169,15 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   dict_premier_jobcode <- dict_premier_jobcode %>%
     mutate(JC_in_Dict = 1)
   #TBD
-  # dict_premier_report <- dict_premier_report %>%
-  #   pivot_longer()
+  # dummy_report_test <- dict_premier_report %>%
+  #   filter(Report.ID %in% dummy_report_ids)
+  # dummy_report_test <- left_join(dummy_report_test,
+  #                                str_split(dummy_report_test$Cost.Center,
+  #                                          pattern = ':', simplify = T),
+  #                                by = 'Cost.Center')
+  # # test_var <- str_split(dict_premier_report$Cost.Center,
+  # #                       pattern = ':', simplify = T)
+  # test_var <- stri_split_fixed(str = 'Cost.Center', pattern = ':')
 
   dist_dates <- map_uni_paycycles %>%
     select(END.DATE, PREMIER.DISTRIBUTION) %>%
@@ -208,7 +221,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   View(piv_wide_check)
   
   ## Data Preprocess --------------------------------------------------------------------
-  test_data <- bislr_payroll %>%
+  bislr_payroll <- bislr_payroll %>%
     mutate(DPT.WRKD = paste0(substr(Full.COA.for.Worked,1,3),
                              substr(Full.COA.for.Worked,41,44),
                              substr(Full.COA.for.Worked,5,7),
@@ -242,6 +255,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                 filter(PAYROLL == 'BISLR') %>%
                 select(J.C, JC_in_UnivseralFile) %>%
                 rename(Job.Code = J.C)) %>%
+    left_join(map_uni_paycodes %>% 
+                select(RAW.PAY.CODE) %>%
+                mutate(Paycode_in_Universal = 1) %>%
+                rename(Pay.Code = RAW.PAY.CODE)) %>%
     left_join(dict_premier_dpt %>%
                 select(Site, Cost.Center, Dpt_in_Dict) %>%
                 rename(Home.FacilityOR.Hospital.ID = Site,
@@ -263,26 +280,46 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                        DPT.WRKD = Cost.Center,
                        WRKJC_in_Dict = JC_in_Dict))
 
-    ### Update Reference Files --------------------------------------------------
-    #update universal job codes
-    if (NA %in% unique(test_data$JC_in_UnivseralFile)) {
-      #create list of new code and suggested mappings
-      stop('New job codes detected, update universal job code dictionary')
+    ## Update Universal Files --------------------------------------------------
+    if (NA %in% unique(bislr_payroll$JC_in_UnivseralFile)) {
+      new_jobcodes <- bislr_payroll %>%
+        filter(is.na(JC_in_UnivseralFile)) %>%
+        select(Job.Code, Position.Code.Description) %>%
+        unique() %>%
+        left_join(map_uni_jobcodes %>% #update so ignors case of string
+                    filter(PAYROLL == 'MSHQ') %>%
+                    select(J.C.DESCRIPTION, PROVIDER, PREMIER.J.C,
+                           PREMIER.J.C.DESCRIPTION) %>%
+                    rename(Position.Code.Description = J.C.DESCRIPTION))
+      View(new_jobcodes)
+      write.csv(new_jobcodes, 'New Job Codes for Universal File.csv')
+      stop('New job codes detected, update universal job code dictionary before continuing to run code')
     }
-    #update universal pay codes
-    #update dpt dict
-    #update dpt map
-    #update dpt job code dict
-    #update dpt job code map
-
-## Data Processing ---------------------------------------------------------
-
   
-  
-  
-# Creating Outputs --------------------------------------------------------
+    if (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
+      new_paycodes <- bislr_payroll %>%
+        filter(is.na(Paycode_in_Universal)) %>%
+        select(Facility.Hospital.Id_Worked, Pay.Code) %>%
+        unique() %>%
+      View(new_paycodes)
+      write.csv(new_jobcodes, 'New Pay Codes for Universal File.csv')
+      stop('New pay codes detected, update universal job code dictionary before continuing')
+    }
 
-  # create Site Hours Quality Check output
+
+# Formatting Outputs ---------------------------------------------------------
+
+  ## Premier Payroll File ----------------------------------------------------
+  
+  ## Premier Reference Files -------------------------------------------------
+  #update dpt dict
+  #update dpt map
+  #update dpt job code dict
+  #update dpt job code map
+  #update dpt pay code dict /map
+  if(exists(new_paycodes)){
+    
+  }
 
 # Quality Checks -------------------------------------------------------
 
@@ -292,5 +329,5 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
 # Exporting Data ----------------------------------------------------------
 
-
+  # remember to output Site Hours Quality Check
 
