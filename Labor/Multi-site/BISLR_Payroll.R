@@ -193,7 +193,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   dist_prev <- dist_dates$END.DATE[
     which(dist_dates$END.DATE == distribution_date) - 1]
-  
+
   ## Site Hours Quality Check ------------------------------------------------
   
   piv_wide_check <- bislr_payroll %>%
@@ -305,7 +305,14 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       write.csv(new_jobcodes, 'New Pay Codes for Universal File.csv')
       stop('New pay codes detected, update universal job code dictionary before continuing')
     }
-
+  
+  #Paycycles to filter on - remeber to update the reference file with these dates
+  filter_dates <- bislr_payroll %>%
+    filter(is.na(Pay_Cycle_Uploaded)) %>%
+    select(Start.Date, End.Date) %>%
+    unique() %>%
+    arrange(Start.Date) %>%
+    filter(End.Date > dist_prev)
 
 # Formatting Outputs ---------------------------------------------------------
 
