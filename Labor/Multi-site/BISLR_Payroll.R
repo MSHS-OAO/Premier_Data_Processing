@@ -15,6 +15,9 @@ dir_universal <- paste0(dir, '/Universal Data')
 # Constants ---------------------------------------------------------------
 new_dpt_map <- 10095
 map_effective_date <- as.Date('2022-01-01') #is this date ok?
+# MM: I typically use an older date like 1/1/2010
+# this way any remappings we perform it will ensure they are incorporated
+# into data
 accural_legacy_cc <- c(1109008600, 1109028600, 4409008600, 6409008600) #add other 8600, make quality check for new 8600, id errors non accural oracle but backmapped accural
 productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
                         'OTHER_WORKED', 'AGENCY')
@@ -81,8 +84,7 @@ dummy_report_ids <- c('DNU_000', 'DNU_MSM000', 'DNU_MSW000')
   }
 
 # Import Data -------------------------------------------------------------
-bislr_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
-
+raw_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
 
 # Import References -------------------------------------------------------
 pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR,
@@ -156,6 +158,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                   sep = ',',
                                   fill = T)
 
+  
 # Data Processing -----------------------------------------------------------
 
   ## References --------------------------------------------------------------
@@ -168,6 +171,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            Dpt_in_Dict = 1)
   dict_premier_jobcode <- dict_premier_jobcode %>%
     mutate(JC_in_Dict = 1)
+
   #TBD
   # dummy_report_test <- dict_premier_report %>%
   #   filter(Report.ID %in% dummy_report_ids)
@@ -186,7 +190,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     arrange(END.DATE) %>%
     filter(PREMIER.DISTRIBUTION %in% c(TRUE, 1),
            END.DATE < max(
-             as.POSIXct(bislr_payroll$End.Date, format = "%m/%d/%Y")))
+             as.POSIXct(raw_payroll$End.Date, format = "%m/%d/%Y")))
   
   #Selecting the most recent distribution date
   distribution_date <- max(as.POSIXct(dist_dates$END.DATE))
@@ -196,7 +200,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
   ## Site Hours Quality Check ------------------------------------------------
   
-  piv_wide_check <- bislr_payroll %>%
+  piv_wide_check <- raw_payroll %>%
     filter(as.Date(End.Date, "%m/%d/%Y") >= dist_prev &
              as.Date(End.Date, "%m/%d/%Y") <= distribution_date +
              lubridate::days(7)) %>%
@@ -221,6 +225,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   View(piv_wide_check)
   
   ## Data Preprocess --------------------------------------------------------------------
+  bislr_payroll <- raw_payroll
+  
   bislr_payroll <- bislr_payroll %>%
     mutate(DPT.WRKD = paste0(substr(Full.COA.for.Worked,1,3),
                              substr(Full.COA.for.Worked,41,44),
@@ -255,10 +261,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                 filter(PAYROLL == 'BISLR') %>%
                 select(J.C, JC_in_UnivseralFile) %>%
                 rename(Job.Code = J.C)) %>%
-    left_join(map_uni_paycodes %>% 
-                select(RAW.PAY.CODE) %>%
-                mutate(Paycode_in_Universal = 1) %>%
-                rename(Pay.Code = RAW.PAY.CODE)) %>%
+    left_join(map_uni_paycodes,
+              c("Pay.Code" = "RAW.PAY.CODE")) %>%
+    mutate(Pay.Code.Prem = PAY.CODE) %>%
     left_join(dict_premier_dpt %>%
                 select(Site, Cost.Center, Dpt_in_Dict) %>%
                 rename(Home.FacilityOR.Hospital.ID = Site,
@@ -279,7 +284,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                 rename(Facility.Hospital.Id_Worked = Site,
                        DPT.WRKD = Cost.Center,
                        WRKJC_in_Dict = JC_in_Dict))
-
+  
+  # MM: I'm not clear on if we need to join all the Premier dictionaries
+  
+  
     ## Update Universal Files --------------------------------------------------
     if (NA %in% unique(bislr_payroll$JC_in_UnivseralFile)) {
       new_jobcodes <- bislr_payroll %>%
@@ -294,6 +302,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       View(new_jobcodes)
       write.csv(new_jobcodes, 'New Job Codes for Universal File.csv')
       stop('New job codes detected, update universal job code dictionary before continuing to run code')
+      # the stop didn't stop code when highlighting a large chunk of code to run
+      # when new job codes existed
     }
   
     if (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
@@ -306,7 +316,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       stop('New pay codes detected, update universal job code dictionary before continuing')
     }
   
-  #Paycycles to filter on - remeber to update the reference file with these dates
+  #Paycycles to filter on - remember to update the reference file with these dates
   filter_dates <- bislr_payroll %>%
     filter(is.na(Pay_Cycle_Uploaded)) %>%
     select(Start.Date, End.Date) %>%
@@ -314,19 +324,115 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     arrange(Start.Date) %>%
     filter(End.Date > dist_prev,
            !Start.Date > distribution_date)
+  # if working on an older file, this filter would need to be set up differently
 
 # Formatting Outputs ---------------------------------------------------------
-
+  
+  ## JC ID check ----------------------------------------------------
+  map_uni_jobcodes_bislr <- map_uni_jobcodes %>%
+    filter(PAYROLL == "BISLR") %>%
+    mutate(J.C.length = nchar(J.C),
+           J.C.prem = substr(J.C, 1, 10))
+  
+  long_jc <- map_uni_jobcodes_bislr %>%
+    filter(J.C.length > 10) %>%
+    group_by(J.C.prem) %>%
+    summarize(freq = n())
+  
+  if (sum(long_jc$freq) > length(long_jc$freq)) {
+    stop("there are duplicates in shorteneed Job Codes")
+  } else {
+    cat("all shortened job codes are unique")
+  }
+  
   ## Premier Payroll File ----------------------------------------------------
   
+  # will need to update the date filter range or join with the filter_dates
+  # dataframe
+  upload_payroll <- bislr_payroll %>%
+    filter(as.Date(Start.Date, "%m/%d/%Y") > dist_prev &
+             as.Date(End.Date, "%m/%d/%Y") <= distribution_date +
+             lubridate::days(7)) %>%
+    mutate(Job.Code = substr(Job.Code, 1, 10)) %>%
+    group_by(
+      PartnerOR.Health.System.ID,
+      Home.FacilityOR.Hospital.ID, DPT.HOME,
+      Facility.Hospital.Id_Worked, DPT.WRKD,
+      Start.Date, End.Date,
+      Employee.ID, Employee.Name,
+      Approved.Hours.per.Pay.Period,
+      Job.Code,
+      Pay.Code.Prem,
+      ) %>%
+    summarize(Hours = sum(Hours, na.rm = TRUE),
+              Expense = sum(Expense, na.rm = TRUE))
+
+  
   ## Premier Reference Files -------------------------------------------------
+  
   #update dpt dict
-  #update dpt map
-  #update dpt job code dict
-  #update dpt job code map
-  #update dpt pay code dict /map
-  if(exists(new_paycodes)){
+  payroll_home_dpt <- bislr_payroll %>%
+      select(PartnerOR.Health.System.ID, Home.FacilityOR.Hospital.ID,
+             DPT.HOME, Department.Name.Home.Dept) %>%
+      unique()
+  
+  payroll_wrk_dpt <- bislr_payroll %>%
+    select(PartnerOR.Health.System.ID, Facility.Hospital.Id_Worked,
+           DPT.WRKD, Department.Name.Worked.Dept) %>%
+    unique()
+  
+  dpt_dict_names <- c("Corporation.Code", "Site",
+                      "Cost.Center", "Cost.Center.Description")
+  colnames(payroll_home_dpt) <- dpt_dict_names
+  colnames(payroll_wrk_dpt) <- dpt_dict_names
     
+  upload_dict_dpt <- rbind(payroll_home_dpt, payroll_wrk_dpt) %>%
+    unique() %>%
+    mutate(Cost.Center.Description = case_when(
+      str_detect(Cost.Center.Description, "&") ~ 
+        str_replace(Cost.Center.Description, "&", "AND"),
+      TRUE ~ Cost.Center.Description)) %>%
+    mutate(Cost.Center.Description = str_sub(Cost.Center.Description, 1, 50))
+  # check for cost center name length
+  # check for special characters in name (e.g. ampersand &)
+  
+  # there's some sort of error in the Cost.Center id column
+  # these are values: --1--83-000 & --1--85-000
+  # when running the July data
+  
+  # MSHQ uploads all depts
+  # we would not have to download, import, and compare the latest file to
+  # what's in Premier everytime if we just upload all
+  
+  # upload_dict_dpt is for all sites in a single file.
+  # this could be filtered to only include new depts if we want to do the
+  # comparison to the downloaded copy of the dictionary from Premier
+
+  
+  #update dpt map
+  upload_map_dpt <- upload_dict_dpt %>%
+    left_join(dict_premier_dpt) %>%
+    filter(is.na(Dpt_in_Dict)) %>%
+    mutate(Dpt_in_Dict = NULL,
+           Cost.Center.Description = NULL) %>%
+    mutate(effective_date = format(map_effective_date, "%m/%d/%Y"),
+           prem_map = new_dpt_map) %>%
+    relocate(effective_date, .before = Corporation.Code)
+  
+  #update dpt job code dict
+  # upload_dict_dpt_jc <- 
+  # all dept jc combinations so as to prevent upload errors in Premier
+  
+  #update dpt job code map
+  # upload_map_dpt_jc
+  # all dept jc combinations so as to prevent upload errors in Premier
+    
+
+  
+  if(exists(new_paycodes)){
+    #update pay code dict /map
+    # upload_dict_paycode
+    # upload_map_paycode
   }
 
 # Quality Checks -------------------------------------------------------
