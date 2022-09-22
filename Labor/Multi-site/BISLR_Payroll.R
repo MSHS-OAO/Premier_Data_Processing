@@ -205,11 +205,11 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     distribution_date <- mdy(distribution_date)
   }
   
-  ## Wide Pivot Check -------------------------------------------------------
-  
   dist_prev <- dist_dates$END.DATE[
     which(dist_dates$END.DATE == distribution_date) - 1]
-
+  
+  ## Wide Pivot Check -------------------------------------------------------
+  
   piv_wide_check <- bislr_payroll %>%
     filter(as.Date(End.Date, "%m/%d/%Y") >= dist_prev &
              as.Date(End.Date, "%m/%d/%Y") <= distribution_date + lubridate::days(7)) %>%
