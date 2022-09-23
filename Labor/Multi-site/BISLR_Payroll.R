@@ -255,7 +255,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
           paste0(msus_removal_list$`Department IdWHERE Worked`,
                  '-', msus_removal_list$`Employee Name`)
         ~ unique(msus_removal_list$`New Job Code`),
-        TRUE ~ Job.Code)) %>% 
+        TRUE ~ Job.Code)) %>%
+    # MM: may want to change the Position.Code.Description for DUS_RMV
+    # to DUS_REMOVE to prevent issues that might arise
     left_join(pay_cycles_uploaded) %>%
     left_join(map_uni_jobcodes %>% 
                 filter(PAYROLL == 'BISLR') %>%
@@ -283,15 +285,22 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                 select(Site, Cost.Center, Job.Code, JC_in_Dict) %>%
                 rename(Facility.Hospital.Id_Worked = Site,
                        DPT.WRKD = Cost.Center,
-                       WRKJC_in_Dict = JC_in_Dict))
+                       WRKJC_in_Dict = JC_in_Dict)) %>%
+    mutate(Job.Code_up = substr(Job.Code, 1, 10)) %>%
+    mutate(Position.Code.Description = str_trim(Position.Code.Description))
   
-  # MM: I'm not clear on if we need to join all the Premier dictionaries
+  # MM: I didn't use the "..._in_Dict" columns
+  # Is it helpful to join all the Premier dictionaries?
+  # If we're only uploading what's not in Premier then maybe it's an
+  # extra filter when creating the dictionary uploads, but the comparison
+  # could be performed at that point in the script on a smaller data set
   
   
     ## Update Universal Files --------------------------------------------------
     if (NA %in% unique(bislr_payroll$JC_in_UnivseralFile)) {
       new_jobcodes <- bislr_payroll %>%
         filter(is.na(JC_in_UnivseralFile)) %>%
+        # does Job.Code_up need to be included in this select()?
         select(Job.Code, Position.Code.Description) %>%
         unique() %>%
         left_join(map_uni_jobcodes %>% #update so ignors case of string
@@ -301,10 +310,20 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                     rename(Position.Code.Description = J.C.DESCRIPTION))
       View(new_jobcodes)
       write.csv(new_jobcodes, 'New Job Codes for Universal File.csv')
+      
+      # how are there new job codes when running this on July data?
+      # the job codes appear in July pay cycles
+      # FYI CHECK:
+      new_jc_check <- bislr_payroll %>%
+        filter(Job.Code %in% new_jobcodes$Job.Code)
+      View(new_jc_check)
+      ###
+      
       stop('New job codes detected, update universal job code dictionary before continuing to run code')
       # the stop didn't stop code when highlighting a large chunk of code to run
       # when new job codes existed
     }
+
   
     if (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
       new_paycodes <- bislr_payroll %>%
@@ -324,15 +343,19 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     arrange(Start.Date) %>%
     filter(End.Date > dist_prev,
            !Start.Date > distribution_date)
-  # if working on an older file, this filter would need to be set up differently
+  # if running an older file through the script,
+  # this filter would need to be set up differently because of the automatic
+  # date selection and comparison to Pay_Cycle_Uploaded
 
 # Formatting Outputs ---------------------------------------------------------
   
   ## JC ID check ----------------------------------------------------
   map_uni_jobcodes_bislr <- map_uni_jobcodes %>%
     filter(PAYROLL == "BISLR") %>%
+    mutate(J.C.DESCRIPTION = str_trim(J.C.DESCRIPTION)) %>%
     mutate(J.C.length = nchar(J.C),
-           J.C.prem = substr(J.C, 1, 10))
+           J.C.prem = substr(J.C, 1, 10)) %>%
+    distinct()
   
   long_jc <- map_uni_jobcodes_bislr %>%
     filter(J.C.length > 10) %>%
@@ -340,11 +363,21 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     summarize(freq = n())
   
   if (sum(long_jc$freq) > length(long_jc$freq)) {
-    stop("there are duplicates in shorteneed Job Codes")
+    showDialog(title = "ERROR: Job Codes",
+               message = paste0("There are duplicates in ",
+                                "shortened Job Codes.  ",
+                                "These will require special handling.  ",
+                                "Please stop the script and resolve concerns ",
+                                "before restarting.")
+    )
+    stop(paste0("There are duplicates in shortened Job Codes.\n\n",
+                "These will require special handling.\n\n",
+                "Please stop the script and resolve concerns ",
+                "before restarting.\n"))
   } else {
-    cat("all shortened job codes are unique")
+    cat("All shortened job codes are unique\n")
   }
-  
+
   ## Premier Payroll File ----------------------------------------------------
   
   # will need to update the date filter range or join with the filter_dates
@@ -353,7 +386,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     filter(as.Date(Start.Date, "%m/%d/%Y") > dist_prev &
              as.Date(End.Date, "%m/%d/%Y") <= distribution_date +
              lubridate::days(7)) %>%
-    mutate(Job.Code = substr(Job.Code, 1, 10)) %>%
+    filter(Job.Code_up != "DUS_RMV") %>%
     group_by(
       PartnerOR.Health.System.ID,
       Home.FacilityOR.Hospital.ID, DPT.HOME,
@@ -361,7 +394,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       Start.Date, End.Date,
       Employee.ID, Employee.Name,
       Approved.Hours.per.Pay.Period,
-      Job.Code,
+      Job.Code_up,
       Pay.Code.Prem,
       ) %>%
     summarize(Hours = sum(Hours, na.rm = TRUE),
@@ -374,12 +407,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   payroll_home_dpt <- bislr_payroll %>%
       select(PartnerOR.Health.System.ID, Home.FacilityOR.Hospital.ID,
              DPT.HOME, Department.Name.Home.Dept) %>%
-      unique()
+      distinct()
   
   payroll_wrk_dpt <- bislr_payroll %>%
     select(PartnerOR.Health.System.ID, Facility.Hospital.Id_Worked,
            DPT.WRKD, Department.Name.Worked.Dept) %>%
-    unique()
+    distinct()
   
   dpt_dict_names <- c("Corporation.Code", "Site",
                       "Cost.Center", "Cost.Center.Description")
@@ -387,7 +420,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   colnames(payroll_wrk_dpt) <- dpt_dict_names
     
   upload_dict_dpt <- rbind(payroll_home_dpt, payroll_wrk_dpt) %>%
-    unique() %>%
+    distinct() %>%
     mutate(Cost.Center.Description = case_when(
       str_detect(Cost.Center.Description, "&") ~ 
         str_replace(Cost.Center.Description, "&", "AND"),
@@ -401,8 +434,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   # when running the July data
   
   # MSHQ uploads all depts
-  # we would not have to download, import, and compare the latest file to
-  # what's in Premier everytime if we just upload all
+  # we might not have to download, import, and compare the latest file to
+  # what's in Premier every time if we just upload all
   
   # upload_dict_dpt is for all sites in a single file.
   # this could be filtered to only include new depts if we want to do the
@@ -417,21 +450,96 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            Cost.Center.Description = NULL) %>%
     mutate(effective_date = format(map_effective_date, "%m/%d/%Y"),
            prem_map = new_dpt_map) %>%
-    relocate(effective_date, .before = Corporation.Code)
-  
+    relocate(effective_date, .before = Corporation.Code) %>%
+    distinct()
+
   #update dpt job code dict
-  # upload_dict_dpt_jc <- 
-  # all dept jc combinations so as to prevent upload errors in Premier
+  upload_dict_dpt_jc <- bislr_payroll %>%
+    mutate(Job.Code = substr(Job.Code, 1, 10)) %>%
+    filter(Job.Code_up != "DUS_RMV") %>%
+    select(PartnerOR.Health.System.ID,
+           Facility.Hospital.Id_Worked, Department.IdWHERE.Worked,
+           Job.Code_up, Position.Code.Description) %>%
+    mutate(Position.Code.Description = case_when(
+      str_detect(Position.Code.Description, "&") ~ 
+        str_replace(Position.Code.Description, "&", "AND"),
+      TRUE ~ Position.Code.Description)) %>%
+    mutate(Position.Code.Description =
+             str_trim(str_sub(Position.Code.Description, 1, 50))) %>%
+    distinct(across(-Position.Code.Description), .keep_all = TRUE)
+  # the distinct across all columns except for the job description is
+  # because there can be slight differences in job codes names.
+  # we don't need to be too concerned if there are slight differences
+  # (like spelling mistakes or a level of a position (e.g. coder 1 vs coder 2))
+  # the names in Premier may differ from what is in the Universal mapping file
   
   #update dpt job code map
-  # upload_map_dpt_jc
-  # all dept jc combinations so as to prevent upload errors in Premier
-    
-
+  upload_map_dpt_jc <- upload_dict_dpt_jc %>%
+    select(-Position.Code.Description) %>%
+    mutate(Department.IdWHERE.Worked =
+             as.character(Department.IdWHERE.Worked)) %>%
+    left_join(map_premier_dpt %>%
+                select(-Effective.Date),
+              by = c("PartnerOR.Health.System.ID" = "Corporation.Code",
+                     "Facility.Hospital.Id_Worked" = "Site",
+                     "Department.IdWHERE.Worked" = "Cost.Center")) %>%
+    mutate(Cost.Center.Map = as.double(Cost.Center.Map)) %>%
+    mutate(Cost.Center.Map = case_when(
+      is.na(Cost.Center.Map) ~ new_dpt_map,
+      TRUE ~ Cost.Center.Map)) %>%
+    left_join(map_uni_jobcodes_bislr %>%
+                select(J.C.prem, PREMIER.J.C) %>%
+                distinct(),
+              by = c("Job.Code_up" = "J.C.prem")) %>%
+    mutate(effective_date = format(map_effective_date, "%m/%d/%Y")) %>%
+    relocate(effective_date, .before = PartnerOR.Health.System.ID) %>%
+    distinct()
+  # new jobcodes that have not been updated in the universal mapping will
+  # show up as NA.  We can either remove them (and have to discover them
+  # when publishing or by running the unampped JC report in Premier)
+  # or we can keep them and let them show up as upload errors
+  # FYI check:
+  upload_map_dpt_jc_na <- upload_map_dpt_jc %>%
+    filter(is.na(PREMIER.J.C))
+  View(upload_map_dpt_jc_na)
   
-  if(exists(new_paycodes)){
-    #update pay code dict /map
-    # upload_dict_paycode
+  # it's surprising that not all the new_jobcodes are found in this upload
+  # mapping file.
+  # FYI check:
+  missing_jc_map <- new_jobcodes %>%
+    filter(!(Job.Code %in% upload_map_dpt_jc$Job.Code_up))
+  View(missing_jc_map)
+  # it's possible that the rows with the new jobcodes are in
+  # time periods that won't be uploaded.
+  # perhaps the new_jobcodes should be created after filtering the data
+  # down to the date range of interest or the date range filtering should
+  # be performed earlier
+    
+  
+  # test data.frame for new paycodes
+  # new_paycodes <- bislr_payroll %>%
+  #   select(Facility.Hospital.Id_Worked, Pay.Code) %>%
+  #   unique() %>%
+  #   head()
+  
+  if (exists(new_paycodes)) {
+    # it seems like this part of the code would not be run if we identified
+    # new pay codes because we would have manually updated them in the 
+    # universal mapping file
+    
+    # if we update the universal mapping file, and then compare with the
+    # paycode dictionary and mapping files downloaded from Premier then
+    # we would not what's not in Premier yet.
+    
+    # do we want to manually prepare the paycode dict and mapping files when we
+    # update the universal mapping file?
+    
+    # should the effective date on this be different from the
+    # map_effective_date? because Premier is sensitive to the effective date
+    # and upload date of paycodes (we would have to upload payroll data in
+    # history with this paycode in order for it to become effective)
+    
+    # upload_dict_paycode <-
     # upload_map_paycode
   }
 
