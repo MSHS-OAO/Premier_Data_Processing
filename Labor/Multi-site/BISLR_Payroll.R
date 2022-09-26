@@ -156,7 +156,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                   sep = ',',
                                   fill = T)
 
-# Data Processing -----------------------------------------------------------
+# Preprocessing --------------------------------------------------------------
 
   ## References --------------------------------------------------------------
   map_uni_jobcodes <- map_uni_jobcodes %>%
@@ -232,7 +232,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   View(piv_wide_check)
   
-  ## Data Preprocess --------------------------------------------------------------------
+  ## Data  --------------------------------------------------------------------
   bislr_payroll <- bislr_payroll %>%
     mutate(DPT.WRKD = paste0(substr(Full.COA.for.Worked,1,3),
                              substr(Full.COA.for.Worked,41,44),
