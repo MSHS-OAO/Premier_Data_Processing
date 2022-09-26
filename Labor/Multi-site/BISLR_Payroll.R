@@ -453,11 +453,13 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   #update dpt dict
   payroll_home_dpt <- bislr_payroll %>%
+    filter(is.na(HomeDpt_in_Dict)) %>%
       select(PartnerOR.Health.System.ID, Home.FacilityOR.Hospital.ID,
              DPT.HOME, Department.Name.Home.Dept) %>%
       distinct()
   
   payroll_wrk_dpt <- bislr_payroll %>%
+    filter(is.na(WRKDpt_in_Dict)) %>%
     select(PartnerOR.Health.System.ID, Facility.Hospital.Id_Worked,
            DPT.WRKD, Department.Name.Worked.Dept) %>%
     distinct()
@@ -469,32 +471,27 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     
   upload_dict_dpt <- rbind(payroll_home_dpt, payroll_wrk_dpt) %>%
     distinct() %>%
+    # check for special characters in name (e.g. ampersand &)
     mutate(Cost.Center.Description = case_when(
       str_detect(Cost.Center.Description, "&") ~ 
         str_replace(Cost.Center.Description, "&", "AND"),
       TRUE ~ Cost.Center.Description)) %>%
+    # check for cost center name length
     mutate(Cost.Center.Description =
              str_sub(Cost.Center.Description, 1, 50)) %>%
-    mutate(Cost.Center.Description = case_when(
-      Cost.Center %in% accural_legacy_cc ~ "ACCRUAL COST CENTER",
-      TRUE ~ Cost.Center.Description)) %>%
+    # must remove accrual cost center IDs since they'll already be in Premier
+    filter(!Cost.Center %in% accural_legacy_cc) %>%
+    # or need to change the description of the cost center before uploading
+    # mutate(Cost.Center.Description = case_when(
+    #   Cost.Center %in% accural_legacy_cc ~ "ACCRUAL COST CENTER",
+    #   TRUE ~ Cost.Center.Description)) %>%
     distinct()
-  # check for cost center name length
-  # check for special characters in name (e.g. ampersand &)
-  
+
   # there's some sort of error in the Cost.Center id column
   # these are values: --1--83-000 & --1--85-000
   # when running the July data
   
-  # MSHQ uploads all depts
-  # we might not have to download, import, and compare the latest file to
-  # what's in Premier every time if we just upload all
-  
-  # upload_dict_dpt is for all sites in a single file.
-  # this could be filtered to only include new depts if we want to do the
-  # comparison to the downloaded copy of the dictionary from Premier
 
-  
   #update dpt map
   upload_map_dpt <- upload_dict_dpt %>%
     left_join(dict_premier_dpt) %>%
