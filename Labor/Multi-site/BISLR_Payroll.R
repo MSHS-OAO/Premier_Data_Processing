@@ -169,7 +169,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   dict_premier_jobcode <- dict_premier_jobcode %>%
     mutate(JC_in_Dict = 1)
   
-  #TBD
   dummy_reports <- dict_premier_report %>%
     filter(Report.ID %in% dummy_report_ids) 
   dummy_reports_dept <- str_split(dummy_reports$Cost.Center,
