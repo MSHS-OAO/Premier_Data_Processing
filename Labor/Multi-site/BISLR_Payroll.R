@@ -168,16 +168,28 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            Dpt_in_Dict = 1)
   dict_premier_jobcode <- dict_premier_jobcode %>%
     mutate(JC_in_Dict = 1)
+  
   #TBD
-  # dummy_report_test <- dict_premier_report %>%
-  #   filter(Report.ID %in% dummy_report_ids)
-  # dummy_report_test <- left_join(dummy_report_test,
-  #                                str_split(dummy_report_test$Cost.Center,
-  #                                          pattern = ':', simplify = T),
-  #                                by = 'Cost.Center')
-  # # test_var <- str_split(dict_premier_report$Cost.Center,
-  # #                       pattern = ':', simplify = T)
-  # test_var <- stri_split_fixed(str = 'Cost.Center', pattern = ':')
+  dummy_reports <- dict_premier_report %>%
+    filter(Report.ID %in% dummy_report_ids) 
+  dummy_reports_dept <- str_split(dummy_reports$Cost.Center,
+                                  pattern = ':',
+                                  simplify = T) %>%
+    as.data.frame()
+  dummy_report_list <- lapply(1:nrow(dummy_reports_dept),
+                              function(x) pivot_longer(dummy_reports_dept[x,],
+                                                       cols = everything()))
+  dummy_report_list  <- lapply(1:length(dummy_report_list),
+                               function(x) mutate(dummy_report_list[[x]],
+                                                  Site = dummy_reports$Site[x]))
+  dummy_report_list  <- do.call(rbind, dummy_report_list)
+  dummy_reports <- left_join(dummy_reports,
+                             dummy_report_list %>% select(Site, value)) %>%
+    select(-contains('blank'), - Cost.Center) %>%
+    relocate(value, .after = Report.ID) %>%
+    rename(Cost.Center = value) %>%
+    unique()
+  rm(dummy_reports_dept, dummy_report_list)
 
   dist_dates <- map_uni_paycycles %>%
     select(END.DATE, PREMIER.DISTRIBUTION) %>%
@@ -309,7 +321,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       stop('New pay codes detected, update universal job code dictionary before continuing')
     }
   
-  #Paycycles to filter on - remeber to update the reference file with these dates
+  #Paycycles to filter on - remember to update the reference file with these dates
   filter_dates <- bislr_payroll %>%
     filter(is.na(Pay_Cycle_Uploaded)) %>%
     select(Start.Date, End.Date) %>%
