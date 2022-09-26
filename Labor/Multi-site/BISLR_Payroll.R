@@ -158,8 +158,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                   sep = ',',
                                   fill = T)
 
-  
-# Data Processing -----------------------------------------------------------
+
+# Preprocessing --------------------------------------------------------------
+
 
   ## References --------------------------------------------------------------
   map_uni_jobcodes <- map_uni_jobcodes %>%
@@ -171,17 +172,28 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            Dpt_in_Dict = 1)
   dict_premier_jobcode <- dict_premier_jobcode %>%
     mutate(JC_in_Dict = 1)
+  
+  dummy_reports <- dict_premier_report %>%
+    filter(Report.ID %in% dummy_report_ids) 
+  dummy_reports_dept <- str_split(dummy_reports$Cost.Center,
+                                  pattern = ':',
+                                  simplify = T) %>%
+    as.data.frame()
+  dummy_report_list <- lapply(1:nrow(dummy_reports_dept),
+                              function(x) pivot_longer(dummy_reports_dept[x,],
+                                                       cols = everything()))
+  dummy_report_list  <- lapply(1:length(dummy_report_list),
+                               function(x) mutate(dummy_report_list[[x]],
+                                                  Site = dummy_reports$Site[x]))
+  dummy_report_list  <- do.call(rbind, dummy_report_list)
+  dummy_reports <- left_join(dummy_reports,
+                             dummy_report_list %>% select(Site, value)) %>%
+    select(-contains('blank'), - Cost.Center) %>%
+    relocate(value, .after = Report.ID) %>%
+    rename(Cost.Center = value) %>%
+    unique()
+  rm(dummy_reports_dept, dummy_report_list)
 
-  #TBD
-  # dummy_report_test <- dict_premier_report %>%
-  #   filter(Report.ID %in% dummy_report_ids)
-  # dummy_report_test <- left_join(dummy_report_test,
-  #                                str_split(dummy_report_test$Cost.Center,
-  #                                          pattern = ':', simplify = T),
-  #                                by = 'Cost.Center')
-  # # test_var <- str_split(dict_premier_report$Cost.Center,
-  # #                       pattern = ':', simplify = T)
-  # test_var <- stri_split_fixed(str = 'Cost.Center', pattern = ':')
 
   dist_dates <- map_uni_paycycles %>%
     select(END.DATE, PREMIER.DISTRIBUTION) %>%
@@ -224,7 +236,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   View(piv_wide_check)
   
-  ## Data Preprocess --------------------------------------------------------------------
+
+  ## Data  --------------------------------------------------------------------
+
   bislr_payroll <- raw_payroll
   
   bislr_payroll <- bislr_payroll %>%
@@ -303,11 +317,14 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
         # does Job.Code_up need to be included in this select()?
         select(Job.Code, Position.Code.Description) %>%
         unique() %>%
+        mutate(JobDescCap = toupper(Position.Code.Description)) %>%
         left_join(map_uni_jobcodes %>% #update so ignors case of string
                     filter(PAYROLL == 'MSHQ') %>%
                     select(J.C.DESCRIPTION, PROVIDER, PREMIER.J.C,
                            PREMIER.J.C.DESCRIPTION) %>%
-                    rename(Position.Code.Description = J.C.DESCRIPTION))
+                    rename(JobDescCap = J.C.DESCRIPTION)) %>%
+        select(-JobDescCap) %>%
+        unique()
       View(new_jobcodes)
       write.csv(new_jobcodes, 'New Job Codes for Universal File.csv')
       
@@ -324,7 +341,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       # when new job codes existed
     }
 
-  
     if (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
       new_paycodes <- bislr_payroll %>%
         filter(is.na(Paycode_in_Universal)) %>%
@@ -332,7 +348,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
         unique() %>%
       View(new_paycodes)
       write.csv(new_jobcodes, 'New Pay Codes for Universal File.csv')
-      stop('New pay codes detected, update universal job code dictionary before continuing')
+      stop(paste0('New pay codes detected, update universal job code dictionary before continuing',
+                  'Continue running code from line TBD.'))
     }
   
   #Paycycles to filter on - remember to update the reference file with these dates
@@ -560,6 +577,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     # upload_dict_paycode <-
     # upload_map_paycode
   }
+  #dummy report upload
 
 # Quality Checks -------------------------------------------------------
 
