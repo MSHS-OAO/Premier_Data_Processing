@@ -515,6 +515,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     filter(is.na(PREMIER.J.C))
   View(upload_map_dpt_jc_na)
   
+  # do we want to import the dept jc mapping file and only upload what is new?
+  # or is simply comparing with the universal mapping file sufficient?
+  
+  # or can we create separate upload files? one that contains manual updates
+  # and another that can be uploaded on it's own?
+  
   # it's surprising that not all the new_jobcodes are found in this upload
   # mapping file.
   # FYI check:
