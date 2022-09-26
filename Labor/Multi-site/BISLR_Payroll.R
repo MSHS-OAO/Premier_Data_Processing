@@ -425,7 +425,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       str_detect(Cost.Center.Description, "&") ~ 
         str_replace(Cost.Center.Description, "&", "AND"),
       TRUE ~ Cost.Center.Description)) %>%
-    mutate(Cost.Center.Description = str_sub(Cost.Center.Description, 1, 50))
+    mutate(Cost.Center.Description =
+             str_sub(Cost.Center.Description, 1, 50)) %>%
+    mutate(Cost.Center.Description = case_when(
+      Cost.Center %in% accural_legacy_cc ~ "ACCRUAL COST CENTER",
+      TRUE ~ Cost.Center.Description)) %>%
+    distinct()
   # check for cost center name length
   # check for special characters in name (e.g. ampersand &)
   
@@ -484,6 +489,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                      "Facility.Hospital.Id_Worked" = "Site",
                      "Department.IdWHERE.Worked" = "Cost.Center")) %>%
     mutate(Cost.Center.Map = as.double(Cost.Center.Map)) %>%
+    # if rbind() performed on the new upload_map_dpt and map_premier_dpt
+    # then could join with that single unified data.frame instead of performing
+    # a case_when for the Cost.Center.Map value
     mutate(Cost.Center.Map = case_when(
       is.na(Cost.Center.Map) ~ new_dpt_map,
       TRUE ~ Cost.Center.Map)) %>%
@@ -495,9 +503,13 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     relocate(effective_date, .before = PartnerOR.Health.System.ID) %>%
     distinct()
   # new jobcodes that have not been updated in the universal mapping will
-  # show up as NA.  We can either remove them (and have to discover them
-  # when publishing or by running the unampped JC report in Premier)
-  # or we can keep them and let them show up as upload errors
+  # show up as NA.
+  # We can either
+  # (1) remove them keep them and let them show up as upload errors
+  # (2) have to discover them when publishing or by running the unmapped JC
+  # report in Premier)
+  # (3) manually correct them before uploading and update the Universal Mapping
+  # file
   # FYI check:
   upload_map_dpt_jc_na <- upload_map_dpt_jc %>%
     filter(is.na(PREMIER.J.C))
