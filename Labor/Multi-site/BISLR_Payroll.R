@@ -552,14 +552,11 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   # update dpt job code map
   upload_map_dpt_jc <- upload_dict_dpt_jc %>%
-    select(-Position.Code.Description) %>%
-    mutate(Department.IdWHERE.Worked =
-             as.character(Department.IdWHERE.Worked)) %>%
+    select(-Job.Code.Desc) %>%
+    mutate(Cost.Center =
+             as.character(Cost.Center)) %>%
     left_join(map_premier_dpt %>%
-                select(-Effective.Date),
-              by = c("PartnerOR.Health.System.ID" = "Corporation.Code",
-                     "Facility.Hospital.Id_Worked" = "Site",
-                     "Department.IdWHERE.Worked" = "Cost.Center")) %>%
+                select(-Effective.Date)) %>%
     mutate(Cost.Center.Map = as.double(Cost.Center.Map)) %>%
     # if rbind() performed on the new upload_map_dpt and map_premier_dpt
     # then could join with that single unified data.frame instead of performing
@@ -570,9 +567,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     left_join(map_uni_jobcodes_bislr %>%
                 select(J.C.prem, PREMIER.J.C) %>%
                 distinct(),
-              by = c("Job.Code_up" = "J.C.prem")) %>%
+              by = c("Job.Code" = "J.C.prem")) %>%
     mutate(effective_date = format(map_effective_date, "%m/%d/%Y")) %>%
-    relocate(effective_date, .before = PartnerOR.Health.System.ID) %>%
+    relocate(effective_date, .before = Corporation.Code) %>%
     distinct()
   # new jobcodes that have not been updated in the universal mapping will
   # show up as NA.
@@ -587,14 +584,16 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     filter(is.na(PREMIER.J.C))
   View(upload_map_dpt_jc_na)
   
-  # do we want to import the dept jc mapping file and only upload what is new?
-  # or is simply comparing with the universal mapping file sufficient?
+  # if we want to ensure that we do not have to run the code 2x to handle
+  # new job codes, we can to import the dept jc mapping file to compare
+  # and identify what is new
   
   # or can we create separate upload files? one that contains manual updates
   # and another that can be uploaded on it's own?
   
-  # it's surprising that not all the new_jobcodes are found in this upload
-  # mapping file.
+  # are there jobcodes for the July data that show up in the missing_jc_map
+  # below?
+  
   # FYI check:
   missing_jc_map <- new_jobcodes %>%
     filter(!(Job.Code %in% upload_map_dpt_jc$Job.Code_up))
@@ -604,6 +603,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   # perhaps the new_jobcodes should be created after filtering the data
   # down to the date range of interest or the date range filtering should
   # be performed earlier
+  # Though, it should be fine if there are extra mappings from old data
+  # that were not previously mapped.
     
   
   # test data.frame for new paycodes
