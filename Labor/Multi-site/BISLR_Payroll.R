@@ -286,11 +286,14 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
         filter(is.na(JC_in_UnivseralFile)) %>%
         select(Job.Code, Position.Code.Description) %>%
         unique() %>%
+        mutate(JobDescCap = toupper(Position.Code.Description)) %>%
         left_join(map_uni_jobcodes %>% #update so ignors case of string
                     filter(PAYROLL == 'MSHQ') %>%
                     select(J.C.DESCRIPTION, PROVIDER, PREMIER.J.C,
                            PREMIER.J.C.DESCRIPTION) %>%
-                    rename(Position.Code.Description = J.C.DESCRIPTION))
+                    rename(JobDescCap = J.C.DESCRIPTION)) %>%
+        select(-JobDescCap) %>%
+        unique()
       View(new_jobcodes)
       write.csv(new_jobcodes, 'New Job Codes for Universal File.csv')
       stop('New job codes detected, update universal job code dictionary before continuing to run code')
