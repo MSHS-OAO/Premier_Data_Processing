@@ -275,7 +275,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     left_join(pay_cycles_uploaded) %>%
     left_join(map_uni_jobcodes %>% 
                 filter(PAYROLL == 'BISLR') %>%
-                select(J.C, JC_in_UnivseralFile) %>%
+                select(J.C, PROVIDER, JC_in_UnivseralFile) %>%
                 rename(Job.Code = J.C)) %>%
     left_join(map_uni_paycodes %>% 
                 select(RAW.PAY.CODE) %>%
@@ -303,13 +303,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                        WRKJC_in_Dict = JC_in_Dict)) %>%
     mutate(Job.Code_up = substr(Job.Code, 1, 10)) %>%
     mutate(Position.Code.Description = str_trim(Position.Code.Description))
-  
-  # MM: I didn't use the "..._in_Dict" columns
-  # Is it helpful to join all the Premier dictionaries?
-  # If we're only uploading what's not in Premier then maybe it's an
-  # extra filter when creating the dictionary uploads, but the comparison
-  # could be performed at that point in the script on a smaller data set
-  
   
     ## Update Universal Files --------------------------------------------------
     if (NA %in% unique(bislr_payroll$JC_in_UnivseralFile)) {
@@ -350,7 +343,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
         select(Facility.Hospital.Id_Worked, Pay.Code) %>%
         unique() %>%
       View(new_paycodes)
-      write.csv(new_jobcodes, 'New Pay Codes for Universal File.csv')
+      write.csv(new_paycodes, 'New Pay Codes for Universal File.csv')
       stop(paste0('New pay codes detected, update universal job code dictionary before continuing',
                   'Continue running code from line TBD.'))
     }
@@ -405,7 +398,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   
   # We can identify new jobcodes by comparing with the dict_premier_jobcode
-  # data.frame
+  # data.frame.  
   dict_premier_jobcode_bislr <- dict_premier_jobcode %>%
   filter(Site %in% c("630571", "NY2162", "NY2163"))
   
@@ -421,7 +414,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     # is there a method to filter on multiple columns instead of join?
     left_join(filter_dates) %>%
     filter(!is.na(upload_date)) %>%
-    filter(Job.Code_up != "DUS_RMV") %>%
+    # need to consider mapping of Providers
+    # could set these as separate files to manually manipulate
+    # check to see how MSHQ handles this
+    filter(Job.Code_up != "DUS_RMV" & PROVIDER %in% c(NA, 0)) %>%
     group_by(
       PartnerOR.Health.System.ID,
       Home.FacilityOR.Hospital.ID, DPT.HOME,
@@ -430,6 +426,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       Employee.ID, Employee.Name,
       Approved.Hours.per.Pay.Period,
       Job.Code_up,
+      # PROVIDER, # uncomment this line to confirm the Providers are filtered out
       Pay.Code) %>%
     summarize(Hours = sum(Hours, na.rm = TRUE),
               Expense = sum(Expense, na.rm = TRUE)) %>%
@@ -514,7 +511,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   # is there a more efficient way to do this 2x?
   upload_dict_dpt_jc_wrk <- bislr_payroll %>%
     mutate(Job.Code = substr(Job.Code, 1, 10)) %>%
-    filter(Job.Code_up != "DUS_RMV") %>%
+    filter(Job.Code_up != "DUS_RMV" & PROVIDER %in% c(NA, 0)) %>%
     filter(is.na(WRKJC_in_Dict)) %>%
     select(PartnerOR.Health.System.ID,
            Facility.Hospital.Id_Worked, DPT.WRKD,
@@ -524,7 +521,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     
   upload_dict_dpt_jc_home <- bislr_payroll %>%
     mutate(Job.Code = substr(Job.Code, 1, 10)) %>%
-    filter(Job.Code_up != "DUS_RMV") %>%
+    filter(Job.Code_up != "DUS_RMV" & PROVIDER %in% c(NA, 0)) %>%
     filter(is.na(HOMEJC_in_Dict)) %>%
     select(PartnerOR.Health.System.ID,
            Home.FacilityOR.Hospital.ID, DPT.HOME,
@@ -613,7 +610,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   #   unique() %>%
   #   head()
   
-  if (exists(new_paycodes)) {
+  if (exists("new_paycodes")) {
     # it seems like this part of the code would not be run if we identified
     # new pay codes because we would have manually updated them in the 
     # universal mapping file
