@@ -277,9 +277,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                 filter(PAYROLL == 'BISLR') %>%
                 select(J.C, JC_in_UnivseralFile) %>%
                 rename(Job.Code = J.C)) %>%
-    left_join(map_uni_paycodes,
-              c("Pay.Code" = "RAW.PAY.CODE")) %>%
-    mutate(Pay.Code.Prem = PAY.CODE) %>%
+    left_join(map_uni_paycodes %>% 
+                select(RAW.PAY.CODE) %>%
+                mutate(Paycode_in_Universal = 1) %>%
+                rename(Pay.Code = RAW.PAY.CODE)) %>%
     left_join(dict_premier_dpt %>%
                 select(Site, Cost.Center, Dpt_in_Dict) %>%
                 rename(Home.FacilityOR.Hospital.ID = Site,
@@ -328,8 +329,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       View(new_jobcodes)
       write.csv(new_jobcodes, 'New Job Codes for Universal File.csv')
       
-      # how are there new job codes when running this on July data?
+      # MM: how are there new job codes when running this on July data?
       # the job codes appear in July pay cycles
+      # MM: expect that the new Premier dict had not been downloaded yet
+      
       # FYI CHECK:
       new_jc_check <- bislr_payroll %>%
         filter(Job.Code %in% new_jobcodes$Job.Code)
@@ -359,14 +362,19 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     unique() %>%
     arrange(Start.Date) %>%
     filter(End.Date > dist_prev,
-           !Start.Date > distribution_date)
-  # if running an older file through the script,
-  # this filter would need to be set up differently because of the automatic
-  # date selection and comparison to Pay_Cycle_Uploaded
+           !Start.Date > distribution_date) %>%
+    mutate(upload_date = 1)
 
 # Formatting Outputs ---------------------------------------------------------
   
   ## JC ID check ----------------------------------------------------
+  # this section is here because if any job codes become duplicates after
+  # getting shortened then we need to be aware of the conflict and resolve it
+  # This might result in a restructuring of the JC universal mapping file
+  
+  # There's an assumption that the universal jc mapping file has been updated
+  # with new jobcodes by this point.
+
   map_uni_jobcodes_bislr <- map_uni_jobcodes %>%
     filter(PAYROLL == "BISLR") %>%
     mutate(J.C.DESCRIPTION = str_trim(J.C.DESCRIPTION)) %>%
@@ -394,15 +402,25 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   } else {
     cat("All shortened job codes are unique\n")
   }
+  
+  
+  # We can identify new jobcodes by comparing with the dict_premier_jobcode
+  # data.frame
+  dict_premier_jobcode_bislr <- dict_premier_jobcode %>%
+  filter(Site %in% c("630571", "NY2162", "NY2163"))
+  
+  new_jobcodes2 <- bislr_payroll %>%
+    filter(!Job.Code %in% dict_premier_jobcode_bislr$Job.Code) %>%
+    select(Job.Code, Position.Code.Description) %>%
+    unique()
+  View(new_jobcodes2)
 
   ## Premier Payroll File ----------------------------------------------------
   
-  # will need to update the date filter range or join with the filter_dates
-  # dataframe
   upload_payroll <- bislr_payroll %>%
-    filter(as.Date(Start.Date, "%m/%d/%Y") > dist_prev &
-             as.Date(End.Date, "%m/%d/%Y") <= distribution_date +
-             lubridate::days(7)) %>%
+    # is there a method to filter on multiple columns instead of join?
+    left_join(filter_dates) %>%
+    filter(!is.na(upload_date)) %>%
     filter(Job.Code_up != "DUS_RMV") %>%
     group_by(
       PartnerOR.Health.System.ID,
@@ -412,10 +430,23 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       Employee.ID, Employee.Name,
       Approved.Hours.per.Pay.Period,
       Job.Code_up,
-      Pay.Code.Prem,
-      ) %>%
+      Pay.Code) %>%
     summarize(Hours = sum(Hours, na.rm = TRUE),
-              Expense = sum(Expense, na.rm = TRUE))
+              Expense = sum(Expense, na.rm = TRUE)) %>%
+    ungroup() %>%
+    left_join(
+      select(map_uni_paycodes, RAW.PAY.CODE, PAY.CODE),
+      by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
+    mutate(Pay.Code = PAY.CODE,
+           PAY.CODE = NULL,
+           Start.Date = format(Start.Date, "%m/%d/%Y"),
+           End.Date = format(End.Date, "%m/%d/%Y"))
+  
+  # check for confirming correct payperiods are included
+  # check <- upload_payroll %>%
+  #   select(Start.Date, End.Date) %>%
+  #   distinct() %>%
+  #   arrange(Start.Date, End.Date)
 
   
   ## Premier Reference Files -------------------------------------------------
