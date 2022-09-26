@@ -307,8 +307,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
         unique()
       View(new_jobcodes)
       write.csv(new_jobcodes, 'New Job Codes for Universal File.csv')
-      stop('New job codes detected, update universal job code dictionary before continuing to run code')
+      stop(paste0('New job codes detected, update universal job code dictionary before continuing to run code. ',
+                  'Continue running code from line TBD.'))
     }
+  stopifnot(exists('new_jobcodes') == F)
   
     if (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
       new_paycodes <- bislr_payroll %>%
@@ -317,7 +319,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
         unique() %>%
       View(new_paycodes)
       write.csv(new_jobcodes, 'New Pay Codes for Universal File.csv')
-      stop('New pay codes detected, update universal job code dictionary before continuing')
+      stop(paste0('New pay codes detected, update universal job code dictionary before continuing',
+                  'Continue running code from line TBD.'))
     }
   
   #Paycycles to filter on - remember to update the reference file with these dates
@@ -328,6 +331,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     arrange(Start.Date) %>%
     filter(End.Date > dist_prev,
            !Start.Date > distribution_date)
+
+
 
 # Formatting Outputs ---------------------------------------------------------
 
