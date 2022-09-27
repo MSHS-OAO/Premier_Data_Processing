@@ -68,23 +68,13 @@ dummy_report_ids <- c('DNU_000', 'DNU_MSM000', 'DNU_MSW000')
                             header = T,
                             sep = '~',
                             fill = T)
-                            # colClasses = "character")
-                            # Home dept came in as numeric and was displaying
-                            # as scientific, so tried bringing in as text
-                            # since all other columns were text.
-                            # Also found that some values are not including
-                            # location and dept code
-
-  # Also seeing:  
-  # Warning message:
-  #   In scan(file = file, what = what, sep = sep, quote = quote, dec = dec,  :
-  #             EOF within quoted string
-
+  #departments coming in as numeric doesn't matter as we create
+  #our own cost center column and do not use what is in the raw data anyway
   return(data_recent)
   }
 
 # Import Data -------------------------------------------------------------
-raw_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
+bislr_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
 
 # Import References -------------------------------------------------------
 pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR,
@@ -202,7 +192,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     arrange(END.DATE) %>%
     filter(PREMIER.DISTRIBUTION %in% c(TRUE, 1),
            END.DATE < max(
-             as.POSIXct(raw_payroll$End.Date, format = "%m/%d/%Y")))
+             as.POSIXct(bislr_payroll$End.Date, format = "%m/%d/%Y")))
   
   #Selecting the most recent distribution date
   distribution_date <- max(as.POSIXct(dist_dates$END.DATE))
@@ -212,7 +202,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
   ## Site Hours Quality Check ------------------------------------------------
   
-  piv_wide_check <- raw_payroll %>%
+  piv_wide_check <- bislr_payroll %>%
     filter(as.Date(End.Date, "%m/%d/%Y") >= dist_prev &
              as.Date(End.Date, "%m/%d/%Y") <= distribution_date +
              lubridate::days(7)) %>%
@@ -238,8 +228,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
 
   ## Data  --------------------------------------------------------------------
-
-  bislr_payroll <- raw_payroll
   
   bislr_payroll <- bislr_payroll %>%
     mutate(DPT.WRKD = paste0(substr(Full.COA.for.Worked,1,3),
@@ -260,7 +248,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            End.Date = as.Date(End.Date, format = '%m/%d/%Y'),
            Employee.Name = substr(Employee.Name, 1, 30),
            Approved.Hours.per.Pay.Period = round(Approved.Hours.per.Pay.Period,
-                                                 digits = 0)) %>%
+                                                 digits = 0),
+           Position.Code.Description = str_trim(Position.Code.Description)) %>%
     mutate(DPT.WRKD = case_when(
       DPT.WRKD.LEGACY %in% accural_legacy_cc ~ DPT.WRKD.LEGACY,
       TRUE ~ DPT.WRKD),
@@ -270,8 +259,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                  '-', msus_removal_list$`Employee Name`)
         ~ unique(msus_removal_list$`New Job Code`),
         TRUE ~ Job.Code)) %>%
-    # MM: may want to change the Position.Code.Description for DUS_RMV
-    # to DUS_REMOVE to prevent issues that might arise
     left_join(pay_cycles_uploaded) %>%
     left_join(map_uni_jobcodes %>% 
                 filter(PAYROLL == 'BISLR') %>%
@@ -301,24 +288,15 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                        DPT.WRKD = Cost.Center,
                        WRKJC_in_Dict = JC_in_Dict)) #%>%
     # mutate(Job.Code_up = substr(Job.Code, 1, 10)) %>%
-    # mutate(Position.Code.Description = str_trim(Position.Code.Description))
-  
-  # MM: I didn't use the "..._in_Dict" columns
-  # Is it helpful to join all the Premier dictionaries?
-  # If we're only uploading what's not in Premier then maybe it's an
-  # extra filter when creating the dictionary uploads, but the comparison
-  # could be performed at that point in the script on a smaller data set
-  
   
     ## Update Universal Files --------------------------------------------------
     if (NA %in% unique(bislr_payroll$JC_in_UnivseralFile)) {
       new_jobcodes <- bislr_payroll %>%
         filter(is.na(JC_in_UnivseralFile)) %>%
-        # does Job.Code_up need to be included in this select()?
         select(Job.Code, Position.Code.Description) %>%
         unique() %>%
         mutate(JobDescCap = toupper(Position.Code.Description)) %>%
-        left_join(map_uni_jobcodes %>% #update so ignors case of string
+        left_join(map_uni_jobcodes %>%
                     filter(PAYROLL == 'MSHQ') %>%
                     select(J.C.DESCRIPTION, PROVIDER, PREMIER.J.C,
                            PREMIER.J.C.DESCRIPTION) %>%
@@ -327,18 +305,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
         unique()
       View(new_jobcodes)
       write.csv(new_jobcodes, 'New Job Codes for Universal File.csv')
-      
-      # how are there new job codes when running this on July data?
-      # the job codes appear in July pay cycles
-      # FYI CHECK:
-      new_jc_check <- bislr_payroll %>%
-        filter(Job.Code %in% new_jobcodes$Job.Code)
-      View(new_jc_check)
-      ###
+      #there are new job codes in july from the pay periods that go
+      #into august that were not uploaded last distribution (or really old pay periods)
       
       stop('New job codes detected, update universal job code dictionary before continuing to run code')
-      # the stop didn't stop code when highlighting a large chunk of code to run
-      # when new job codes existed
     }
 
     if (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
@@ -360,9 +330,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     arrange(Start.Date) %>%
     filter(End.Date > dist_prev,
            !Start.Date > distribution_date)
-  # if running an older file through the script,
-  # this filter would need to be set up differently because of the automatic
-  # date selection and comparison to Pay_Cycle_Uploaded
 
 # Formatting Outputs ---------------------------------------------------------
   
@@ -397,8 +364,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
   ## Premier Payroll File ----------------------------------------------------
 
-  # will need to update the date filter range or join with the filter_dates
-  # dataframe
   upload_payroll <- bislr_payroll %>%
     filter(as.Date(Start.Date, "%m/%d/%Y") > dist_prev &
              as.Date(End.Date, "%m/%d/%Y") <= distribution_date +
@@ -557,25 +522,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   #   head()
   
   if (exists(new_paycodes)) {
-    # it seems like this part of the code would not be run if we identified
-    # new pay codes because we would have manually updated them in the 
-    # universal mapping file
-    
-    # if we update the universal mapping file, and then compare with the
-    # paycode dictionary and mapping files downloaded from Premier then
-    # we would not what's not in Premier yet.
-    
-    # do we want to manually prepare the paycode dict and mapping files when we
-    # update the universal mapping file?
-    
-    # should the effective date on this be different from the
-    # map_effective_date? because Premier is sensitive to the effective date
-    # and upload date of paycodes (we would have to upload payroll data in
-    # history with this paycode in order for it to become effective)
-    
-    # upload_dict_paycode <-
-    # upload_map_paycode
+  
   }
+  
   #dummy report upload
 
 # Quality Checks -------------------------------------------------------
