@@ -75,6 +75,7 @@ dummy_report_ids <- c('DNU_000', 'DNU_MSM000', 'DNU_MSW000')
 
 # Import Data -------------------------------------------------------------
 bislr_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
+raw_payroll_export <- bislr_payroll
 
 # Import References -------------------------------------------------------
 pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR,
@@ -249,6 +250,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            Employee.Name = substr(Employee.Name, 1, 30),
            Approved.Hours.per.Pay.Period = round(Approved.Hours.per.Pay.Period,
                                                  digits = 0),
+           Job.Code = str_trim(Job.Code),
            Position.Code.Description = str_trim(Position.Code.Description)) %>%
     mutate(DPT.WRKD = case_when(
       DPT.WRKD.LEGACY %in% accural_legacy_cc ~ DPT.WRKD.LEGACY,
@@ -307,7 +309,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       write.csv(new_jobcodes, 'New Job Codes for Universal File.csv')
       #there are new job codes in july from the pay periods that go
       #into august that were not uploaded last distribution (or really old pay periods)
-      
       stop('New job codes detected, update universal job code dictionary before continuing to run code')
     }
 
@@ -397,10 +398,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            DPT.WRKD, Department.Name.Worked.Dept) %>%
     distinct()
   
-  dpt_dict_names <- c("Corporation.Code", "Site",
-                      "Cost.Center", "Cost.Center.Description")
-  colnames(payroll_home_dpt) <- dpt_dict_names
-  colnames(payroll_wrk_dpt) <- dpt_dict_names
+  # don't have to define the names you can just use the department dictionary
+  #variable which already has the needed names
+  # dpt_dict_names <- c("Corporation.Code", "Site",
+  #                     "Cost.Center", "Cost.Center.Description")
+  # colnames(payroll_home_dpt) <- dpt_dict_names
+  # colnames(payroll_wrk_dpt) <- dpt_dict_names
     
   upload_dict_dpt <- rbind(payroll_home_dpt, payroll_wrk_dpt) %>%
     distinct() %>%
