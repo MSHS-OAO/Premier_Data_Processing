@@ -266,9 +266,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                 filter(PAYROLL == 'BISLR') %>%
                 select(J.C, JC_in_UnivseralFile) %>%
                 rename(Job.Code = J.C)) %>%
-    left_join(map_uni_paycodes,
-              c("Pay.Code" = "RAW.PAY.CODE")) %>%
-    mutate(Pay.Code.Prem = PAY.CODE) %>%
+    left_join(map_uni_paycodes %>%
+                select(-PAY.CODE.NAME) %>%
+                rename(Pay.Code = RAW.PAY.CODE,
+                       Permier.Pay.Code = PAY.CODE)) %>%
     left_join(dict_premier_dpt %>%
                 select(Site, Cost.Center, Dpt_in_Dict) %>%
                 rename(Home.FacilityOR.Hospital.ID = Site,
