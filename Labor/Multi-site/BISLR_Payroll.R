@@ -313,9 +313,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       stop('New job codes detected, update universal job code dictionary before continuing to run code')
     }
 
-    if (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
+    if (NA %in% unique(bislr_payroll$Permier.Pay.Code)) {
       new_paycodes <- bislr_payroll %>%
-        filter(is.na(Paycode_in_Universal)) %>%
+        filter(is.na(Permier.Pay.Code)) %>%
         select(Facility.Hospital.Id_Worked, Pay.Code) %>%
         unique() %>%
       View(new_paycodes)
