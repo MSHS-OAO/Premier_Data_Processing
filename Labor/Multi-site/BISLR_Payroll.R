@@ -16,7 +16,7 @@ dir_universal <- paste0(dir, '/Universal Data')
 new_dpt_map <- 10095
 map_effective_date <- as.Date('2022-01-01') #is this date ok?
 # MM: I typically use an older date like 1/1/2010
-# this way any remappings we perform it will ensure they are incorporated
+# this way any remapping we perform will ensure it's incorporated
 # into data
 accural_legacy_cc <- c(1109008600, 1109028600, 4409008600, 6409008600) #add other 8600, make quality check for new 8600, id errors non accural oracle but backmapped accural
 productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
@@ -398,15 +398,19 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   
   # We can identify new jobcodes by comparing with the dict_premier_jobcode
-  # data.frame.  
-  dict_premier_jobcode_bislr <- dict_premier_jobcode %>%
-  filter(Site %in% c("630571", "NY2162", "NY2163"))
+  # data.frame.
+  # But it seems like maybe the Premier Dictionary is not completely up to date
+  # We use the dict_premier_jobcode file to identify deptartment-jobcode
+  # combinations that don't exist.
   
-  new_jobcodes2 <- bislr_payroll %>%
-    filter(!Job.Code %in% dict_premier_jobcode_bislr$Job.Code) %>%
-    select(Job.Code, Position.Code.Description) %>%
-    unique()
-  View(new_jobcodes2)
+  # dict_premier_jobcode_bislr <- dict_premier_jobcode %>%
+  # filter(Site %in% c("630571", "NY2162", "NY2163"))
+  # 
+  # new_jobcodes2 <- bislr_payroll %>%
+  #   filter(!Job.Code %in% dict_premier_jobcode_bislr$Job.Code) %>%
+  #   select(Job.Code, Position.Code.Description) %>%
+  #   unique()
+  # View(new_jobcodes2)
 
   ## Premier Payroll File ----------------------------------------------------
   
@@ -431,6 +435,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     summarize(Hours = sum(Hours, na.rm = TRUE),
               Expense = sum(Expense, na.rm = TRUE)) %>%
     ungroup() %>%
+    # the paycode that is used in Premier needs to be used instead of the
+    # raw paycode, so it needs to be joined in.
     left_join(
       select(map_uni_paycodes, RAW.PAY.CODE, PAY.CODE),
       by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
@@ -449,13 +455,18 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   ## Premier Reference Files -------------------------------------------------
   
   # update dpt dict
+  
+  # we should ensure that the dict_premier_jobcode file is actually up to date.
+  # it won't be awful if it's not, we'll just upload more than we need to.
+  # MSHQ and Rightsourcing upload everything without comparing to historical
+  
   # is there a more efficient way to do this 2x?
   
   payroll_home_dpt <- bislr_payroll %>%
     filter(is.na(HomeDpt_in_Dict)) %>%
-      select(PartnerOR.Health.System.ID, Home.FacilityOR.Hospital.ID,
-             DPT.HOME, Department.Name.Home.Dept) %>%
-      distinct()
+    select(PartnerOR.Health.System.ID, Home.FacilityOR.Hospital.ID,
+           DPT.HOME, Department.Name.Home.Dept) %>%
+    distinct()
   
   payroll_wrk_dpt <- bislr_payroll %>%
     filter(is.na(WRKDpt_in_Dict)) %>%
@@ -504,10 +515,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     distinct()
 
   # update dpt job code dict
-  
-  jc_dict_names <- c("Corporation.Code", "Site",
-                      "Cost.Center", "Job.Code", "Job.Code.Desc")
-  
+
   # is there a more efficient way to do this 2x?
   upload_dict_dpt_jc_wrk <- bislr_payroll %>%
     mutate(Job.Code = substr(Job.Code, 1, 10)) %>%
@@ -517,8 +525,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            Facility.Hospital.Id_Worked, DPT.WRKD,
            Job.Code_up, Position.Code.Description) %>%
     distinct()
-  colnames(upload_dict_dpt_jc_wrk) <- jc_dict_names
-    
+  
   upload_dict_dpt_jc_home <- bislr_payroll %>%
     mutate(Job.Code = substr(Job.Code, 1, 10)) %>%
     filter(Job.Code_up != "DUS_RMV" & PROVIDER %in% c(NA, 0)) %>%
@@ -527,6 +534,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            Home.FacilityOR.Hospital.ID, DPT.HOME,
            Job.Code_up, Position.Code.Description) %>%
     distinct()
+  
+  jc_dict_names <- c("Corporation.Code", "Site",
+                     "Cost.Center", "Job.Code", "Job.Code.Desc")
+  colnames(upload_dict_dpt_jc_wrk) <- jc_dict_names
   colnames(upload_dict_dpt_jc_home) <- jc_dict_names
   
   upload_dict_dpt_jc <- rbind(upload_dict_dpt_jc_wrk,
@@ -581,12 +592,16 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     filter(is.na(PREMIER.J.C))
   View(upload_map_dpt_jc_na)
   
-  # if we want to ensure that we do not have to run the code 2x to handle
-  # new job codes, we can to import the dept jc mapping file to compare
-  # and identify what is new
+  # the upload_map_dpt_jc file can be uploaded after all other files are
+  # uploaded, so it could be manually handled and uploaded later after
+  # the script has been run.
   
-  # or can we create separate upload files? one that contains manual updates
-  # and another that can be uploaded on it's own?
+  # we can create separate sets of upload files? files that can be uploaded
+  # cleanly and then other files that require manual input before upload
+  
+  # if we want to ensure that we do not have to run the code 2x to handle
+  # new job codes, we can import the dept jc mapping file to compare
+  # and identify what is new
   
   # are there jobcodes for the July data that show up in the missing_jc_map
   # below?
@@ -611,24 +626,41 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   #   head()
   
   if (exists("new_paycodes")) {
+    
+    # this seems like a rare occurrence that we can handle manually.
+    # MM: I think that if there are new paycodes, we can simply warn the user
+    # of the issue, and require that the universal mapping, dictionary,
+    # and mapping files all be taken care of before coming back to start running
+    # the script from the beginning.  We could have the script stop at the
+    # check performed in "Update Universal Files" section
+    # MSHQ doesn't do special prep in the script - it's supposed to stop
+    
+    # the paycode dictionary seems challenging to automate
+    # because we might have to take special consideration on the name of the
+    # paycode if it's too many characters and gets shortened and becomes a
+    # duplicate of one that already exists.
+    
     # it seems like this part of the code would not be run if we identified
     # new pay codes because we would have manually updated them in the 
     # universal mapping file
     
-    # if we update the universal mapping file, and then compare with the
-    # paycode dictionary and mapping files downloaded from Premier then
-    # we would not what's not in Premier yet.
+    # if we updated the universal mapping file before this section of code, we
+    # would then need to compare with the paycode dictionary and mapping files
+    # downloaded from Premier in order to know what's not in Premier yet.
     
-    # do we want to manually prepare the paycode dict and mapping files when we
-    # update the universal mapping file?
+    # do we want to manually prepare the paycode dict and mapping files after
+    # we update the universal mapping file?
     
     # should the effective date on this be different from the
     # map_effective_date? because Premier is sensitive to the effective date
     # and upload date of paycodes (we would have to upload payroll data in
     # history with this paycode in order for it to become effective)
     
+    # FYI:
+    # if there's a new paycode at one site, we should upload it for all sites
+    
     # upload_dict_paycode <-
-    # upload_map_paycode
+    # upload_map_paycode <- 
   }
   #dummy report upload
 
