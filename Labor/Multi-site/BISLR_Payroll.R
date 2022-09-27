@@ -333,7 +333,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
 # Formatting Outputs ---------------------------------------------------------
   
-  ## JC ID check ----------------------------------------------------
+  #JC ID check
   map_uni_jobcodes_bislr <- map_uni_jobcodes %>%
     filter(PAYROLL == "BISLR") %>%
     mutate(J.C.DESCRIPTION = str_trim(J.C.DESCRIPTION)) %>%
