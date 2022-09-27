@@ -421,7 +421,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     # need to consider mapping of Providers
     # could set these as separate files to manually manipulate
     # check to see how MSHQ handles this
+    # IT IS CRITICAL THAT WE KNOW IF NEW JOBCODES ARE PROVIDERS
     filter(Job.Code_up != "DUS_RMV" & PROVIDER %in% c(NA, 0)) %>%
+    # filter(Job.Code_up != "DUS_RMV" & PROVIDER == 0) %>%
     group_by(
       PartnerOR.Health.System.ID,
       Home.FacilityOR.Hospital.ID, DPT.HOME,
@@ -582,7 +584,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   # new jobcodes that have not been updated in the universal mapping will
   # show up as NA.
   # We can either
-  # (1) remove them keep them and let them show up as upload errors
+  # (1) keep them and let them show up as upload errors
   # (2) have to discover them when publishing or by running the unmapped JC
   # report in Premier)
   # (3) manually correct them before uploading and update the Universal Mapping
