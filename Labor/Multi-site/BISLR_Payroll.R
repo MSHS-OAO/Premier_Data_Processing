@@ -324,7 +324,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                   'Continue running code from line TBD.'))
     }
   
-  #Paycycles to filter on - remember to update the reference file with these dates
+  #Paycycles to filter on
   filter_dates <- bislr_payroll %>%
     filter(is.na(Pay_Cycle_Uploaded)) %>%
     select(Start.Date, End.Date) %>%
@@ -533,6 +533,27 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   }
   
   #dummy report upload
+  upload_report_dict <- bislr_payroll %>%
+    select(Home.FacilityOR.Hospital.ID,
+           DPT.HOME,
+           DPT.WRKD) %>%
+    left_join(map_uni_reports %>%
+                select(ORACLE.COST.CENTER) %>%
+                rename(DPT.WRKD = ORACLE.COST.CENTER) %>%
+                mutate(WRKD.DPT.in.Report = 1)) %>%
+    left_join(map_uni_reports %>%
+                select(ORACLE.COST.CENTER) %>%
+                rename(DPT.HOME = ORACLE.COST.CENTER) %>%
+                mutate(HOME.DPT.in.Report = 1)) %>%
+    filter(WRKD.DPT.in.Report == 1,
+           is.na(HOME.DPT.in.Report)) %>%
+    select(-DPT.WRKD, -WRKD.DPT.in.Report, -HOME.DPT.in.Report) %>%
+    rename(Site = Home.FacilityOR.Hospital.ID,
+           Cost.Center = DPT.HOME)  %>%
+    rbind(dummy_reports %>%
+            select(Site, Cost.Center)) %>%
+      unique() %>%
+      group_by(Site)
 
 # Quality Checks -------------------------------------------------------
 
