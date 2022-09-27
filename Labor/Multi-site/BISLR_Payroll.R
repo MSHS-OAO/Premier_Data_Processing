@@ -365,10 +365,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   ## Premier Payroll File ----------------------------------------------------
 
   upload_payroll <- bislr_payroll %>%
-    filter(as.Date(Start.Date, "%m/%d/%Y") > dist_prev &
+    filter(as.Date(Start.Date, "%m/%d/%Y") > dist_prev & #filter using paycycle dictionary
              as.Date(End.Date, "%m/%d/%Y") <= distribution_date +
-             lubridate::days(7)) %>%
-    filter(Job.Code_up != "DUS_RMV") %>%
+             lubridate::days(7)) %>% 
+    #need to filter out the providers too
+    filter(Job.Code_up != "DUS_RMV") %>% # don't need to filter these uniquely 
+    #the are already classified as providers and will be filterd out with those jobcodes
     group_by(
       PartnerOR.Health.System.ID,
       Home.FacilityOR.Hospital.ID, DPT.HOME,
@@ -442,7 +444,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   #update dpt job code dict
   upload_dict_dpt_jc <- bislr_payroll %>%
     mutate(Job.Code = substr(Job.Code, 1, 10)) %>%
-    filter(Job.Code_up != "DUS_RMV") %>%
+    filter(Job.Code_up != "DUS_RMV") %>% # don't need to filter these out uniquely
+    #they are classified as providers and will be filter out with them
     select(PartnerOR.Health.System.ID,
            Facility.Hospital.Id_Worked, Department.IdWHERE.Worked,
            Job.Code_up, Position.Code.Description) %>%
