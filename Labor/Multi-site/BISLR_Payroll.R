@@ -406,7 +406,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   # dict_premier_jobcode_bislr <- dict_premier_jobcode %>%
   # filter(Site %in% c("630571", "NY2162", "NY2163"))
-  # 
+  #
   # new_jobcodes2 <- bislr_payroll %>%
   #   filter(!Job.Code %in% dict_premier_jobcode_bislr$Job.Code) %>%
   #   select(Job.Code, Position.Code.Description) %>%
@@ -483,12 +483,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   colnames(payroll_wrk_dpt) <- dpt_dict_names
   
   
-  # need to consider if there are no new departments?  
+  # need to consider if there are no new departments?
   upload_dict_dpt <- rbind(payroll_home_dpt, payroll_wrk_dpt) %>%
     distinct() %>%
     # check for special characters in name (e.g. ampersand &)
     mutate(Cost.Center.Description = case_when(
-      str_detect(Cost.Center.Description, "&") ~ 
+      str_detect(Cost.Center.Description, "&") ~
         str_replace(Cost.Center.Description, "&", "AND"),
       TRUE ~ Cost.Center.Description)) %>%
     # check for cost center name length
@@ -521,7 +521,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
   # update dpt job code dict
   
-  # need to consider if there are no new departments? 
+  # need to consider if there are no new departments?
 
   # is there a more efficient way to do this 2x?
   upload_dict_dpt_jc_wrk <- bislr_payroll %>%
@@ -550,7 +550,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   upload_dict_dpt_jc <- rbind(upload_dict_dpt_jc_wrk,
                               upload_dict_dpt_jc_home) %>%
     mutate(Job.Code.Desc = case_when(
-      str_detect(Job.Code.Desc, "&") ~ 
+      str_detect(Job.Code.Desc, "&") ~
         str_replace(Job.Code.Desc, "&", "AND"),
       TRUE ~ Job.Code.Desc)) %>%
     mutate(Job.Code.Desc =
@@ -637,7 +637,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   # through?
   # I think we need to walk through this process or process map it.
   if (exists("new_paycodes")) {
-    
+
     upload_dict_paycode <- new_paycodes %>%
       left_join(
         select(map_uni_paycodes, RAW.PAY.CODE, PAY.CODE, PAY.CODE.NAME),
@@ -645,13 +645,13 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       # Corporation.Code can come from somewhere else, but it doesn't
       # naturally come in from a join like with other dictionaries.
       # perhaps make it a constant
-      mutate(Corporation.Code = 729805) %>% 
+      mutate(Corporation.Code = 729805) %>%
       rename(Site = Facility.Hospital.Id_Worked) %>%
       relocate(Corporation.Code, .before = Site) %>%
       mutate(Pay.Code = NULL)
-    
+
     if (max(nchar(upload_dict_paycode$PAY.CODE)) > char_len_paycode |
-        max(nchar(upload_dict_paycode$PAY.CODE.NAME)) > char_len_paycode_name){
+        max(nchar(upload_dict_paycode$PAY.CODE.NAME)) > char_len_paycode_name) {
       showDialog(title = "Paycode field error",
                  message = paste0("Either a paycode or paycode name has more ",
                                   "characters than permitted.  ",
@@ -659,7 +659,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                   "the script."))
       stop("Fix paycode errors and restart")
     }
-    
+
     upload_map_paycode <- upload_dict_paycode %>%
       left_join(select(map_uni_paycodes, -RAW.PAY.CODE)) %>%
       mutate(PAY.CODE.NAME = NULL) %>%
@@ -667,7 +667,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
              # should this percent be a constant set at beginning of script?
              allocation_pct = 100) %>%
       relocate(effective_date, .before = Corporation.Code)
-      
+
     # this seems like a rare occurrence that we can handle manually.
     # MM: I think that if there are new paycodes, we can simply warn the user
     # of the issue, and require that the universal mapping, dictionary,
@@ -675,31 +675,31 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     # the script from the beginning.  We could have the script stop at the
     # check performed in "Update Universal Files" section
     # MSHQ doesn't do special prep in the script - it's supposed to stop
-    
+
     # the paycode dictionary seems challenging to automate
     # because we might have to take special consideration on the name of the
     # paycode if it's too many characters and gets shortened and becomes a
     # duplicate of one that already exists.
-    
+
     # it seems like this part of the code would not be run if we identified
-    # new pay codes because we would have manually updated them in the 
+    # new pay codes because we would have manually updated them in the
     # universal mapping file
-    
+
     # if we updated the universal mapping file before this section of code, we
     # would then need to compare with the paycode dictionary and mapping files
     # downloaded from Premier in order to know what's not in Premier yet.
-    
+
     # do we want to manually prepare the paycode dict and mapping files after
     # we update the universal mapping file?
-    
+
     # should the effective date on this be different from the
     # map_effective_date? because Premier is sensitive to the effective date
     # and upload date of paycodes (we would have to upload payroll data in
     # history with this paycode in order for it to become effective)
-    
+
     # FYI:
     # if there's a new paycode at one site, we should upload it for all sites
-    
+
   }
   #dummy report upload
 
@@ -712,4 +712,3 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 # Exporting Data ----------------------------------------------------------
 
   # remember to output Site Hours Quality Check
-
