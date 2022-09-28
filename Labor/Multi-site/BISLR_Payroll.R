@@ -332,6 +332,17 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       # MM: how are there new job codes when running this on July data?
       # the job codes appear in July pay cycles
       # MM: expect that the new Premier dict had not been downloaded yet
+      # MM: it was because of trailing whitespace on jobcodes.  This should
+      # be taken care of now.
+      # For the comparison with the jobcode mapping, should we also trim
+      # whitespace on both the bislr_payroll data.frame and the mapping
+      # file so that there's no mismatches?
+      
+      # MM: Additionally, we can check to see if there are any jobcodes
+      # that end up without a proper mapping after checking MSHQ and if all
+      # have a recommendation, then we can continue on, but we'll have to be
+      # sure to update the Universal mapping file
+      
       
       # FYI CHECK:
       new_jc_check <- bislr_payroll %>%
