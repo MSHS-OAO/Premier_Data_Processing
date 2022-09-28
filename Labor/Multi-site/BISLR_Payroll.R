@@ -34,6 +34,7 @@ dummy_report_ids <- c('DNU_000', 'DNU_MSM000', 'DNU_MSW000')
   char_len_employ <- 30
   char_len_jobcode <- 10
   char_len_paycode <- 15
+  char_len_paycode_name <- 50
 
 # Functions --------------------------------------------------------------
   import_recent_file <- function(folder.path, place) {
@@ -480,7 +481,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                       "Cost.Center", "Cost.Center.Description")
   colnames(payroll_home_dpt) <- dpt_dict_names
   colnames(payroll_wrk_dpt) <- dpt_dict_names
-    
+  
+  
+  # need to consider if there are no new departments?  
   upload_dict_dpt <- rbind(payroll_home_dpt, payroll_wrk_dpt) %>%
     distinct() %>%
     # check for special characters in name (e.g. ampersand &)
@@ -517,6 +520,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     distinct()
 
   # update dpt job code dict
+  
+  # need to consider if there are no new departments? 
 
   # is there a more efficient way to do this 2x?
   upload_dict_dpt_jc_wrk <- bislr_payroll %>%
@@ -622,13 +627,47 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     
   
   # test data.frame for new paycodes
-  # new_paycodes <- bislr_payroll %>%
-  #   select(Facility.Hospital.Id_Worked, Pay.Code) %>%
-  #   unique() %>%
-  #   head()
+  new_paycodes <- bislr_payroll %>%
+    select(Facility.Hospital.Id_Worked, Pay.Code) %>%
+    unique() %>%
+    tail()
+  ###
   
+  # alternatively, check for existence of file written the first time
+  # through?
+  # I think we need to walk through this process or process map it.
   if (exists("new_paycodes")) {
     
+    upload_dict_paycode <- new_paycodes %>%
+      left_join(
+        select(map_uni_paycodes, RAW.PAY.CODE, PAY.CODE, PAY.CODE.NAME),
+        by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
+      # Corporation.Code can come from somewhere else, but it doesn't
+      # naturally come in from a join like with other dictionaries.
+      # perhaps make it a constant
+      mutate(Corporation.Code = 729805) %>% 
+      rename(Site = Facility.Hospital.Id_Worked) %>%
+      relocate(Corporation.Code, .before = Site) %>%
+      mutate(Pay.Code = NULL)
+    
+    if (max(nchar(upload_dict_paycode$PAY.CODE)) > char_len_paycode |
+        max(nchar(upload_dict_paycode$PAY.CODE.NAME)) > char_len_paycode_name){
+      showDialog(title = "Paycode field error",
+                 message = paste0("Either a paycode or paycode name has more ",
+                                  "characters than permitted.  ",
+                                  "Please fix them and rerun this segment of",
+                                  "the script."))
+      stop("Fix paycode errors and restart")
+    }
+    
+    upload_map_paycode <- upload_dict_paycode %>%
+      left_join(select(map_uni_paycodes, -RAW.PAY.CODE)) %>%
+      mutate(PAY.CODE.NAME = NULL) %>%
+      mutate(effective_date = format(map_effective_date, "%m/%d/%Y"),
+             # should this percent be a constant set at beginning of script?
+             allocation_pct = 100) %>%
+      relocate(effective_date, .before = Corporation.Code)
+      
     # this seems like a rare occurrence that we can handle manually.
     # MM: I think that if there are new paycodes, we can simply warn the user
     # of the issue, and require that the universal mapping, dictionary,
@@ -661,8 +700,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     # FYI:
     # if there's a new paycode at one site, we should upload it for all sites
     
-    # upload_dict_paycode <-
-    # upload_map_paycode <- 
   }
   #dummy report upload
 
