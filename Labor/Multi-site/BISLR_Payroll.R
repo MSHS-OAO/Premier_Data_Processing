@@ -165,6 +165,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
   ## References --------------------------------------------------------------
   map_uni_jobcodes <- map_uni_jobcodes %>%
+    # MM: trim white space on job.code to ensure that join works properly
+    mutate(J.C = str_trim(J.C)) %>%
     mutate(JC_in_UnivseralFile = 1)
   pay_cycles_uploaded <- pay_cycles_uploaded %>%
     mutate(Pay_Cycle_Uploaded = 1)
@@ -262,6 +264,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            Employee.Name = substr(Employee.Name, 1, 30),
            Approved.Hours.per.Pay.Period = round(Approved.Hours.per.Pay.Period,
                                                  digits = 0)) %>%
+    # MM: trim whitespace on the jobcodes in order to ensure mapping works
+    # properly.  Jobcode dictionary download from Premier has no trailing
+    # whitespace on any jobcodes
+    mutate(Job.Code = str_trim(Job.Code)) %>%
     mutate(DPT.WRKD = case_when(
       DPT.WRKD.LEGACY %in% accural_legacy_cc ~ DPT.WRKD.LEGACY,
       TRUE ~ DPT.WRKD),
@@ -526,6 +532,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   # is there a more efficient way to do this 2x?
   upload_dict_dpt_jc_wrk <- bislr_payroll %>%
     mutate(Job.Code = substr(Job.Code, 1, 10)) %>%
+    # need to consider mapping of Providers
+    # could set these as separate files to manually manipulate
+    # check to see how MSHQ handles this
+    # IT IS CRITICAL THAT WE KNOW IF NEW JOBCODES ARE PROVIDERS
     filter(Job.Code_up != "DUS_RMV" & PROVIDER %in% c(NA, 0)) %>%
     filter(is.na(WRKJC_in_Dict)) %>%
     select(PartnerOR.Health.System.ID,
@@ -535,6 +545,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   upload_dict_dpt_jc_home <- bislr_payroll %>%
     mutate(Job.Code = substr(Job.Code, 1, 10)) %>%
+    # need to consider mapping of Providers
+    # could set these as separate files to manually manipulate
+    # check to see how MSHQ handles this
+    # IT IS CRITICAL THAT WE KNOW IF NEW JOBCODES ARE PROVIDERS
     filter(Job.Code_up != "DUS_RMV" & PROVIDER %in% c(NA, 0)) %>%
     filter(is.na(HOMEJC_in_Dict)) %>%
     select(PartnerOR.Health.System.ID,
