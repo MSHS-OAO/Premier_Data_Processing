@@ -444,14 +444,13 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   upload_payroll <- bislr_payroll %>%
     # is there a method to filter on multiple columns instead of join?
+    # reference the DUS_RMV mutate()-case_when() as an example
+    # join seems simple/quick enough that we can keep it.
     left_join(filter_dates) %>%
     filter(!is.na(upload_date)) %>%
-    # need to consider mapping of Providers
-    # could set these as separate files to manually manipulate
-    # check to see how MSHQ handles this
-    # IT IS CRITICAL THAT WE KNOW IF NEW JOBCODES ARE PROVIDERS
-    filter(Job.Code_up != "DUS_RMV" & PROVIDER %in% c(NA, 0)) %>%
-    # filter(Job.Code_up != "DUS_RMV" & PROVIDER == 0) %>%
+    # if any PROVIDER value is NA, then it needs to be mapped
+    # it will be checked for in QC section
+    filter(PROVIDER == 0) %>%
     group_by(
       PartnerOR.Health.System.ID,
       Home.FacilityOR.Hospital.ID, DPT.HOME,
@@ -460,7 +459,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       Employee.ID, Employee.Name,
       Approved.Hours.per.Pay.Period,
       Job.Code_up,
-      # PROVIDER, # uncomment this line to confirm the Providers are filtered out
       Pay.Code) %>%
     summarize(Hours = sum(Hours, na.rm = TRUE),
               Expense = sum(Expense, na.rm = TRUE)) %>%
@@ -475,13 +473,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            Start.Date = format(Start.Date, "%m/%d/%Y"),
            End.Date = format(End.Date, "%m/%d/%Y"))
   
-  # check for confirming correct payperiods are included
-  # check <- upload_payroll %>%
-  #   select(Start.Date, End.Date) %>%
-  #   distinct() %>%
-  #   arrange(Start.Date, End.Date)
 
-  
   ## Premier Reference Files -------------------------------------------------
   
   # update dpt dict
