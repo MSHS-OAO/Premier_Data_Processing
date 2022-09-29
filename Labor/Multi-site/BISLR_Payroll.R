@@ -14,17 +14,22 @@ dir_universal <- paste0(dir, '/Universal Data')
   
 # Constants ---------------------------------------------------------------
 new_dpt_map <- 10095
-map_effective_date <- as.Date('2022-01-01') #is this date ok?
 # MM: I typically use an older date like 1/1/2010
 # this way any remapping we perform will ensure it's incorporated
 # into data
+map_effective_date <- as.Date('2022-01-01') #is this date ok?
+# MM: can we just look at the 4-digit department and look for 8600?
+# (e.g. look at the 4 right digits of the legacy cost cost center)
+# or can we put these values from the department dictionary?
+# having a check for new 8600 accrual depts is a good idea, but is
+# it necessary?
 accural_legacy_cc <- c(1109008600, 1109028600, 4409008600, 6409008600) #add other 8600, make quality check for new 8600, id errors non accural oracle but backmapped accural
+# MM: general improvement opportunity:
+# can we update the paycode mapping file to indicate productive vs. non-prod?
 productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
                         'OTHER_WORKED', 'AGENCY')
 
-# general improvement opportunity:
-# can we update the paycode mapping file to indicate productive vs. non-prod?
-
+# MM: can we put these IDs into the Universal Department Mapping file?
 dummy_report_ids <- c('DNU_000', 'DNU_MSM000', 'DNU_MSW000')
 
 
@@ -331,17 +336,22 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       
       # MM: how are there new job codes when running this on July data?
       # the job codes appear in July pay cycles
-      # MM: expect that the new Premier dict had not been downloaded yet
-      # MM: it was because of trailing whitespace on jobcodes.  This should
+      # MM: expected that the new Premier dict had not been downloaded yet
+      # MM: but it was because of trailing whitespace on jobcodes.  This should
       # be taken care of now.
       # For the comparison with the jobcode mapping, should we also trim
       # whitespace on both the bislr_payroll data.frame and the mapping
       # file so that there's no mismatches?
+      # should we remove trailing whitespace in the universal jobcode mapping
+      # file?
       
       # MM: Additionally, we can check to see if there are any jobcodes
-      # that end up without a proper mapping after checking MSHQ and if all
-      # have a recommendation, then we can continue on, but we'll have to be
-      # sure to update the Universal mapping file
+      # that end up without a proper mapping after checking MSHQ
+      # if all have a recommendation, then we can continue on, but we'll have
+      # to be sure to update the Universal mapping file
+      # if not all have a recommendation from MSHQ, would could look in BISLR
+      # because there are times when the name is the same but the jobcode is
+      # different
       
       
       # FYI CHECK:
