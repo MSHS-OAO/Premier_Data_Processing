@@ -176,14 +176,15 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   dummy_report_list  <- lapply(1:length(dummy_report_list),
                                function(x) mutate(dummy_report_list[[x]],
                                                   Site = dummy_reports$Site[x]))
-  dummy_report_list  <- do.call(rbind, dummy_report_list)
-  dummy_reports <- left_join(dummy_reports,
-                             dummy_report_list %>% select(Site, value)) %>%
-    select(-contains('blank'), - Cost.Center) %>%
-    relocate(value, .after = Report.ID) %>%
-    rename(Cost.Center = value) %>%
-    unique()
-  rm(dummy_reports_dept, dummy_report_list)
+  dummy_report_list  <- do.call(rbind, dummy_report_list) %>%
+    rename(Cost.Center = value) 
+  # dummy_reports <- left_join(dummy_reports,
+  #                            dummy_report_list %>% select(Site, value)) %>%
+  #   select(-contains('blank'), - Cost.Center) %>%
+  #   relocate(value, .after = Report.ID) %>%
+  #   rename(Cost.Center = value) %>%
+  #   unique()
+  # rm(dummy_reports_dept, dummy_report_list)
 
 
   dist_dates <- map_uni_paycycles %>%
@@ -550,10 +551,14 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     select(-DPT.WRKD, -WRKD.DPT.in.Report, -HOME.DPT.in.Report) %>%
     rename(Site = Home.FacilityOR.Hospital.ID,
            Cost.Center = DPT.HOME)  %>%
-    rbind(dummy_reports %>%
+    rbind(dummy_report_list %>%
             select(Site, Cost.Center)) %>%
       unique() %>%
-      group_by(Site)
+      group_by(Site) %>%
+    summarize(Cost.Center = paste(Cost.Center, collapse = ':')) %>%
+    left_join(dummy_reports %>% select(-contains('blank'), -Cost.Center)) %>%
+    relocate(Site, .after = Corporation.Code) %>%
+    relocate(Cost.Center, .after = Report.ID)
 
 # Quality Checks -------------------------------------------------------
 
