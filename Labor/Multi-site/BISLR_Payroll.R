@@ -23,13 +23,13 @@ map_effective_date <- as.Date('2022-01-01') #is this date ok?
 # or can we put these values from the department dictionary?
 # having a check for new 8600 accrual depts is a good idea, but is
 # it necessary?
+# Or can we add these to the Universal Report Def file?
 accural_legacy_cc <- c(1109008600, 1109028600, 4409008600, 6409008600) #add other 8600, make quality check for new 8600, id errors non accural oracle but backmapped accural
 # MM: general improvement opportunity:
 # can we update the paycode mapping file to indicate productive vs. non-prod?
 productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
                         'OTHER_WORKED', 'AGENCY')
 
-# MM: can we put these IDs into the Universal Department Mapping file?
 dummy_report_ids <- c('DNU_000', 'DNU_MSM000', 'DNU_MSW000')
 
 
@@ -472,7 +472,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            PAY.CODE = NULL,
            Start.Date = format(Start.Date, "%m/%d/%Y"),
            End.Date = format(End.Date, "%m/%d/%Y"))
-  
+  # this will be split into BIB and SLW in the Exporting section
 
   ## Premier Reference Files -------------------------------------------------
   
