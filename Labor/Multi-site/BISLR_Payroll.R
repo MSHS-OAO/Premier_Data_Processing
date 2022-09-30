@@ -279,6 +279,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     mutate(DPT.WRKD = case_when(
       DPT.WRKD.LEGACY %in% accural_legacy_cc ~ DPT.WRKD.LEGACY,
       TRUE ~ DPT.WRKD),
+      Department.Name.Worked.Dept = case_when(
+        DPT.WRKD.LEGACY %in% accural_legacy_cc ~ "ACCRUAL COST CENTER",
+        TRUE ~ Department.Name.Worked.Dept),
       Job.Code = case_when(
         paste0(DPT.WRKD, '-', Employee.Name) %in%
           paste0(msus_removal_list$`Department IdWHERE Worked`,
@@ -357,6 +360,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       # different
       
       
+      
+      
       # FYI CHECK:
       new_jc_check <- bislr_payroll %>%
         filter(Job.Code %in% new_jobcodes$Job.Code)
@@ -411,18 +416,15 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   # There's an assumption that the universal jc mapping file has been updated
   # with new jobcodes by this point.
-
-  map_uni_jobcodes_bislr <- map_uni_jobcodes %>%
-    filter(PAYROLL == "BISLR") %>%
-    mutate(J.C.DESCRIPTION = str_trim(J.C.DESCRIPTION)) %>%
-    mutate(J.C.length = nchar(J.C),
-           J.C.prem = substr(J.C, 1, 10)) %>%
-    distinct()
   
-  long_jc <- map_uni_jobcodes_bislr %>%
-    filter(J.C.length > 10) %>%
-    group_by(J.C.prem) %>%
-    summarize(freq = n())
+  #MM: update this to compare new shortened jobcode with the
+  # dict_premier_jobcode
+  
+  # if new jobcode (based on JC_in_UnivseralFile)
+  # and shortened
+  # compare with the premier dictionary
+  
+  # This will get incorporated into Preprocessing-Updating Universal Files section
   
   if (sum(long_jc$freq) > length(long_jc$freq)) {
     showDialog(title = "ERROR: Job Codes",
@@ -439,6 +441,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   } else {
     cat("All shortened job codes are unique\n")
   }
+  
   
   ## Premier Payroll File ----------------------------------------------------
   
@@ -478,12 +481,13 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   # update dpt dict
 
+  # wrap the new dept in a an if looking at columns for NA
+  
   upload_dict_dpt <- rbind(bislr_payroll %>%
                              filter(is.na(HomeDpt_in_Dict)) %>%
                              select(PartnerOR.Health.System.ID,
                                     Home.FacilityOR.Hospital.ID,
                                     DPT.HOME, Department.Name.Home.Dept) %>%
-                             distinct() %>%
                              setNames(
                                colnames(dict_premier_dpt %>%
                                           select(-Dpt_in_Dict))),
@@ -492,32 +496,25 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                              select(PartnerOR.Health.System.ID,
                                     Facility.Hospital.Id_Worked,
                                     DPT.WRKD, Department.Name.Worked.Dept) %>%
-                             distinct() %>%
                              setNames(
                                colnames(dict_premier_dpt %>%
                                           select(-Dpt_in_Dict)))
                            ) %>%
     distinct() %>%
     # check for special characters in name (e.g. ampersand &)
-    mutate(Cost.Center.Description = case_when(
-      str_detect(Cost.Center.Description, "&") ~
-        str_replace(Cost.Center.Description, "&", "AND"),
-      TRUE ~ Cost.Center.Description)) %>%
+    # mutate(Cost.Center.Description = case_when(
+    #   str_detect(Cost.Center.Description, "&") ~
+    #     str_replace(Cost.Center.Description, "&", "AND"),
+    #   TRUE ~ Cost.Center.Description)) %>%
     # check for cost center name length
     mutate(Cost.Center.Description =
              str_sub(Cost.Center.Description, 1, 50)) %>%
-    # must remove accrual cost center IDs since they'll already be in Premier
-    filter(!Cost.Center %in% accural_legacy_cc) %>%
-    # or need to change the description of the cost center before uploading
-    # mutate(Cost.Center.Description = case_when(
-    #   Cost.Center %in% accural_legacy_cc ~ "ACCRUAL COST CENTER",
-    #   TRUE ~ Cost.Center.Description)) %>%
     distinct()
   # if there are no new depts, then this will be empty
 
   # there's some sort of error in the Cost.Center id column
   # these are values: --1--83-000 & --1--85-000
-  # when running the July data
+  # Anjelica will code to handle this issue further up in the script.
   
   # update dpt map
   upload_map_dpt <- upload_dict_dpt %>%
@@ -533,45 +530,31 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   # update dpt job code dict
   
   upload_dict_dpt_jc <- rbind(bislr_payroll %>%
-                                # need to consider mapping of Providers?
-                                # we can upload them, but their payroll data should never make it into
-                                # Premier
-                                # filter(PROVIDER == 0) %>%
-                                filter(is.na(WRKJC_in_Dict)) %>%
+                                filter(is.na(WRKJC_in_Dict),
+                                       PROVIDER == 0) %>%
                                 select(PartnerOR.Health.System.ID,
                                        Facility.Hospital.Id_Worked,
                                        DPT.WRKD, Job.Code_up,
                                        Position.Code.Description) %>%
-                                distinct() %>%
                                 setNames(colnames(dict_premier_jobcode %>%
                                                     select(-JC_in_Dict))),
                               bislr_payroll %>%
-                                # need to consider mapping of Providers?
-                                # we can upload them, but their payroll data should never make it into
-                                # Premier
-                                # filter(PROVIDER == 0) %>%
-                                filter(is.na(HOMEJC_in_Dict)) %>%
+                                filter(is.na(HOMEJC_in_Dict),
+                                       PROVIDER == 0) %>%
                                 select(PartnerOR.Health.System.ID,
                                        Home.FacilityOR.Hospital.ID,
                                        DPT.HOME, Job.Code_up,
                                        Position.Code.Description) %>%
-                                distinct() %>%
                                 setNames(colnames(dict_premier_jobcode %>%
                                                     select(-JC_in_Dict)))
                               ) %>%
-    mutate(Job.Code.Description = case_when(
-      str_detect(Job.Code.Description, "&") ~
-        str_replace(Job.Code.Description, "&", "AND"),
-      TRUE ~ Job.Code.Description)) %>%
+    # mutate(Job.Code.Description = case_when(
+    #   str_detect(Job.Code.Description, "&") ~
+    #     str_replace(Job.Code.Description, "&", "AND"),
+    #   TRUE ~ Job.Code.Description)) %>%
     mutate(Job.Code.Description =
              str_trim(str_sub(Job.Code.Description, 1, 50))) %>%
     distinct(across(-Job.Code.Description), .keep_all = TRUE)
-  # the distinct across all columns except for the job description is
-  # because there can be slight differences in job codes names.
-  # we don't need to be too concerned if there are slight differences
-  # (like spelling mistakes or a level of a position (e.g. coder 1 vs coder 2))
-  # With this, the names in Premier may differ from what is in the Universal
-  # mapping file
   
   # update dpt job code map
   upload_map_dpt_jc <- upload_dict_dpt_jc %>%
