@@ -74,23 +74,14 @@ dummy_report_ids <- c('DNU_000', 'DNU_MSM000', 'DNU_MSW000')
                             header = T,
                             sep = '~',
                             fill = T)
-                            # colClasses = "character")
-                            # Home dept came in as numeric and was displaying
-                            # as scientific, so tried bringing in as text
-                            # since all other columns were text.
-                            # Also found that some values are not including
-                            # location and dept code
-
-  # Also seeing:  
-  # Warning message:
-  #   In scan(file = file, what = what, sep = sep, quote = quote, dec = dec,  :
-  #             EOF within quoted string
-
+  #departments coming in as numeric doesn't matter as we create
+  #our own cost center column and do not use what is in the raw data anyway
   return(data_recent)
   }
 
 # Import Data -------------------------------------------------------------
-raw_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
+bislr_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
+raw_payroll_export <- bislr_payroll
 
 # Import References -------------------------------------------------------
 pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR,
@@ -193,14 +184,15 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   dummy_report_list  <- lapply(1:length(dummy_report_list),
                                function(x) mutate(dummy_report_list[[x]],
                                                   Site = dummy_reports$Site[x]))
-  dummy_report_list  <- do.call(rbind, dummy_report_list)
-  dummy_reports <- left_join(dummy_reports,
-                             dummy_report_list %>% select(Site, value)) %>%
-    select(-contains('blank'), - Cost.Center) %>%
-    relocate(value, .after = Report.ID) %>%
-    rename(Cost.Center = value) %>%
-    unique()
-  rm(dummy_reports_dept, dummy_report_list)
+  dummy_report_list  <- do.call(rbind, dummy_report_list) %>%
+    rename(Cost.Center = value) 
+  # dummy_reports <- left_join(dummy_reports,
+  #                            dummy_report_list %>% select(Site, value)) %>%
+  #   select(-contains('blank'), - Cost.Center) %>%
+  #   relocate(value, .after = Report.ID) %>%
+  #   rename(Cost.Center = value) %>%
+  #   unique()
+  # rm(dummy_reports_dept, dummy_report_list)
 
 
   dist_dates <- map_uni_paycycles %>%
@@ -210,7 +202,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     arrange(END.DATE) %>%
     filter(PREMIER.DISTRIBUTION %in% c(TRUE, 1),
            END.DATE < max(
-             as.POSIXct(raw_payroll$End.Date, format = "%m/%d/%Y")))
+             as.POSIXct(bislr_payroll$End.Date, format = "%m/%d/%Y")))
   
   #Selecting the most recent distribution date
   distribution_date <- max(as.POSIXct(dist_dates$END.DATE))
@@ -220,7 +212,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
   ## Site Hours Quality Check ------------------------------------------------
   
-  piv_wide_check <- raw_payroll %>%
+  piv_wide_check <- bislr_payroll %>%
     filter(as.Date(End.Date, "%m/%d/%Y") >= dist_prev &
              as.Date(End.Date, "%m/%d/%Y") <= distribution_date +
              lubridate::days(7)) %>%
@@ -246,11 +238,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
 
   ## Data  --------------------------------------------------------------------
-
-  # this line is here for simple re-running of the script during development.
-  # if it is earlier in the code, then we'd have to rerun a larger chunk of
-  # code in order to reset the bislr_payroll data.frame
-  bislr_payroll <- raw_payroll
   
   bislr_payroll <- bislr_payroll %>%
     mutate(DPT.WRKD = paste0(substr(Full.COA.for.Worked,1,3),
@@ -271,11 +258,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            End.Date = as.Date(End.Date, format = '%m/%d/%Y'),
            Employee.Name = substr(Employee.Name, 1, 30),
            Approved.Hours.per.Pay.Period = round(Approved.Hours.per.Pay.Period,
-                                                 digits = 0)) %>%
-    # MM: trim whitespace on the jobcodes in order to ensure mapping works
-    # properly.  Jobcode dictionary download from Premier has no trailing
-    # whitespace on any jobcodes
-    mutate(Job.Code = str_trim(Job.Code)) %>%
+                                                 digits = 0),
+           Job.Code = str_trim(Job.Code),
+           Position.Code.Description = str_trim(Position.Code.Description)) %>%
     mutate(DPT.WRKD = case_when(
       DPT.WRKD.LEGACY %in% accural_legacy_cc ~ DPT.WRKD.LEGACY,
       TRUE ~ DPT.WRKD),
@@ -288,8 +273,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                  '-', msus_removal_list$`Employee Name`)
         ~ unique(msus_removal_list$`New Job Code`),
         TRUE ~ Job.Code)) %>%
-    # MM: may want to change the Position.Code.Description for DUS_RMV
-    # to DUS_REMOVE to prevent issues that might arise
     left_join(pay_cycles_uploaded) %>%
     left_join(map_uni_jobcodes %>% 
                 filter(PAYROLL == 'BISLR') %>%
@@ -319,18 +302,18 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                 rename(Facility.Hospital.Id_Worked = Site,
                        DPT.WRKD = Cost.Center,
                        WRKJC_in_Dict = JC_in_Dict)) %>%
-    mutate(Job.Code_up = substr(Job.Code, 1, 10)) %>%
-    mutate(Position.Code.Description = str_trim(Position.Code.Description))
+    mutate(Job.Code_up = substr(Job.Code, 1, 10))
+
+
   
     ## Update Universal Files --------------------------------------------------
     if (NA %in% unique(bislr_payroll$JC_in_UnivseralFile)) {
       new_jobcodes <- bislr_payroll %>%
         filter(is.na(JC_in_UnivseralFile)) %>%
-        # does Job.Code_up need to be included in this select()?
         select(Job.Code, Position.Code.Description) %>%
         unique() %>%
         mutate(JobDescCap = toupper(Position.Code.Description)) %>%
-        left_join(map_uni_jobcodes %>% #update so ignors case of string
+        left_join(map_uni_jobcodes %>%
                     filter(PAYROLL == 'MSHQ') %>%
                     select(J.C.DESCRIPTION, PROVIDER, PREMIER.J.C,
                            PREMIER.J.C.DESCRIPTION) %>%
@@ -340,42 +323,17 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       View(new_jobcodes)
       write.csv(new_jobcodes, 'New Job Codes for Universal File.csv')
       
-      # MM: how are there new job codes when running this on July data?
-      # the job codes appear in July pay cycles
-      # MM: expected that the new Premier dict had not been downloaded yet
-      # MM: but it was because of trailing whitespace on jobcodes.  This should
-      # be taken care of now.
-      # For the comparison with the jobcode mapping, should we also trim
-      # whitespace on both the bislr_payroll data.frame and the mapping
-      # file so that there's no mismatches?
-      # should we remove trailing whitespace in the universal jobcode mapping
-      # file?
-      
-      # MM: Additionally, we can check to see if there are any jobcodes
-      # that end up without a proper mapping after checking MSHQ
-      # if all have a recommendation, then we can continue on, but we'll have
-      # to be sure to update the Universal mapping file
-      # if not all have a recommendation from MSHQ, would could look in BISLR
+ 
+      # if not all have a recommendation from MSHQ, we could look in BISLR
       # because there are times when the name is the same but the jobcode is
       # different
       
-      
-      
-      
-      # FYI CHECK:
-      new_jc_check <- bislr_payroll %>%
-        filter(Job.Code %in% new_jobcodes$Job.Code)
-      View(new_jc_check)
-      ###
-      
       stop('New job codes detected, update universal job code dictionary before continuing to run code')
-      # the stop didn't stop code when highlighting a large chunk of code to run
-      # when new job codes existed
     }
 
-    if (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
+    if (NA %in% unique(bislr_payroll$Permier.Pay.Code)) {
       new_paycodes <- bislr_payroll %>%
-        filter(is.na(Paycode_in_Universal)) %>%
+        filter(is.na(Permier.Pay.Code)) %>%
         select(Facility.Hospital.Id_Worked, Pay.Code) %>%
         unique() %>%
       View(new_paycodes)
@@ -384,7 +342,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                   'Continue running code from line TBD.'))
     }
   
-  #Paycycles to filter on - remember to update the reference file with these dates
+  #Paycycles to filter on
   filter_dates <- bislr_payroll %>%
     filter(is.na(Pay_Cycle_Uploaded)) %>%
     select(Start.Date, End.Date) %>%
@@ -393,13 +351,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     filter(End.Date > dist_prev,
            !Start.Date > distribution_date) %>%
     mutate(upload_date = 1)
-  
-  # MM: can the filter for dates simply be:
-  # Start.Date > dist_prev & Start.Date < distribution_date
-  # ?
-  # This would ensure the bi-weekly SLW period is included
-  # but not the weekly SLW period that is right after distribution
-  # Then no need to maintain the filter_dates file
   
   # MM: is it worth filtering out dates that are not of interest at this point
   # in the script?
@@ -639,7 +590,33 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     # if there's a new paycode at one site, we should upload it for all sites
 
   }
+  
   #dummy report upload
+  upload_report_dict <- bislr_payroll %>%
+    select(Home.FacilityOR.Hospital.ID,
+           DPT.HOME,
+           DPT.WRKD) %>%
+    left_join(map_uni_reports %>%
+                select(ORACLE.COST.CENTER) %>%
+                rename(DPT.WRKD = ORACLE.COST.CENTER) %>%
+                mutate(WRKD.DPT.in.Report = 1)) %>%
+    left_join(map_uni_reports %>%
+                select(ORACLE.COST.CENTER) %>%
+                rename(DPT.HOME = ORACLE.COST.CENTER) %>%
+                mutate(HOME.DPT.in.Report = 1)) %>%
+    filter(WRKD.DPT.in.Report == 1,
+           is.na(HOME.DPT.in.Report)) %>%
+    select(-DPT.WRKD, -WRKD.DPT.in.Report, -HOME.DPT.in.Report) %>%
+    rename(Site = Home.FacilityOR.Hospital.ID,
+           Cost.Center = DPT.HOME)  %>%
+    rbind(dummy_report_list %>%
+            select(Site, Cost.Center)) %>%
+      unique() %>%
+      group_by(Site) %>%
+    summarize(Cost.Center = paste(Cost.Center, collapse = ':')) %>%
+    left_join(dummy_reports %>% select(-contains('blank'), -Cost.Center)) %>%
+    relocate(Site, .after = Corporation.Code) %>%
+    relocate(Cost.Center, .after = Report.ID)
 
 # Quality Checks -------------------------------------------------------
 
