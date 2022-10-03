@@ -14,10 +14,7 @@ dir_universal <- paste0(dir, '/Universal Data')
   
 # Constants ---------------------------------------------------------------
 new_dpt_map <- 10095
-# MM: I typically use an older date like 1/1/2010
-# this way any remapping we perform will ensure it's incorporated
-# into data
-map_effective_date <- as.Date('2022-01-01') #is this date ok?
+map_effective_date <- as.Date('2010-01-01')
 # MM: can we just look at the 4-digit department and look for 8600?
 # (e.g. look at the 4 right digits of the legacy cost cost center)
 # or can we put these values from the department dictionary?
@@ -80,8 +77,9 @@ dummy_report_ids <- c('DNU_000', 'DNU_MSM000', 'DNU_MSW000')
   }
 
 # Import Data -------------------------------------------------------------
-bislr_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
-raw_payroll_export <- bislr_payroll
+raw_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
+#bislr_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
+  #raw_payroll_export <- bislr_payroll
 
 # Import References -------------------------------------------------------
 pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR,
@@ -161,9 +159,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
   ## References --------------------------------------------------------------
   map_uni_jobcodes <- map_uni_jobcodes %>%
-    # MM: trim white space on job.code to ensure that join works properly
     mutate(J.C = str_trim(J.C)) %>%
     mutate(JC_in_UnivseralFile = 1)
+  map_uni_paycodes <- map_uni_paycodes %>%
+    mutate(Paycode_in_Universal = 1)
   pay_cycles_uploaded <- pay_cycles_uploaded %>%
     mutate(Pay_Cycle_Uploaded = 1)
   dict_premier_dpt <- dict_premier_dpt %>%
@@ -186,14 +185,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                                   Site = dummy_reports$Site[x]))
   dummy_report_list  <- do.call(rbind, dummy_report_list) %>%
     rename(Cost.Center = value) 
-  # dummy_reports <- left_join(dummy_reports,
-  #                            dummy_report_list %>% select(Site, value)) %>%
-  #   select(-contains('blank'), - Cost.Center) %>%
-  #   relocate(value, .after = Report.ID) %>%
-  #   rename(Cost.Center = value) %>%
-  #   unique()
-  # rm(dummy_reports_dept, dummy_report_list)
-
 
   dist_dates <- map_uni_paycycles %>%
     select(END.DATE, PREMIER.DISTRIBUTION) %>%
@@ -202,7 +193,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     arrange(END.DATE) %>%
     filter(PREMIER.DISTRIBUTION %in% c(TRUE, 1),
            END.DATE < max(
-             as.POSIXct(bislr_payroll$End.Date, format = "%m/%d/%Y")))
+             as.POSIXct(raw_payroll$End.Date, format = "%m/%d/%Y")))
   
   #Selecting the most recent distribution date
   distribution_date <- max(as.POSIXct(dist_dates$END.DATE))
@@ -212,7 +203,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
   ## Site Hours Quality Check ------------------------------------------------
   
-  piv_wide_check <- bislr_payroll %>%
+  piv_wide_check <- raw_payroll %>%
     filter(as.Date(End.Date, "%m/%d/%Y") >= dist_prev &
              as.Date(End.Date, "%m/%d/%Y") <= distribution_date +
              lubridate::days(7)) %>%
@@ -239,7 +230,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
   ## Data  --------------------------------------------------------------------
   
-  bislr_payroll <- bislr_payroll %>%
+  bislr_payroll <- raw_payroll %>%
     mutate(DPT.WRKD = paste0(substr(Full.COA.for.Worked,1,3),
                              substr(Full.COA.for.Worked,41,44),
                              substr(Full.COA.for.Worked,5,7),
@@ -279,8 +270,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                 select(J.C, PROVIDER, JC_in_UnivseralFile) %>%
                 rename(Job.Code = J.C)) %>%
     left_join(map_uni_paycodes %>% 
-                select(RAW.PAY.CODE) %>%
-                mutate(Paycode_in_Universal = 1) %>%
+                select(RAW.PAY.CODE, Paycode_in_Universal) %>%
                 rename(Pay.Code = RAW.PAY.CODE)) %>%
     left_join(dict_premier_dpt %>%
                 select(Site, Cost.Center, Dpt_in_Dict) %>%
@@ -331,9 +321,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       stop('New job codes detected, update universal job code dictionary before continuing to run code')
     }
 
-    if (NA %in% unique(bislr_payroll$Permier.Pay.Code)) {
+    if (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
       new_paycodes <- bislr_payroll %>%
-        filter(is.na(Permier.Pay.Code)) %>%
+        filter(is.na(Paycode_in_Universal)) %>%
         select(Facility.Hospital.Id_Worked, Pay.Code) %>%
         unique() %>%
       View(new_paycodes)
@@ -377,21 +367,21 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   # This will get incorporated into Preprocessing-Updating Universal Files section
   
-  if (sum(long_jc$freq) > length(long_jc$freq)) {
-    showDialog(title = "ERROR: Job Codes",
-               message = paste0("There are duplicates in ",
-                                "shortened Job Codes.  ",
-                                "These will require special handling.  ",
-                                "Please stop the script and resolve concerns ",
-                                "before restarting.")
-    )
-    stop(paste0("There are duplicates in shortened Job Codes.\n\n",
-                "These will require special handling.\n\n",
-                "Please stop the script and resolve concerns ",
-                "before restarting.\n"))
-  } else {
-    cat("All shortened job codes are unique\n")
-  }
+  # if (sum(long_jc$freq) > length(long_jc$freq)) {
+  #   showDialog(title = "ERROR: Job Codes",
+  #              message = paste0("There are duplicates in ",
+  #                               "shortened Job Codes.  ",
+  #                               "These will require special handling.  ",
+  #                               "Please stop the script and resolve concerns ",
+  #                               "before restarting.")
+  #   )
+  #   stop(paste0("There are duplicates in shortened Job Codes.\n\n",
+  #               "These will require special handling.\n\n",
+  #               "Please stop the script and resolve concerns ",
+  #               "before restarting.\n"))
+  # } else {
+  #   cat("All shortened job codes are unique\n")
+  # }
   
   
   ## Premier Payroll File ----------------------------------------------------
@@ -521,10 +511,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       TRUE ~ Cost.Center.Map)) %>%
     # the map_uni_jobcodes_bislr data.frame should be refreshed by the time this
     # part of the code is run
-    left_join(map_uni_jobcodes_bislr %>%
-                select(J.C.prem, PREMIER.J.C) %>%
-                distinct(),
-              by = c("Job.Code" = "J.C.prem")) %>%
+    left_join(map_uni_jobcodes %>%
+                filter(PAYROLL == 'BISLR') %>%
+                select(J.C.prem, PREMIER.J.C),
+              by = c("Job.Code" = "J.C.prem")) %>% #J.C.prem column doesn't exist anymore
     mutate(effective_date = format(map_effective_date, "%m/%d/%Y")) %>%
     relocate(effective_date, .before = Corporation.Code) %>%
     distinct()
