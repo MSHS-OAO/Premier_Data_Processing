@@ -253,6 +253,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            Job.Code = str_trim(Job.Code),
            Position.Code.Description = str_trim(Position.Code.Description)) %>%
     mutate(DPT.WRKD = case_when(
+      trimws(Department.Name.Worked.Dept) == "" ~ as.character(Department.IdWHERE.Worked),
+      TRUE ~ DPT.WRKD),
+      DPT.HOME = case_when(
+        trimws(Department.Name.Home.Dept) == "" ~ as.character(Department.ID.Home.Department),
+        TRUE ~ DPT.HOME)) %>%
+    mutate(DPT.WRKD = case_when(
       DPT.WRKD.LEGACY %in% accural_legacy_cc ~ DPT.WRKD.LEGACY,
       TRUE ~ DPT.WRKD),
       Department.Name.Worked.Dept = case_when(
