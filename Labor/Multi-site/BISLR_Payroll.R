@@ -202,7 +202,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     which(dist_dates$END.DATE == distribution_date) - 1]
 
   ## Site Hours Quality Check ------------------------------------------------
-  
   piv_wide_check <- raw_payroll %>%
     filter(as.Date(End.Date, "%m/%d/%Y") >= dist_prev &
              as.Date(End.Date, "%m/%d/%Y") <= distribution_date +
@@ -229,8 +228,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
 
   ## Data  --------------------------------------------------------------------
-  
-  bislr_payroll <- raw_payroll %>%
+  bislr_payroll <- raw_payroll_test %>%
     mutate(DPT.WRKD = paste0(substr(Full.COA.for.Worked,1,3),
                              substr(Full.COA.for.Worked,41,44),
                              substr(Full.COA.for.Worked,5,7),
@@ -300,10 +298,34 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                        WRKJC_in_Dict = JC_in_Dict)) %>%
     mutate(Job.Code_up = substr(Job.Code, 1, 10))
 
-
-  
     ## Update Universal Files --------------------------------------------------
-    if (NA %in% unique(bislr_payroll$JC_in_UnivseralFile)) {
+    # if (NA %in% unique(bislr_payroll$JC_in_UnivseralFile)) {
+    #   new_jobcodes <- bislr_payroll %>%
+    #     filter(is.na(JC_in_UnivseralFile)) %>%
+    #     select(Job.Code, Position.Code.Description) %>%
+    #     unique() %>%
+    #     mutate(JobDescCap = toupper(Position.Code.Description)) %>%
+    #     left_join(map_uni_jobcodes %>%
+    #                 filter(PAYROLL == 'MSHQ') %>%
+    #                 select(J.C.DESCRIPTION, PROVIDER, PREMIER.J.C,
+    #                        PREMIER.J.C.DESCRIPTION) %>%
+    #                 rename(JobDescCap = J.C.DESCRIPTION)) %>%
+    #     select(-JobDescCap) %>%
+    #     unique()
+    #   View(new_jobcodes)
+    #   write.csv(new_jobcodes, 'New Job Codes for Universal File.csv')
+    #   
+    # 
+    #   # if not all have a recommendation from MSHQ, we could look in BISLR
+    #   # because there are times when the name is the same but the jobcode is
+    #   # different
+    #   
+    #   stop('New job codes detected, update universal job code dictionary before continuing to run code')
+    # }
+
+    loop <- 0
+    while (NA %in% unique(bislr_payroll$JC_in_UnivseralFile)) {
+      loop <- loop + 1
       new_jobcodes <- bislr_payroll %>%
         filter(is.na(JC_in_UnivseralFile)) %>%
         select(Job.Code, Position.Code.Description) %>%
@@ -317,14 +339,34 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
         select(-JobDescCap) %>%
         unique()
       View(new_jobcodes)
-      write.csv(new_jobcodes, 'New Job Codes for Universal File.csv')
+      write.csv(new_jobcodes,
+                paste0('New Job Codes for Universal File',
+                       if(loop == 1){''}else{paste0('_V',loop)},
+                       '.csv'))
+
+      showQuestion(
+        title = 'Warning',
+        message = paste0(if(loop == 1){
+          'New job codes detected! \n'}else{
+            'There are still new job codes. \n'
+            },
+                         'Update Universal Job Code File before continuing. \n',
+                         '\n Have new jobes been added?'),
+                             ok = 'Yes',
+                             cancel = 'No')
       
- 
-      # if not all have a recommendation from MSHQ, we could look in BISLR
-      # because there are times when the name is the same but the jobcode is
-      # different
+      map_uni_jobcodes <- read_xlsx(paste0(dir_universal,
+                                           '/Mapping/MSHS_Jobcode_Mapping.xlsx'),
+                                    sheet = 1)
+      map_uni_jobcodes <- map_uni_jobcodes %>%
+        mutate(J.C = str_trim(J.C)) %>%
+        mutate(JC_in_UnivseralFile = 1)
       
-      stop('New job codes detected, update universal job code dictionary before continuing to run code')
+      bislr_payroll <- left_join(bislr_payroll %>%
+                                   select(-JC_in_UnivseralFile),
+                                 map_uni_jobcodes %>% 
+                                   filter(PAYROLL == 'BISLR') %>%
+                                   select(J.C, PROVIDER, JC_in_UnivseralFile))
     }
 
     if (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
