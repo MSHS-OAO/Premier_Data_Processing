@@ -408,15 +408,23 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   ## Premier Payroll File ----------------------------------------------------
   
-  upload_payroll <- bislr_payroll %>%
+  row_count <- nrow(bislr_payroll)
+  upload_payroll <- bislr_payroll %>%  
     # is there a method to filter on multiple columns instead of join?
     # reference the DUS_RMV mutate()-case_when() as an example
     # join seems simple/quick enough that we can keep it.
-    left_join(filter_dates) %>%
-    filter(!is.na(upload_date)) %>%
+    left_join(filter_dates)
+  if (nrow(upload_payroll) != row_count) {
+    showDialog(title = "Join error",
+               message = paste("Row count failed at", "upload_payroll"))
+    stop(paste("Row count failed at", "upload_payroll"))
+    }
+  
+  upload_payroll <- upload_payroll %>%
     # if any PROVIDER value is NA, then it needs to be mapped
     # it will be checked for in QC section
     filter(PROVIDER == 0) %>%
+    filter(!is.na(upload_date)) %>%
     group_by(
       PartnerOR.Health.System.ID,
       Home.FacilityOR.Hospital.ID, DPT.HOME,
@@ -428,7 +436,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       Pay.Code) %>%
     summarize(Hours = sum(Hours, na.rm = TRUE),
               Expense = sum(Expense, na.rm = TRUE)) %>%
-    ungroup() %>%
+    ungroup()
+    
+  row_count <- nrow(upload_payroll)
+  upload_payroll <- upload_payroll %>%
     # the paycode that is used in Premier needs to be used instead of the
     # raw paycode, so it needs to be joined in.
     left_join(
@@ -439,6 +450,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            Start.Date = format(Start.Date, "%m/%d/%Y"),
            End.Date = format(End.Date, "%m/%d/%Y"))
   # this will be split into BIB and SLW in the Exporting section
+  
+  if (nrow(upload_payroll) != row_count) {
+    showDialog(title = "Join error",
+               message = paste("Row count failed at", "upload_payroll"))
+    stop(paste("Row count failed at", "upload_payroll"))
+    }
 
   ## Premier Reference Files -------------------------------------------------
   
@@ -463,7 +480,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                  colnames(dict_premier_dpt %>%
                                             select(-Dpt_in_Dict)))
     ) %>%
-      distinct() %>%
       # check for special characters in name (e.g. ampersand &)
       # mutate(Cost.Center.Description = case_when(
       #   str_detect(Cost.Center.Description, "&") ~
@@ -480,8 +496,17 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     # Anjelica will code to handle this issue further up in the script.
     
     # update dpt map
+    
+    row_count <- nrow(upload_dict_dpt)
     upload_map_dpt <- upload_dict_dpt %>%
-      left_join(dict_premier_dpt) %>%
+      left_join(dict_premier_dpt)
+    if (nrow(upload_map_dpt) != row_count) {
+      showDialog(title = "Join error",
+                 message = paste("Row count failed at", "upload_map_dpt"))
+      stop(paste("Row count failed at", "upload_map_dpt"))
+      }  
+      
+    upload_map_dpt <- upload_map_dpt %>%
       filter(is.na(Dpt_in_Dict)) %>%
       mutate(Dpt_in_Dict = NULL,
              Cost.Center.Description = NULL) %>%
@@ -489,6 +514,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
              prem_map = new_dpt_map) %>%
       relocate(effective_date, .before = Corporation.Code) %>%
       distinct()
+
   }
   
   if (NA %in% bislr_payroll$WRKJC_in_Dict |
@@ -523,6 +549,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       distinct(across(-Job.Code.Description), .keep_all = TRUE)
     
     # update dpt job code map
+    
+    row_count <- nrow(upload_dict_dpt_jc)
     upload_map_dpt_jc <- upload_dict_dpt_jc %>%
       select(-Job.Code.Description) %>%
       # the map_premier_dpt Cost.Center column is character type
@@ -550,6 +578,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     # when running the code live, new jobcodes that have not been updated in the
     # universal mapping should show up as NA.
     # but they should have been manually corrected by this point.
+    if (nrow(upload_map_dpt_jc) != row_count) {
+      showDialog(title = "Join error",
+                 message = paste("Row count failed at",
+                                 "upload_map_dpt_jc"))
+      stop(paste("Row count failed at", "upload_map_dpt_jc"))
+      }
     
     # FYI check:
     # This can be moved into the QC section and/or we can filter out any NA
@@ -561,15 +595,16 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   }
   
 
-  # test data.frame for new paycodes
-  new_paycodes <- bislr_payroll %>%
-    select(Facility.Hospital.Id_Worked, Pay.Code) %>%
-    unique() %>%
-    tail()
-  ##
+  # # test data.frame for new paycodes
+  # new_paycodes <- bislr_payroll %>%
+  #   select(Facility.Hospital.Id_Worked, Pay.Code) %>%
+  #   unique() %>%
+  #   tail()
+  # ##
   
   if (exists("new_paycodes")) {
     # update paycode dict
+    row_count <- nrow(new_paycodes)
     upload_dict_paycode <- new_paycodes %>%
       left_join(map_uni_paycodes %>%
                   select(RAW.PAY.CODE, PAY.CODE, PAY.CODE.NAME),
@@ -581,6 +616,11 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       rename(Site = Facility.Hospital.Id_Worked) %>%
       relocate(Corporation.Code, .before = Site) %>%
       mutate(Pay.Code = NULL)
+    if (nrow(upload_dict_paycode) != row_count) {
+      showDialog(title = "Join error",
+                 message = paste("Row count failed at", "upload_dict_paycode"))
+      stop(paste("Row count failed at", "upload_dict_paycode"))
+      }
 
     if (max(nchar(upload_dict_paycode$PAY.CODE)) > char_len_paycode |
         max(nchar(upload_dict_paycode$PAY.CODE.NAME)) > char_len_paycode_name) {
@@ -593,6 +633,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     }
     
     # update paycode dict
+    row_count <- nrow(upload_dict_paycode)
     upload_map_paycode <- upload_dict_paycode %>%
       left_join(map_uni_paycodes %>%
                   select(-RAW.PAY.CODE, -Paycode_in_Universal)) %>%
@@ -608,12 +649,18 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
              # the script?
              allocation_pct = 100) %>%
       relocate(effective_date, .before = Corporation.Code)
+    if (nrow(upload_map_paycode) != row_count) {
+      showDialog(title = "Join error",
+                 message = paste("Row count failed at", "upload_map_paycode"))
+      stop(paste("Row count failed at", "upload_map_paycode"))
+      }
 
     # FYI:
     # if there's a new paycode at one site, we should upload it for all sites,
     # correct? including MSH?
     # the below code will ensure this, and can be appended to the pipelines
     # above if preferred
+    # Would need to be mindful of incorporating join row count checks
     
     # corp_site <- data.frame(cbind(Corporation.Code = 729805,
     #                      Site = c("630571", "NY2162", "NY2163"))) %>%
