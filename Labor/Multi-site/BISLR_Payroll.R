@@ -712,6 +712,32 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 # Quality Checks -------------------------------------------------------
 
 
+## JC with multiple Description -------------------------------------------
+
+  jc_desc_check <- bislr_payroll %>%
+    select(Job.Code, Position.Code.Description) %>%
+    distinct() %>%
+    group_by(Job.Code) %>%
+    summarize(freq = n()) %>%
+    arrange(-freq, Job.Code) %>%
+    filter(freq > 1) %>%
+    # mutate(freq = NULL) %>%
+    inner_join(bislr_payroll %>%
+                select(Job.Code, Position.Code.Description, PROVIDER) %>%
+                 distinct())
+  
+  # 5 is selected because of the DUS_RMV jobcode
+  if (max(jc_desc_check$freq) > 5) {
+    showDialog(title = "Jobcode Descriptino Check",
+               message = paste("There are a large number of descriptions",
+                               "mapped to the same jobcode. ",
+                               "Review the jobcodes with multiple",
+                               "descriptions before proceeding."))
+    View(jc_desc_check)
+  }
+    
+
+
 # Visualizations ----------------------------------------------------------
 
 
