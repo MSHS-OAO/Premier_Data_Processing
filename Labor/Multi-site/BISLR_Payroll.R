@@ -728,15 +728,35 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   # 5 is selected because of the DUS_RMV jobcode
   if (max(jc_desc_check$freq) > 5) {
-    showDialog(title = "Jobcode Descriptino Check",
+    showDialog(title = "Jobcode Description Check",
                message = paste("There are a large number of descriptions",
                                "mapped to the same jobcode. ",
                                "Review the jobcodes with multiple",
                                "descriptions before proceeding."))
     View(jc_desc_check)
   }
-    
+  # pull in Premier jobcode category or other info to help?
+  # seems like it will be infrequent, so may not be worth coding for it
+  
 
+  ## cost center and upload FTE count -------------------------------------
+
+  
+
+  ## 8600 Accrual Site Summary --------------------------------------------
+
+  accrual_summary <- bislr_payroll %>%
+    left_join(filter_dates) %>%
+    filter(!is.na(upload_date)) %>%
+    filter(PROVIDER == 0) %>%
+    filter(Department.Name.Worked.Dept == "ACCRUAL COST CENTER") %>%
+    group_by(
+      Home.FacilityOR.Hospital.ID, DPT.HOME,
+      Facility.Hospital.Id_Worked, DPT.WRKD,
+      Start.Date, End.Date,) %>%
+    summarize(Hours = sum(Hours, na.rm = TRUE),
+              Expense = sum(Expense, na.rm = TRUE)) %>%
+    ungroup()
 
 # Visualizations ----------------------------------------------------------
 
