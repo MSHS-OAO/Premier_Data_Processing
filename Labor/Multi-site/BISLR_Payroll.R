@@ -299,29 +299,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     mutate(Job.Code_up = substr(Job.Code, 1, 10))
 
     ## Update Universal Files --------------------------------------------------
-    # if (NA %in% unique(bislr_payroll$JC_in_UnivseralFile)) {
-    #   new_jobcodes <- bislr_payroll %>%
-    #     filter(is.na(JC_in_UnivseralFile)) %>%
-    #     select(Job.Code, Position.Code.Description) %>%
-    #     unique() %>%
-    #     mutate(JobDescCap = toupper(Position.Code.Description)) %>%
-    #     left_join(map_uni_jobcodes %>%
-    #                 filter(PAYROLL == 'MSHQ') %>%
-    #                 select(J.C.DESCRIPTION, PROVIDER, PREMIER.J.C,
-    #                        PREMIER.J.C.DESCRIPTION) %>%
-    #                 rename(JobDescCap = J.C.DESCRIPTION)) %>%
-    #     select(-JobDescCap) %>%
-    #     unique()
-    #   View(new_jobcodes)
-    #   write.csv(new_jobcodes, 'New Job Codes for Universal File.csv')
-    #   
-    # 
-    #   # if not all have a recommendation from MSHQ, we could look in BISLR
-    #   # because there are times when the name is the same but the jobcode is
-    #   # different
-    #   
-    #   stop('New job codes detected, update universal job code dictionary before continuing to run code')
-    # }
   bislr_payroll_test <- head(bislr_payroll)
   bislr_payroll_test$Job.Code[1] <- 'test_jc'
   bislr_payroll_test$JC_in_UnivseralFile[1] <- NA
@@ -353,7 +330,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
             'There are still new job codes. \n'
             },
                          'Update Universal Job Code File before continuing. \n',
-                         '\n Have new jobes been added?'),
+                         '\n Have new jobs been added?'),
                              ok = 'Yes',
                              cancel = 'No')
       
@@ -372,15 +349,41 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                    rename(Job.Code = J.C))
     }
 
-    if (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
-      new_paycodes <- bislr_payroll %>%
+    loop <- 0
+    while (NA %in% unique(bislr_payroll_test$Paycode_in_Universal)) {
+      loop <- loop + 1
+      new_paycodes <- bislr_payroll_test %>%
         filter(is.na(Paycode_in_Universal)) %>%
         select(Facility.Hospital.Id_Worked, Pay.Code) %>%
-        unique() %>%
-      View(new_paycodes)
-      write.csv(new_paycodes, 'New Pay Codes for Universal File.csv')
-      stop(paste0('New pay codes detected, update universal job code dictionary before continuing',
-                  'Continue running code from line TBD.'))
+        unique()
+      View(new_jobcodes)
+      write.csv(new_paycodes,
+                paste0('New Pay Codes for Universal File',
+                       if(loop == 1){''}else{paste0('_V',loop)},
+                       '.csv'))
+      
+      showQuestion(
+        title = 'Warning',
+        message = paste0(if(loop == 1){
+          'New pay codes detected! \n'}else{
+            'There are still new pay codes. \n'
+          },
+          'Update Universal Pay Code File before continuing. \n',
+          '\n Have new pay codes been added?'),
+        ok = 'Yes',
+        cancel = 'No')
+      
+      map_uni_paycodes <- read_xlsx(paste0(dir_universal,
+                                           '/Mapping/MSHS_Paycode_Mapping.xlsx'),
+                                    sheet = 1)
+      map_uni_paycodes <- map_uni_paycodes %>%
+        mutate(Paycode_in_Universal = 1)
+      
+      bislr_payroll_test <- left_join(bislr_payroll_test %>%
+                                        select(-Paycode_in_Universal),
+                                      map_uni_paycodes %>%
+                                        select(RAW.PAY.CODE, Paycode_in_Universal) %>%
+                                        rename(Pay.Code = RAW.PAY.CODE))
     }
   
   #Paycycles to filter on
