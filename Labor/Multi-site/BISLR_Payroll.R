@@ -299,13 +299,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     mutate(Job.Code_up = substr(Job.Code, 1, 10))
 
     ## Update Universal Files --------------------------------------------------
-  bislr_payroll_test <- head(bislr_payroll)
-  bislr_payroll_test$Job.Code[1] <- 'test_jc'
-  bislr_payroll_test$JC_in_UnivseralFile[1] <- NA
     loop <- 0
-    while (NA %in% unique(bislr_payroll_test$JC_in_UnivseralFile)) {
+    while (NA %in% unique(bislr_payroll$JC_in_UnivseralFile)) {
       loop <- loop + 1
-      new_jobcodes <- bislr_payroll_test %>%
+      new_jobcodes <- bislr_payroll %>%
         filter(is.na(JC_in_UnivseralFile)) %>%
         select(Job.Code, Position.Code.Description) %>%
         unique() %>%
@@ -330,9 +327,11 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
             'There are still new job codes. \n'
             },
                          'Update Universal Job Code File before continuing. \n',
-                         '\n Have new jobs been added?'),
-                             ok = 'Yes',
-                             cancel = 'No')
+                         '\n Have new jobs been added?',
+          '\n \n If you want to quit running the code select no \n',
+          ' then click the stop code button in the console'),
+        ok = 'Yes',
+        cancel = 'No')
       
       map_uni_jobcodes <- read_xlsx(paste0(dir_universal,
                                            '/Mapping/MSHS_Jobcode_Mapping.xlsx'),
@@ -341,22 +340,23 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
         mutate(J.C = str_trim(J.C)) %>%
         mutate(JC_in_UnivseralFile = 1)
       
-      bislr_payroll_test <- left_join(bislr_payroll_test %>%
+      bislr_payroll <- left_join(bislr_payroll %>%
                                    select(-JC_in_UnivseralFile, - PROVIDER),
                                  map_uni_jobcodes %>% 
                                    filter(PAYROLL == 'BISLR') %>%
                                    select(J.C, PROVIDER, JC_in_UnivseralFile) %>%
                                    rename(Job.Code = J.C))
+      Sys.sleep(2)
     }
-
+  
     loop <- 0
-    while (NA %in% unique(bislr_payroll_test$Paycode_in_Universal)) {
+    while (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
       loop <- loop + 1
-      new_paycodes <- bislr_payroll_test %>%
+      new_paycodes <- bislr_payroll %>%
         filter(is.na(Paycode_in_Universal)) %>%
         select(Facility.Hospital.Id_Worked, Pay.Code) %>%
         unique()
-      View(new_jobcodes)
+      View(new_paycodes)
       write.csv(new_paycodes,
                 paste0('New Pay Codes for Universal File',
                        if(loop == 1){''}else{paste0('_V',loop)},
@@ -369,7 +369,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
             'There are still new pay codes. \n'
           },
           'Update Universal Pay Code File before continuing. \n',
-          '\n Have new pay codes been added?'),
+          '\n Have new pay codes been added?',
+          '\n \n If you want to quit running the code select no \n',
+          ' then click the stop code button in the console'),
         ok = 'Yes',
         cancel = 'No')
       
@@ -379,11 +381,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       map_uni_paycodes <- map_uni_paycodes %>%
         mutate(Paycode_in_Universal = 1)
       
-      bislr_payroll_test <- left_join(bislr_payroll_test %>%
+      bislr_payroll <- left_join(bislr_payroll %>%
                                         select(-Paycode_in_Universal),
                                       map_uni_paycodes %>%
                                         select(RAW.PAY.CODE, Paycode_in_Universal) %>%
                                         rename(Pay.Code = RAW.PAY.CODE))
+      Sys.sleep(2)
     }
   
   #Paycycles to filter on
