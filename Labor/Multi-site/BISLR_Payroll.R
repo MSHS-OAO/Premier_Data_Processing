@@ -228,7 +228,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
 
   ## Data  --------------------------------------------------------------------
-  bislr_payroll <- raw_payroll_test %>%
+  bislr_payroll <- raw_payroll %>%
     mutate(DPT.WRKD = paste0(substr(Full.COA.for.Worked,1,3),
                              substr(Full.COA.for.Worked,41,44),
                              substr(Full.COA.for.Worked,5,7),
@@ -322,11 +322,13 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     #   
     #   stop('New job codes detected, update universal job code dictionary before continuing to run code')
     # }
-
+  bislr_payroll_test <- head(bislr_payroll)
+  bislr_payroll_test$Job.Code[1] <- 'test_jc'
+  bislr_payroll_test$JC_in_UnivseralFile[1] <- NA
     loop <- 0
-    while (NA %in% unique(bislr_payroll$JC_in_UnivseralFile)) {
+    while (NA %in% unique(bislr_payroll_test$JC_in_UnivseralFile)) {
       loop <- loop + 1
-      new_jobcodes <- bislr_payroll %>%
+      new_jobcodes <- bislr_payroll_test %>%
         filter(is.na(JC_in_UnivseralFile)) %>%
         select(Job.Code, Position.Code.Description) %>%
         unique() %>%
@@ -362,11 +364,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
         mutate(J.C = str_trim(J.C)) %>%
         mutate(JC_in_UnivseralFile = 1)
       
-      bislr_payroll <- left_join(bislr_payroll %>%
-                                   select(-JC_in_UnivseralFile),
+      bislr_payroll_test <- left_join(bislr_payroll_test %>%
+                                   select(-JC_in_UnivseralFile, - PROVIDER),
                                  map_uni_jobcodes %>% 
                                    filter(PAYROLL == 'BISLR') %>%
-                                   select(J.C, PROVIDER, JC_in_UnivseralFile))
+                                   select(J.C, PROVIDER, JC_in_UnivseralFile) %>%
+                                   rename(Job.Code = J.C))
     }
 
     if (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
