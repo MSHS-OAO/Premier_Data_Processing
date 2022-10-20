@@ -29,6 +29,7 @@ productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
 
 dummy_report_ids <- c('DNU_000', 'DNU_MSM000', 'DNU_MSW000')
 
+jc_desc_threshold <- 5
 
   ## Premier Formatting ------------------------------------------------------
   char_len_dpt <- 15
@@ -727,7 +728,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                  distinct())
   
   # 5 is selected because of the DUS_RMV jobcode
-  if (max(jc_desc_check$freq) > 5) {
+  if (max(jc_desc_check$freq) > jc_desc_threshold) {
     showDialog(title = "Jobcode Description Check",
                message = paste("There are a large number of descriptions",
                                "mapped to the same jobcode. ",
