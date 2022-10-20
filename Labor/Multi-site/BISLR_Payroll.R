@@ -734,6 +734,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
   # reporting period average FTEs
   fte_summary <- upload_payroll %>%
+    # reminder to left_join the worked paycode qualifier
     group_by(Facility.Hospital.Id_Worked, DPT.WRKD) %>%
     summarize(FTEs_RP = round(
       sum(Hours, na.rm = TRUE) /
