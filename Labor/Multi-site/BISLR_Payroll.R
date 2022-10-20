@@ -224,6 +224,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
 
   ## Data  --------------------------------------------------------------------
+  row_count <- nrow(raw_payroll)
+  
   bislr_payroll <- raw_payroll %>%
     mutate(DPT.WRKD = paste0(substr(Full.COA.for.Worked,1,3),
                              substr(Full.COA.for.Worked,41,44),
@@ -274,7 +276,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     left_join(map_uni_jobcodes %>% 
                 filter(PAYROLL == 'BISLR') %>%
                 select(J.C, PROVIDER, JC_in_UnivseralFile) %>%
-                rename(Job.Code = J.C)) %>%
+                rename(Job.Code = J.C) %>%
+                unique()) %>%
     left_join(map_uni_paycodes %>% 
                 select(RAW.PAY.CODE, Paycode_in_Universal) %>%
                 rename(Pay.Code = RAW.PAY.CODE)) %>%
@@ -299,6 +302,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                        DPT.WRKD = Cost.Center,
                        WRKJC_in_Dict = JC_in_Dict)) %>%
     mutate(Job.Code_up = substr(Job.Code, 1, 10))
+  
+  if (nrow(bislr_payroll) != row_count) {
+    showDialog(title = "Join error",
+               message = paste("Row count failed at", "upload_payroll"))
+    stop(paste("Row count failed at", "upload_payroll"))
+  }
 
     ## Update Universal Files --------------------------------------------------
     loop <- 0
