@@ -740,14 +740,24 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     left_join(filter_dates) %>%
     filter(!is.na(upload_date)) %>%
     filter(PROVIDER == 0) %>%
-    filter(Department.Name.Worked.Dept == "ACCRUAL COST CENTER") %>%
+    filter(DPT.WRKD %in% accural_legacy_cc) %>%
     group_by(
-      Home.FacilityOR.Hospital.ID, DPT.HOME,
       Facility.Hospital.Id_Worked, DPT.WRKD,
-      Start.Date, End.Date,) %>%
+      Start.Date, End.Date) %>%
     summarize(Hours = sum(Hours, na.rm = TRUE),
               Expense = sum(Expense, na.rm = TRUE)) %>%
     ungroup()
+  
+  # create a detailed view of the accrual depts?
+  # include: what the worked depts were originally mapped to?
+  #  (Worked Dept ID & Worked Dept Name)
+
+  # accrual_raw_detail <- raw_payroll %>%
+  #   filter(DPT.WRKD.LEGACY %in% accural_legacy_cc)
+  # this results in error because the Legacy cost center is created in the
+  # bislr_payroll data.frame
+  # MM: I think we should save off the raw_accrual info in the midst of
+  # pre-processing.
 
 # Visualizations ----------------------------------------------------------
 
