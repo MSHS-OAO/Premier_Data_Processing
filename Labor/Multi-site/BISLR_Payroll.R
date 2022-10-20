@@ -305,8 +305,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   if (nrow(bislr_payroll) != row_count) {
     showDialog(title = "Join error",
-               message = paste("Row count failed at", "upload_payroll"))
-    stop(paste("Row count failed at", "upload_payroll"))
+               message = paste("Row count failed at", "bislr_payroll"))
+    stop(paste("Row count failed at", "bislr_payroll"))
   }
 
     ## Update Universal Files --------------------------------------------------
