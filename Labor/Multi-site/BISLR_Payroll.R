@@ -732,7 +732,19 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
   ## cost center and upload FTE count -------------------------------------
 
-  
+  # reporting period average FTEs
+  fte_summary <- upload_payroll %>%
+    group_by(Facility.Hospital.Id_Worked, DPT.WRKD) %>%
+    summarize(FTEs_RP = round(
+      sum(Hours, na.rm = TRUE) /
+        (37.5 * (as.numeric(distribution_date - dist_prev) / 7)),
+      1)) %>%
+    ungroup() %>%
+    mutate(dist_date = format(distribution_date, "%m/%d/%Y")) %>%
+    relocate(dist_date, .before = FTEs_RP)
+  # is there special handling to consider for the SLW shifted pay periods?
+  # is it better to list every bi-weekly or weekly pay period in order
+  # to get a better sense of the changes that are occurring?
 
   ## 8600 Accrual Site Summary --------------------------------------------
 
