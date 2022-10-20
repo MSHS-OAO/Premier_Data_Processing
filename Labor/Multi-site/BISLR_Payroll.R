@@ -71,15 +71,11 @@ dummy_report_ids <- c('DNU_000', 'DNU_MSM000', 'DNU_MSW000')
                             header = T,
                             sep = '~',
                             fill = T)
-  #departments coming in as numeric doesn't matter as we create
-  #our own cost center column and do not use what is in the raw data anyway
   return(data_recent)
   }
 
 # Import Data -------------------------------------------------------------
 raw_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
-#bislr_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
-  #raw_payroll_export <- bislr_payroll
 
 # Import References -------------------------------------------------------
 pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR,
@@ -267,7 +263,13 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
           paste0(msus_removal_list$`Department IdWHERE Worked`,
                  '-', msus_removal_list$`Employee Name`)
         ~ unique(msus_removal_list$`New Job Code`),
-        TRUE ~ Job.Code)) %>%
+        TRUE ~ Job.Code),
+      Position.Code.Description = case_when(
+        paste0(DPT.WRKD, '-', Employee.Name) %in%
+          paste0(msus_removal_list$`Department IdWHERE Worked`,
+                 '-', msus_removal_list$`Employee Name`)
+        ~ unique(msus_removal_list$`New Job Code Description`),
+        TRUE ~ Position.Code.Description)) %>%
     left_join(pay_cycles_uploaded) %>%
     left_join(map_uni_jobcodes %>% 
                 filter(PAYROLL == 'BISLR') %>%
