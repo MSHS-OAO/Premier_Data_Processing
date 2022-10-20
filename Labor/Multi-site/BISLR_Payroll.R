@@ -414,7 +414,14 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     # is there a method to filter on multiple columns instead of join?
     # reference the DUS_RMV mutate()-case_when() as an example
     # join seems simple/quick enough that we can keep it.
-    left_join(filter_dates)
+    left_join(filter_dates) %>%
+    left_join(
+      select(map_uni_paycodes, RAW.PAY.CODE, PAY.CODE),
+      by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
+    mutate(Pay.Code = PAY.CODE,
+           PAY.CODE = NULL,
+           Start.Date = format(Start.Date, "%m/%d/%Y"),
+           End.Date = format(End.Date, "%m/%d/%Y"))
   if (nrow(upload_payroll) != row_count) {
     showDialog(title = "Join error",
                message = paste("Row count failed at", "upload_payroll"))
@@ -438,26 +445,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     summarize(Hours = sum(Hours, na.rm = TRUE),
               Expense = sum(Expense, na.rm = TRUE)) %>%
     ungroup()
-    
-  row_count <- nrow(upload_payroll)
-  upload_payroll <- upload_payroll %>%
-    # the paycode that is used in Premier needs to be used instead of the
-    # raw paycode, so it needs to be joined in.
-    left_join(
-      select(map_uni_paycodes, RAW.PAY.CODE, PAY.CODE),
-      by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
-    mutate(Pay.Code = PAY.CODE,
-           PAY.CODE = NULL,
-           Start.Date = format(Start.Date, "%m/%d/%Y"),
-           End.Date = format(End.Date, "%m/%d/%Y"))
-  # this will be split into BIB and SLW in the Exporting section
-  
-  if (nrow(upload_payroll) != row_count) {
-    showDialog(title = "Join error",
-               message = paste("Row count failed at", "upload_payroll"))
-    stop(paste("Row count failed at", "upload_payroll"))
-    }
 
+  # upload_payroll will be split into BIB and SLW in the Exporting section
+  
   ## Premier Reference Files -------------------------------------------------
   
   if (NA %in% bislr_payroll$HomeDpt_in_Dict |
