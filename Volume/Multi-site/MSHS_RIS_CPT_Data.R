@@ -151,6 +151,9 @@
   rename(Date = DATE, `Pay Period End Date` = END.DATE) %>%
   select(Date, `Pay Period End Date`) %>%
   drop_na()
+  
+  map_cost_centers <- map_cost_centers %>%
+    filter(`Dummy Cost Center` != "EXCLUDE")
     
   cdm_complete_list <- cdm_msbib %>% 
     mutate(`Premier Site` = '630571') %>%
@@ -253,6 +256,29 @@
   
   ## Quality Charts ----------------------------------------------------------
 
+  
 # Outputs -----------------------------------------------------------------
-
-
+write.csv(msmw_upload,
+          file = paste0('MSMW RIS CPT_',
+                        format(as.Date(min(msmw_upload$`End Date`),
+                                       format = '%m/%d/%Y'),
+                               '%d%b%y'),
+                        ' to ',
+                        format(as.Date(max(msmw_upload$`End Date`),
+                                       format = '%m/%d/%Y'),
+                               '%d%b%y'),
+                        '.csv'),
+          row.names = F,
+          col.names = F)
+  write.csv(msbib_upload,
+            file = paste0('MSBIB RIS CPT_',
+                          format(as.Date(min(msmw_upload$`End Date`),
+                                         format = '%m/%d/%Y'),
+                                 '%d%b%y'),
+                          ' to ',
+                          format(as.Date(max(msmw_upload$`End Date`),
+                                         format = '%m/%d/%Y'),
+                                 '%d%b%y'),
+                          '.csv'),
+            row.names = F,
+            col.names = F)
