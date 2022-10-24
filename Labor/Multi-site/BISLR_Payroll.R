@@ -317,7 +317,11 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
         filter(is.na(JC_in_UnivseralFile)) %>%
         select(Job.Code, Position.Code.Description) %>%
         unique() %>%
-        mutate(JobDescCap = toupper(Position.Code.Description)) %>%
+        mutate(JobDescCap = toupper(Position.Code.Description))
+     
+      row_count <- nrow(new_jobcodes)
+      
+      new_jobcodes <- new_jobcodes %>%
         left_join(map_uni_jobcodes %>%
                     filter(PAYROLL == 'MSHQ') %>%
                     select(J.C.DESCRIPTION, PROVIDER, PREMIER.J.C,
@@ -325,7 +329,14 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                     rename(JobDescCap = J.C.DESCRIPTION)) %>%
         select(-JobDescCap) %>%
         unique()
+      if (nrow(new_jobcodes) != row_count) {
+        showDialog(title = "Join error",
+                   message = paste("Row count failed at", "new_jobcodes"))
+        stop(paste("Row count failed at", "new_jobcodes"))
+      }
+      
       View(new_jobcodes)
+      
       write.csv(new_jobcodes,
                 paste0('New Job Codes for Universal File',
                        if(loop == 1){''}else{paste0('_V',loop)},
@@ -351,12 +362,19 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
         mutate(J.C = str_trim(J.C)) %>%
         mutate(JC_in_UnivseralFile = 1)
       
+      row_count <- nrow(bislr_payroll)
+      
       bislr_payroll <- left_join(bislr_payroll %>%
                                    select(-JC_in_UnivseralFile, - PROVIDER),
                                  map_uni_jobcodes %>% 
                                    filter(PAYROLL == 'BISLR') %>%
                                    select(J.C, PROVIDER, JC_in_UnivseralFile) %>%
                                    rename(Job.Code = J.C))
+      if (nrow(bislr_payroll) != row_count) {
+        showDialog(title = "Join error",
+                   message = paste("Row count failed at", "bislr_payroll"))
+        stop(paste("Row count failed at", "bislr_payroll new job codes"))
+      }
       Sys.sleep(2)
     }
   
