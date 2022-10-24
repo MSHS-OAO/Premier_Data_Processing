@@ -276,8 +276,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     left_join(map_uni_jobcodes %>% 
                 filter(PAYROLL == 'BISLR') %>%
                 select(J.C, PROVIDER, JC_in_UnivseralFile) %>%
-                rename(Job.Code = J.C) %>%
-                unique()) %>%
+                rename(Job.Code = J.C)) %>%
     left_join(map_uni_paycodes %>% 
                 select(RAW.PAY.CODE, Paycode_in_Universal) %>%
                 rename(Pay.Code = RAW.PAY.CODE)) %>%
