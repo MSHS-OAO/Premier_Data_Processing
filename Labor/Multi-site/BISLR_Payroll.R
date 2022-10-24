@@ -372,7 +372,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                    rename(Job.Code = J.C))
       if (nrow(bislr_payroll) != row_count) {
         showDialog(title = "Join error",
-                   message = paste("Row count failed at", "bislr_payroll"))
+                   message = paste("Row count failed at", "bislr_payroll new job codes"))
         stop(paste("Row count failed at", "bislr_payroll new job codes"))
       }
       Sys.sleep(2)
@@ -410,11 +410,18 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       map_uni_paycodes <- map_uni_paycodes %>%
         mutate(Paycode_in_Universal = 1)
       
+      row_count <- nrow(bislr_payroll)
+      
       bislr_payroll <- left_join(bislr_payroll %>%
                                         select(-Paycode_in_Universal),
                                       map_uni_paycodes %>%
                                         select(RAW.PAY.CODE, Paycode_in_Universal) %>%
                                         rename(Pay.Code = RAW.PAY.CODE))
+      if (nrow(bislr_payroll) != row_count) {
+        showDialog(title = "Join error",
+                   message = paste("Row count failed at", "bislr_payroll new pay codes"))
+        stop(paste("Row count failed at", "bislr_payroll new pay codes"))
+      }
       Sys.sleep(2)
     }
   
