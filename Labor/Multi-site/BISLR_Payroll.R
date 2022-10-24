@@ -22,10 +22,6 @@ map_effective_date <- as.Date('2010-01-01')
 # it necessary?
 # Or can we add these to the Universal Report Def file?
 accural_legacy_cc <- c(1109008600, 1109028600, 4409008600, 6409008600) #add other 8600, make quality check for new 8600, id errors non accural oracle but backmapped accural
-# MM: general improvement opportunity:
-# can we update the paycode mapping file to indicate productive vs. non-prod?
-productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
-                        'OTHER_WORKED', 'AGENCY')
 
 dummy_report_ids <- c('DNU_000', 'DNU_MSM000', 'DNU_MSW000')
 
@@ -733,20 +729,63 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   ## cost center and upload FTE count -------------------------------------
 
   # reporting period average FTEs
+  row_count <- nrow(upload_payroll)
   fte_summary <- upload_payroll %>%
-    # reminder to left_join the worked paycode qualifier
+    left_join(map_uni_paycodes %>%
+                select(PAY.CODE, INCLUDE.HOURS, WORKED.PAY.CODE) %>%
+                distinct(),
+              by = c("Pay.Code" = "PAY.CODE"))
+  
+  if (nrow(fte_summary) != row_count) {
+    showDialog(title = "Join error",
+               message = paste("Row count failed at", "fte_summary"))
+    stop(paste("Row count failed at", "fte_summary"))
+  }  
+  
+  fte_summary <- fte_summary %>%
+    filter(INCLUDE.HOURS == 1) %>%
+    mutate(Hours_Worked = WORKED.PAY.CODE * Hours) %>%
     group_by(Facility.Hospital.Id_Worked, DPT.WRKD) %>%
-    summarize(FTEs_RP = round(
-      sum(Hours, na.rm = TRUE) /
-        (37.5 * (as.numeric(distribution_date - dist_prev) / 7)),
-      1)) %>%
+    summarize(
+      work_FTEs_since_prev = round(
+        sum(Hours_Worked, na.rm = TRUE) /
+          (37.5 * (as.numeric(distribution_date - dist_prev) / 7)), 1),
+      paid_FTEs_since_prev = round(
+        sum(Hours, na.rm = TRUE) /
+          (37.5 * (as.numeric(distribution_date - dist_prev) / 7)), 1)
+    ) %>%
     ungroup() %>%
     mutate(dist_date = format(distribution_date, "%m/%d/%Y")) %>%
-    relocate(dist_date, .before = FTEs_RP)
-  # is there special handling to consider for the SLW shifted pay periods?
-  # is it better to list every bi-weekly or weekly pay period in order
-  # to get a better sense of the changes that are occurring?
+    relocate(dist_date, .before = work_FTEs_since_prev)
+  
+  # report def
+  # bring in the previous file and re-join the report dept def
 
+  # THIS COMMENTED CODE NEEDS TO BE REFINED TO WORK:
+    
+  # row_count <- nrow(upload_payroll)
+  # fte_summary <- fte_summary %>%
+  #   mutate(Facility.Hospital.Id_Worked =
+  #            as.integer(Facility.Hospital.Id_Worked)) %>%
+  #   left_join(map_uni_reports %>%
+  #               filter(is.na(CLOSED) & DEPARTMENT.BREAKDOWN == 1) %>%
+  #               select(DEFINITION.CODE, DEFINITION.NAME,
+  #                      ORACLE.COST.CENTER) %>%
+  #               distinct(),
+  #             by = c("DPT.WRKD" = "ORACLE.COST.CENTER"))  %>%
+  #   left_join(rbind(dict_premier_dpt %>%
+  #                     select(-Dpt_in_Dict),
+  #                   upload_dict_dpt) %>%
+  #               select(-Corporation.Code),
+  #             by = c("Facility.Hospital.Id_Worked" = "Site",
+  #                    "DPT.WRKD" = "Cost.Center"))
+  # 
+  # if (nrow(fte_summary) != row_count) {
+  #   showDialog(title = "Join error",
+  #              message = paste("Row count failed at", "fte_summary"))
+  #   stop(paste("Row count failed at", "fte_summary"))
+  # } 
+  
   ## 8600 Accrual Site Summary --------------------------------------------
 
   accrual_summary <- bislr_payroll %>%
@@ -766,7 +805,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   #  (Worked Dept ID & Worked Dept Name)
 
   # accrual_raw_detail <- raw_payroll %>%
-  #   filter(DPT.WRKD.LEGACY %in% accural_legacy_cc)
+  #   filter(TBD)
   # this results in error because the Legacy cost center is created in the
   # bislr_payroll data.frame
   # MM: I think we should save off the raw_accrual info in the midst of
