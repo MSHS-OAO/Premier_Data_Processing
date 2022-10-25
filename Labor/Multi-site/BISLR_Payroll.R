@@ -758,33 +758,73 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     mutate(dist_date = format(distribution_date, "%m/%d/%Y")) %>%
     relocate(dist_date, .before = work_FTEs_since_prev)
   
-  # report def
+  ###
   # bring in the previous file and re-join the report dept def
+  ###
 
-  # THIS COMMENTED CODE NEEDS TO BE REFINED TO WORK:
+  # needs file location
+  # fte_summary_hist <- readRDS()
+  
+  # if(max(fte_summary_hist$dist_date) > max(fte_summary$dist_date)) {
+  #   fte_summary_all <- rbind(fte_summary, fte_summary_hist)
+  #   
+  #   # needs file location
+  #   # saveRDS(fte_summary_all, )
+  #   
+  #   
+  # } else {
+  #   showDialog(title = "Trend error",
+  #              message = paste("FTE Trend is not updated because",
+  #                              "of a date conflict in data.")))
+  # }
     
-  # row_count <- nrow(upload_payroll)
-  # fte_summary <- fte_summary %>%
-  #   mutate(Facility.Hospital.Id_Worked =
-  #            as.integer(Facility.Hospital.Id_Worked)) %>%
-  #   left_join(map_uni_reports %>%
-  #               filter(is.na(CLOSED) & DEPARTMENT.BREAKDOWN == 1) %>%
-  #               select(DEFINITION.CODE, DEFINITION.NAME,
-  #                      ORACLE.COST.CENTER) %>%
-  #               distinct(),
-  #             by = c("DPT.WRKD" = "ORACLE.COST.CENTER"))  %>%
-  #   left_join(rbind(dict_premier_dpt %>%
-  #                     select(-Dpt_in_Dict),
-  #                   upload_dict_dpt) %>%
-  #               select(-Corporation.Code),
-  #             by = c("Facility.Hospital.Id_Worked" = "Site",
-  #                    "DPT.WRKD" = "Cost.Center"))
+  row_count <- nrow(fte_summary)
+  fte_summary <- fte_summary %>%
+    left_join(map_uni_reports %>%
+                filter(is.na(CLOSED) & DEPARTMENT.BREAKDOWN == 1) %>%
+                select(DEFINITION.CODE, DEFINITION.NAME,
+                       ORACLE.COST.CENTER) %>%
+                distinct(),
+              by = c("DPT.WRKD" = "ORACLE.COST.CENTER"))  %>%
+    left_join(rbind(dict_premier_dpt %>%
+                      select(-Dpt_in_Dict),
+                    upload_dict_dpt) %>%
+                select(-Corporation.Code),
+              by = c("Facility.Hospital.Id_Worked" = "Site",
+                     "DPT.WRKD" = "Cost.Center")) %>%
+    relocate(Cost.Center.Description, .after = DPT.WRKD) %>%
+    relocate(dist_date, work_FTEs_since_prev, paid_FTEs_since_prev,
+             .after = DEFINITION.NAME)
+
+  if (nrow(fte_summary) != row_count) {
+    showDialog(title = "Join error",
+               message = paste("Row count failed at", "fte_summary"))
+    stop(paste("Row count failed at", "fte_summary"))
+  }
+  
+  # fte_trend_work <- fte_summary %>%
+  #   pivot_wider()
+  # %>%
+  #   mutate(diff = new - old,
+  #          diff_pct = (new - old) / old)
   # 
-  # if (nrow(fte_summary) != row_count) {
-  #   showDialog(title = "Join error",
-  #              message = paste("Row count failed at", "fte_summary"))
-  #   stop(paste("Row count failed at", "fte_summary"))
-  # } 
+  # fte_trend_paid <- fte_summary %>%
+  #   pivot_wider()
+  # %>%
+  #   mutate(diff = new - old,
+  #          diff_pct = (new - old) / old)
+  
+  # write.table(fte_trend_work,
+  #             file = "fte_trend_work.csv",
+  #             row.names = FALSE,
+  #             append = FALSE,
+  #             sep = ",")
+  
+  # write.table(fte_trend_paid,
+  #             file = "fte_trend_work.csv",
+  #             row.names = FALSE,
+  #             append = FALSE,
+  #             sep = ",")
   
   ## 8600 Accrual Site Summary --------------------------------------------
 
