@@ -762,6 +762,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   # bring in the previous file and re-join the report dept def
   ###
 
+  # read this file in during import
   # needs file location
   # fte_summary_hist <- readRDS()
   
@@ -802,11 +803,37 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     stop(paste("Row count failed at", "fte_summary"))
   }
   
-  # fte_trend_work <- fte_summary %>%
-  #   pivot_wider()
+  # fte_summary <- fte_summary %>%
+  #   arrange(as.Date(dist_date, "%m/%d/%Y")) %>%
+  #   bind_rows(summarize(group_by(., Facility.Hospital.Id_Worked, End.Date),
+  #                       Hours = sum(Hours, na.rm = TRUE),
+  #                       dist_date = "latest_diff")) %>%
+  #   bind_rows(summarize(group_by(filter(., Payroll.Name == "-SITE TOTAL-"),
+  #                                End.Date),
+  #                       Hours = sum(Hours, na.rm = TRUE),
+  #                       dist_date = "latest_diff_%"))) %>%
+  #   arrange(Facility.Hospital.Id_Worked, Payroll.Name,
+  #           as.Date(End.Date, "%m/%d/%Y")) %>%
+  #   mutate(Hours = prettyNum(Hours, big.mark = ",")) %>%
+  #   pivot_wider(names_from = End.Date,
+  #               values_from = Hours)
+  
+  fte_trend_work <- fte_summary %>%
+    arrange(as.Date(dist_date, "%m/%d/%Y")) %>%
+    pivot_wider(
+      id_cols = c(Facility.Hospital.Id_Worked,
+                  DPT.WRKD, Cost.Center.Description,
+                  DEFINITION.CODE, DEFINITION.NAME),
+      values_from = work_FTEs_since_prev,
+      names_from = dist_date
+    )
   # %>%
   #   mutate(diff = new - old,
   #          diff_pct = (new - old) / old)
+  # how to reference columns by names that change?
+  # or reference by column location (last and 2nd to last)
+  # will 0 need to be filled in for NA for math to work?
+  
   # 
   # fte_trend_paid <- fte_summary %>%
   #   pivot_wider()
