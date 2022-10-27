@@ -26,9 +26,8 @@ accural_legacy_cc <- c(1109008600, 1109028600, 4409008600, 6409008600) #add othe
 # can we update the paycode mapping file to indicate productive vs. non-prod?
 productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
                         'OTHER_WORKED', 'AGENCY')
-
+accural_report_ids <- c('DNU_8600')
 dummy_report_ids <- c('DNU_000', 'DNU_MSM000', 'DNU_MSW000')
-
 
   ## Premier Formatting ------------------------------------------------------
   char_len_dpt <- 15
@@ -258,10 +257,14 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
         trimws(Department.Name.Home.Dept) == "" ~ as.character(Department.ID.Home.Department),
         TRUE ~ DPT.HOME)) %>%
     mutate(DPT.WRKD = case_when(
-      DPT.WRKD.LEGACY %in% accural_legacy_cc ~ DPT.WRKD.LEGACY,
+      DPT.WRKD.LEGACY %in% subset(report_list,
+                                  Report.ID %in% accural_report_ids, 
+                                  select = Cost.Center) ~ DPT.WRKD.LEGACY,
       TRUE ~ DPT.WRKD),
       Department.Name.Worked.Dept = case_when(
-        DPT.WRKD.LEGACY %in% accural_legacy_cc ~ "ACCRUAL COST CENTER",
+        DPT.WRKD.LEGACY %in% subset(report_list,
+                                    Report.ID %in% accural_report_ids, 
+                                    select = Cost.Center) ~ "ACCRUAL COST CENTER",
         TRUE ~ Department.Name.Worked.Dept),
       Job.Code = case_when(
         paste0(DPT.WRKD, '-', Employee.Name) %in%
