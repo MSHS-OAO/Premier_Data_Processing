@@ -330,11 +330,15 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   #Paycycles to filter on
   filter_dates <- bislr_payroll %>%
-    filter(is.na(Pay_Cycle_Uploaded)) %>%
+    # filter commented out for generating historical
+    # fte_summary file
+    # filter(is.na(Pay_Cycle_Uploaded)) %>%
     select(Start.Date, End.Date) %>%
     unique() %>%
     arrange(Start.Date) %>%
-    filter(End.Date > dist_prev,
+    # End.Date changed to Start.Date for generating historical
+    # fte_summary file
+    filter(Start.Date > dist_prev,
            !Start.Date > distribution_date) %>%
     mutate(upload_date = 1)
   
@@ -747,37 +751,37 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     mutate(Hours_Worked = WORKED.PAY.CODE * Hours) %>%
     group_by(Facility.Hospital.Id_Worked, DPT.WRKD) %>%
     summarize(
-      work_FTEs_since_prev = round(
+      Avg_FTEs_worked = round(
         sum(Hours_Worked, na.rm = TRUE) /
           (37.5 * (as.numeric(distribution_date - dist_prev) / 7)), 1),
-      paid_FTEs_since_prev = round(
+      Avg_FTEs_paid = round(
         sum(Hours, na.rm = TRUE) /
           (37.5 * (as.numeric(distribution_date - dist_prev) / 7)), 1)
     ) %>%
     ungroup() %>%
     mutate(dist_date = format(distribution_date, "%m/%d/%Y")) %>%
-    relocate(dist_date, .before = work_FTEs_since_prev)
+    relocate(dist_date, .before = Avg_FTEs_worked)
   
   ###
-  # bring in the previous file and re-join the report dept def
+  # need to check to confirm that it's appropriate to write to the file
+  # (e.g. are we adding extra rows for the same distribution date?)
+  # for debugging purposes, it could be good to have a timestamp column
+  # so we can delete out rows that have been added for a single distribution
+  # date multiple times
   ###
-
-  # read this file in during import
-  # needs file location
-  # fte_summary_hist <- readRDS()
   
-  # if(max(fte_summary_hist$dist_date) > max(fte_summary$dist_date)) {
-  #   fte_summary_all <- rbind(fte_summary, fte_summary_hist)
-  #   
-  #   # needs file location
-  #   # saveRDS(fte_summary_all, )
-  #   
-  #   
-  # } else {
-  #   showDialog(title = "Trend error",
-  #              message = paste("FTE Trend is not updated because",
-  #                              "of a date conflict in data.")))
-  # }
+  fte_summary_path <- paste0("//researchsan02b/shr2/deans/Presidents/",
+                             "SixSigma/MSHS Productivity/Productivity/",
+                             "Labor - Data/Multi-site/BISLR/Quality Checks/")
+  
+  fte_summary <- rbind(fte_summary,
+                       read.xlsx2(file = paste0(fte_summary_path,
+                                                "fte_summary.xlsx"),
+                                  colClasses = c(rep("character", 6),
+                                                 rep("numeric", 2)),
+                                  sheetName = "fte_summary") %>%
+                         select(-Cost.Center.Description,
+                                -DEFINITION.CODE, -DEFINITION.NAME))
     
   row_count <- nrow(fte_summary)
   fte_summary <- fte_summary %>%
@@ -794,7 +798,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
               by = c("Facility.Hospital.Id_Worked" = "Site",
                      "DPT.WRKD" = "Cost.Center")) %>%
     relocate(Cost.Center.Description, .after = DPT.WRKD) %>%
-    relocate(dist_date, work_FTEs_since_prev, paid_FTEs_since_prev,
+    relocate(dist_date, Avg_FTEs_worked, Avg_FTEs_paid,
              .after = DEFINITION.NAME)
 
   if (nrow(fte_summary) != row_count) {
@@ -803,55 +807,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     stop(paste("Row count failed at", "fte_summary"))
   }
   
-  # fte_summary <- fte_summary %>%
-  #   arrange(as.Date(dist_date, "%m/%d/%Y")) %>%
-  #   bind_rows(summarize(group_by(., Facility.Hospital.Id_Worked, End.Date),
-  #                       Hours = sum(Hours, na.rm = TRUE),
-  #                       dist_date = "latest_diff")) %>%
-  #   bind_rows(summarize(group_by(filter(., Payroll.Name == "-SITE TOTAL-"),
-  #                                End.Date),
-  #                       Hours = sum(Hours, na.rm = TRUE),
-  #                       dist_date = "latest_diff_%"))) %>%
-  #   arrange(Facility.Hospital.Id_Worked, Payroll.Name,
-  #           as.Date(End.Date, "%m/%d/%Y")) %>%
-  #   mutate(Hours = prettyNum(Hours, big.mark = ",")) %>%
-  #   pivot_wider(names_from = End.Date,
-  #               values_from = Hours)
-  
-  fte_trend_work <- fte_summary %>%
-    arrange(as.Date(dist_date, "%m/%d/%Y")) %>%
-    pivot_wider(
-      id_cols = c(Facility.Hospital.Id_Worked,
-                  DPT.WRKD, Cost.Center.Description,
-                  DEFINITION.CODE, DEFINITION.NAME),
-      values_from = work_FTEs_since_prev,
-      names_from = dist_date
-    )
-  # %>%
-  #   mutate(diff = new - old,
-  #          diff_pct = (new - old) / old)
-  # how to reference columns by names that change?
-  # or reference by column location (last and 2nd to last)
-  # will 0 need to be filled in for NA for math to work?
-  
-  # 
-  # fte_trend_paid <- fte_summary %>%
-  #   pivot_wider()
-  # %>%
-  #   mutate(diff = new - old,
-  #          diff_pct = (new - old) / old)
-  
-  # write.table(fte_trend_work,
-  #             file = "fte_trend_work.csv",
-  #             row.names = FALSE,
-  #             append = FALSE,
-  #             sep = ",")
-  
-  # write.table(fte_trend_paid,
-  #             file = "fte_trend_work.csv",
-  #             row.names = FALSE,
-  #             append = FALSE,
-  #             sep = ",")
+  write.xlsx2(as.data.frame(fte_summary),
+              file = paste0(fte_summary_path,"fte_summary.xlsx"),
+              row.names = F,
+              sheetName = "fte_summary",
+              append = TRUE)
+
   
   ## 8600 Accrual Site Summary --------------------------------------------
 
