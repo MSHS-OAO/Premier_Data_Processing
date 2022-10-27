@@ -15,13 +15,6 @@ dir_universal <- paste0(dir, '/Universal Data')
 # Constants ---------------------------------------------------------------
 new_dpt_map <- 10095
 map_effective_date <- as.Date('2010-01-01')
-# MM: can we just look at the 4-digit department and look for 8600?
-# (e.g. look at the 4 right digits of the legacy cost cost center)
-# or can we put these values from the department dictionary?
-# having a check for new 8600 accrual depts is a good idea, but is
-# it necessary?
-# Or can we add these to the Universal Report Def file?
-accural_legacy_cc <- c(1109008600, 1109028600, 4409008600, 6409008600) #add other 8600, make quality check for new 8600, id errors non accural oracle but backmapped accural
 # MM: general improvement opportunity:
 # can we update the paycode mapping file to indicate productive vs. non-prod?
 productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
@@ -685,11 +678,13 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            DPT.HOME,
            DPT.WRKD) %>%
     left_join(report_list %>%
+                filter(Report.ID %in% dummy_report_ids) %>%
                 select(Site, Cost.Center) %>%
                 rename(Facility.Hospital.Id_Worked = Site,
                        DPT.WRKD = Cost.Center) %>%
                 mutate(WRKD.DPT.in.Report = 1)) %>%
     left_join(report_list %>%
+                filter(Report.ID %in% dummy_report_ids) %>%
                 select(Site, Cost.Center) %>%
                 rename(Home.FacilityOR.Hospital.ID = Site,
                        DPT.HOME = Cost.Center) %>%
