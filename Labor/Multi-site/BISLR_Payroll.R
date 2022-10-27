@@ -781,12 +781,16 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                                  rep("numeric", 2)),
                                   sheetName = "fte_summary") %>%
                          select(-Cost.Center.Description,
+                                # if the Service Line column is included
+                                # will need to be sure to exclude it
+                                # as well
                                 -DEFINITION.CODE, -DEFINITION.NAME))
     
   row_count <- nrow(fte_summary)
   fte_summary <- fte_summary %>%
     left_join(map_uni_reports %>%
                 filter(is.na(CLOSED) & DEPARTMENT.BREAKDOWN == 1) %>%
+                # do we want to pull in the Service Line column?
                 select(DEFINITION.CODE, DEFINITION.NAME,
                        ORACLE.COST.CENTER) %>%
                 distinct(),
