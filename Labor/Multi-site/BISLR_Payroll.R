@@ -732,7 +732,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
   ## cost center and upload FTE count -------------------------------------
 
-  # reporting period average FTEs
+  # average FTEs since previous distribution
+  
+  # need Pay Code info to get appropriate hours
   row_count <- nrow(upload_payroll)
   fte_summary <- upload_payroll %>%
     left_join(map_uni_paycodes %>%
@@ -760,15 +762,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     ) %>%
     ungroup() %>%
     mutate(dist_date = format(distribution_date, "%m/%d/%Y")) %>%
-    relocate(dist_date, .before = Avg_FTEs_worked)
-  
-  ###
-  # need to check to confirm that it's appropriate to write to the file
-  # (e.g. are we adding extra rows for the same distribution date?)
-  # for debugging purposes, it could be good to have a timestamp column
-  # so we can delete out rows that have been added for a single distribution
-  # date multiple times
-  ###
+    relocate(dist_date, .before = Avg_FTEs_worked) %>%
+    mutate(capture_time = as.character(Sys.time()))
   
   fte_summary_path <- paste0("//researchsan02b/shr2/deans/Presidents/",
                              "SixSigma/MSHS Productivity/Productivity/",
@@ -777,22 +772,35 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   fte_summary <- rbind(fte_summary,
                        read.xlsx2(file = paste0(fte_summary_path,
                                                 "fte_summary.xlsx"),
-                                  colClasses = c(rep("character", 6),
-                                                 rep("numeric", 2)),
+                                  colClasses = c(rep("character", 9),
+                                                 rep("numeric", 2),
+                                                 "character"),
                                   sheetName = "fte_summary") %>%
-                         select(-Cost.Center.Description,
-                                # if the Service Line column is included
-                                # will need to be sure to exclude it
-                                # as well
-                                -DEFINITION.CODE, -DEFINITION.NAME))
-    
+                         select(Facility.Hospital.Id_Worked, DPT.WRKD,
+                                dist_date, Avg_FTEs_worked, Avg_FTEs_paid,
+                                capture_time))
+
+  if (fte_summary %>% select(dist_date) %>%
+      distinct() %>% nrow() != 
+      fte_summary %>% select(dist_date, capture_time) %>%
+      distinct() %>% nrow()) {
+    showDialog(title = "Warning",
+               message = paste("You are liking appending rows to",
+                               "the fte_summary file for a distribution",
+                               "period that already exists in the file."))
+    stop(paste("You are liking appending rows to",
+               "the fte_summary file for a distribution",
+               "period that already exists in the file."))
+  }
+  
   row_count <- nrow(fte_summary)
   fte_summary <- fte_summary %>%
     left_join(map_uni_reports %>%
                 filter(is.na(CLOSED) & DEPARTMENT.BREAKDOWN == 1) %>%
-                # do we want to pull in the Service Line column?
                 select(DEFINITION.CODE, DEFINITION.NAME,
-                       ORACLE.COST.CENTER) %>%
+                       ORACLE.COST.CENTER,
+                       SERVICE.LINE, CORPORATE.SERVICE.LINE,
+                       VP) %>%
                 distinct(),
               by = c("DPT.WRKD" = "ORACLE.COST.CENTER"))  %>%
     left_join(rbind(dict_premier_dpt %>%
@@ -801,9 +809,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                 select(-Corporation.Code),
               by = c("Facility.Hospital.Id_Worked" = "Site",
                      "DPT.WRKD" = "Cost.Center")) %>%
-    relocate(Cost.Center.Description, .after = DPT.WRKD) %>%
-    relocate(dist_date, Avg_FTEs_worked, Avg_FTEs_paid,
-             .after = DEFINITION.NAME)
+    select(Facility.Hospital.Id_Worked, DPT.WRKD, Cost.Center.Description,
+           DEFINITION.CODE, DEFINITION.NAME, SERVICE.LINE,
+           CORPORATE.SERVICE.LINE, VP, dist_date,
+           Avg_FTEs_worked, Avg_FTEs_paid, capture_time)
+    # Any preference on the arrangement order of columns?
+    # arrange()
 
   if (nrow(fte_summary) != row_count) {
     showDialog(title = "Join error",
@@ -811,6 +822,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     stop(paste("Row count failed at", "fte_summary"))
   }
   
+  file.remove(paste0(fte_summary_path,"fte_summary.xlsx"))
   write.xlsx2(as.data.frame(fte_summary),
               file = paste0(fte_summary_path,"fte_summary.xlsx"),
               row.names = F,
