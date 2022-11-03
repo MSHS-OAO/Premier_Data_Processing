@@ -68,15 +68,11 @@ jc_desc_threshold <- 5
                             header = T,
                             sep = '~',
                             fill = T)
-  #departments coming in as numeric doesn't matter as we create
-  #our own cost center column and do not use what is in the raw data anyway
   return(data_recent)
   }
 
 # Import Data -------------------------------------------------------------
 raw_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
-#bislr_payroll <- import_recent_file(paste0(dir_BISLR, '/Source Data'), 1)
-  #raw_payroll_export <- bislr_payroll
 
 # Import References -------------------------------------------------------
 pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR,
@@ -199,7 +195,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     which(dist_dates$END.DATE == distribution_date) - 1]
 
   ## Site Hours Quality Check ------------------------------------------------
-  
   piv_wide_check <- raw_payroll %>%
     filter(as.Date(End.Date, "%m/%d/%Y") >= dist_prev &
              as.Date(End.Date, "%m/%d/%Y") <= distribution_date +
@@ -226,6 +221,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
 
   ## Data  --------------------------------------------------------------------
+  row_count <- nrow(raw_payroll)
   
   bislr_payroll <- raw_payroll %>%
     mutate(DPT.WRKD = paste0(substr(Full.COA.for.Worked,1,3),
@@ -250,6 +246,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            Job.Code = str_trim(Job.Code),
            Position.Code.Description = str_trim(Position.Code.Description)) %>%
     mutate(DPT.WRKD = case_when(
+      trimws(Department.Name.Worked.Dept) == "" ~ as.character(Department.IdWHERE.Worked),
+      TRUE ~ DPT.WRKD),
+      DPT.HOME = case_when(
+        trimws(Department.Name.Home.Dept) == "" ~ as.character(Department.ID.Home.Department),
+        TRUE ~ DPT.HOME)) %>%
+    mutate(DPT.WRKD = case_when(
       DPT.WRKD.LEGACY %in% accural_legacy_cc ~ DPT.WRKD.LEGACY,
       TRUE ~ DPT.WRKD),
       Department.Name.Worked.Dept = case_when(
@@ -260,7 +262,13 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
           paste0(msus_removal_list$`Department IdWHERE Worked`,
                  '-', msus_removal_list$`Employee Name`)
         ~ unique(msus_removal_list$`New Job Code`),
-        TRUE ~ Job.Code)) %>%
+        TRUE ~ Job.Code),
+      Position.Code.Description = case_when(
+        paste0(DPT.WRKD, '-', Employee.Name) %in%
+          paste0(msus_removal_list$`Department IdWHERE Worked`,
+                 '-', msus_removal_list$`Employee Name`)
+        ~ unique(msus_removal_list$`New Job Code Description`),
+        TRUE ~ Position.Code.Description)) %>%
     left_join(pay_cycles_uploaded) %>%
     left_join(map_uni_jobcodes %>% 
                 filter(PAYROLL == 'BISLR') %>%
@@ -290,15 +298,26 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                        DPT.WRKD = Cost.Center,
                        WRKJC_in_Dict = JC_in_Dict)) %>%
     mutate(Job.Code_up = substr(Job.Code, 1, 10))
-
+  
+  if (nrow(bislr_payroll) != row_count) {
+    showDialog(title = "Join error",
+               message = paste("Row count failed at", "bislr_payroll"))
+    stop(paste("Row count failed at", "bislr_payroll"))
+  }
 
     ## Update Universal Files --------------------------------------------------
-    if (NA %in% unique(bislr_payroll$JC_in_UnivseralFile)) {
+    loop <- 0
+    while (NA %in% unique(bislr_payroll$JC_in_UnivseralFile)) {
+      loop <- loop + 1
       new_jobcodes <- bislr_payroll %>%
         filter(is.na(JC_in_UnivseralFile)) %>%
         select(Job.Code, Position.Code.Description) %>%
         unique() %>%
-        mutate(JobDescCap = toupper(Position.Code.Description)) %>%
+        mutate(JobDescCap = toupper(Position.Code.Description))
+     
+      row_count <- nrow(new_jobcodes)
+      
+      new_jobcodes <- new_jobcodes %>%
         left_join(map_uni_jobcodes %>%
                     filter(PAYROLL == 'MSHQ') %>%
                     select(J.C.DESCRIPTION, PROVIDER, PREMIER.J.C,
@@ -306,26 +325,100 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                     rename(JobDescCap = J.C.DESCRIPTION)) %>%
         select(-JobDescCap) %>%
         unique()
+      if (nrow(new_jobcodes) != row_count) {
+        showDialog(title = "Join error",
+                   message = paste("Row count failed at", "new_jobcodes"))
+        stop(paste("Row count failed at", "new_jobcodes"))
+      }
+      
       View(new_jobcodes)
-      write.csv(new_jobcodes, 'New Job Codes for Universal File.csv')
       
- 
-      # if not all have a recommendation from MSHQ, we could look in BISLR
-      # because there are times when the name is the same but the jobcode is
-      # different
-      
-      stop('New job codes detected, update universal job code dictionary before continuing to run code')
-    }
+      write.csv(new_jobcodes,
+                paste0('New Job Codes for Universal File',
+                       if(loop == 1){''}else{paste0('_V',loop)},
+                       '.csv'))
 
-    if (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
+      showQuestion(
+        title = 'Warning',
+        message = paste0(if(loop == 1){
+          'New job codes detected! \n'}else{
+            'There are still new job codes. \n'
+            },
+                         'Update Universal Job Code File before continuing. \n',
+                         '\n Have new jobs been added?',
+          '\n \n If you want to quit running the code select no \n',
+          ' then click the stop code button in the console'),
+        ok = 'Yes',
+        cancel = 'No')
+      
+      map_uni_jobcodes <- read_xlsx(paste0(dir_universal,
+                                           '/Mapping/MSHS_Jobcode_Mapping.xlsx'),
+                                    sheet = 1)
+      map_uni_jobcodes <- map_uni_jobcodes %>%
+        mutate(J.C = str_trim(J.C)) %>%
+        mutate(JC_in_UnivseralFile = 1)
+      
+      row_count <- nrow(bislr_payroll)
+      
+      bislr_payroll <- left_join(bislr_payroll %>%
+                                   select(-JC_in_UnivseralFile, - PROVIDER),
+                                 map_uni_jobcodes %>% 
+                                   filter(PAYROLL == 'BISLR') %>%
+                                   select(J.C, PROVIDER, JC_in_UnivseralFile) %>%
+                                   rename(Job.Code = J.C))
+      if (nrow(bislr_payroll) != row_count) {
+        showDialog(title = "Join error",
+                   message = paste("Row count failed at", "bislr_payroll new job codes"))
+        stop(paste("Row count failed at", "bislr_payroll new job codes"))
+      }
+      Sys.sleep(2)
+    }
+  
+    loop <- 0
+    while (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
+      loop <- loop + 1
       new_paycodes <- bislr_payroll %>%
         filter(is.na(Paycode_in_Universal)) %>%
         select(Facility.Hospital.Id_Worked, Pay.Code) %>%
-        unique() %>%
+        unique()
       View(new_paycodes)
-      write.csv(new_paycodes, 'New Pay Codes for Universal File.csv')
-      stop(paste0('New pay codes detected, update universal job code dictionary before continuing',
-                  'Continue running code from line TBD.'))
+      write.csv(new_paycodes,
+                paste0('New Pay Codes for Universal File',
+                       if(loop == 1){''}else{paste0('_V',loop)},
+                       '.csv'))
+      
+      showQuestion(
+        title = 'Warning',
+        message = paste0(if(loop == 1){
+          'New pay codes detected! \n'}else{
+            'There are still new pay codes. \n'
+          },
+          'Update Universal Pay Code File before continuing. \n',
+          '\n Have new pay codes been added?',
+          '\n \n If you want to quit running the code select no \n',
+          ' then click the stop code button in the console'),
+        ok = 'Yes',
+        cancel = 'No')
+      
+      map_uni_paycodes <- read_xlsx(paste0(dir_universal,
+                                           '/Mapping/MSHS_Paycode_Mapping.xlsx'),
+                                    sheet = 1)
+      map_uni_paycodes <- map_uni_paycodes %>%
+        mutate(Paycode_in_Universal = 1)
+      
+      row_count <- nrow(bislr_payroll)
+      
+      bislr_payroll <- left_join(bislr_payroll %>%
+                                        select(-Paycode_in_Universal),
+                                      map_uni_paycodes %>%
+                                        select(RAW.PAY.CODE, Paycode_in_Universal) %>%
+                                        rename(Pay.Code = RAW.PAY.CODE))
+      if (nrow(bislr_payroll) != row_count) {
+        showDialog(title = "Join error",
+                   message = paste("Row count failed at", "bislr_payroll new pay codes"))
+        stop(paste("Row count failed at", "bislr_payroll new pay codes"))
+      }
+      Sys.sleep(2)
     }
   
   #Paycycles to filter on
