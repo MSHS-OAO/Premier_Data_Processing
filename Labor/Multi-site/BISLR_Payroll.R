@@ -822,12 +822,18 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     stop(paste("Row count failed at", "fte_summary"))
   }
   
-  file.remove(paste0(fte_summary_path,"fte_summary.xlsx"))
-  write.xlsx2(as.data.frame(fte_summary),
-              file = paste0(fte_summary_path,"fte_summary.xlsx"),
-              row.names = F,
-              sheetName = "fte_summary",
-              append = TRUE)
+  # we can limit the number of distributions included in the fte_summary
+  # or the visuals can limit the data displayed based on the excel
+  # file
+  
+  # re-writing the file will need to be refined and likely located to a
+  # different section
+  # file.remove(paste0(fte_summary_path,"fte_summary.xlsx"))
+  # write.xlsx2(as.data.frame(fte_summary),
+  #             file = paste0(fte_summary_path,"fte_summary.xlsx"),
+  #             row.names = F,
+  #             sheetName = "fte_summary",
+  #             append = FALSE)
 
   
   ## 8600 Accrual Site Summary --------------------------------------------
