@@ -15,14 +15,11 @@ dir_universal <- paste0(dir, '/Universal Data')
 # Constants ---------------------------------------------------------------
 new_dpt_map <- 10095
 map_effective_date <- as.Date('2010-01-01')
-# MM: can we just look at the 4-digit department and look for 8600?
-# (e.g. look at the 4 right digits of the legacy cost cost center)
-# or can we put these values from the department dictionary?
-# having a check for new 8600 accrual depts is a good idea, but is
-# it necessary?
-# Or can we add these to the Universal Report Def file?
-accural_legacy_cc <- c(1109008600, 1109028600, 4409008600, 6409008600) #add other 8600, make quality check for new 8600, id errors non accural oracle but backmapped accural
-
+# MM: general improvement opportunity:
+# can we update the paycode mapping file to indicate productive vs. non-prod?
+productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
+                        'OTHER_WORKED', 'AGENCY')
+accural_report_ids <- c('DNU_8600')
 dummy_report_ids <- c('DNU_000', 'DNU_MSM000', 'DNU_MSW000')
 
 jc_desc_threshold <- 5
@@ -163,21 +160,24 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            Dpt_in_Dict = 1)
   dict_premier_jobcode <- dict_premier_jobcode %>%
     mutate(JC_in_Dict = 1)
-  
-  dummy_reports <- dict_premier_report %>%
-    filter(Report.ID %in% dummy_report_ids) 
-  dummy_reports_dept <- str_split(dummy_reports$Cost.Center,
-                                  pattern = ':',
-                                  simplify = T) %>%
+
+  reports_dept <- str_split(dict_premier_report$Cost.Center,
+                            pattern = ':',
+                            simplify = T) %>%
     as.data.frame()
-  dummy_report_list <- lapply(1:nrow(dummy_reports_dept),
-                              function(x) pivot_longer(dummy_reports_dept[x,],
-                                                       cols = everything()))
-  dummy_report_list  <- lapply(1:length(dummy_report_list),
-                               function(x) mutate(dummy_report_list[[x]],
-                                                  Site = dummy_reports$Site[x]))
-  dummy_report_list  <- do.call(rbind, dummy_report_list) %>%
-    rename(Cost.Center = value) 
+  report_list <- lapply(1:nrow(reports_dept),
+                        function(x) pivot_longer(reports_dept[x,],
+                                                 cols = everything()))
+  report_list <- lapply(1:length(report_list),
+                        function(x) subset(report_list[[x]], value != ""))
+  report_list <- lapply(1:length(report_list),
+                         function(x) mutate(report_list[[x]],
+                                            Site = dict_premier_report$Site[x],
+                                            Report.ID = dict_premier_report$Report.ID[x],
+                                            Effective.Date = dict_premier_report$Effective.Date[x]))
+  report_list <- do.call(rbind, report_list) %>%
+    rename(Cost.Center = value) %>%
+    select(-name)
 
   dist_dates <- map_uni_paycycles %>%
     select(END.DATE, PREMIER.DISTRIBUTION) %>%
@@ -252,10 +252,14 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
         trimws(Department.Name.Home.Dept) == "" ~ as.character(Department.ID.Home.Department),
         TRUE ~ DPT.HOME)) %>%
     mutate(DPT.WRKD = case_when(
-      DPT.WRKD.LEGACY %in% accural_legacy_cc ~ DPT.WRKD.LEGACY,
+      DPT.WRKD.LEGACY %in% subset(report_list,
+                                  Report.ID %in% accural_report_ids, 
+                                  select = Cost.Center) ~ DPT.WRKD.LEGACY,
       TRUE ~ DPT.WRKD),
       Department.Name.Worked.Dept = case_when(
-        DPT.WRKD.LEGACY %in% accural_legacy_cc ~ "ACCRUAL COST CENTER",
+        DPT.WRKD.LEGACY %in% subset(report_list,
+                                    Report.ID %in% accural_report_ids, 
+                                    select = Cost.Center) ~ "ACCRUAL COST CENTER",
         TRUE ~ Department.Name.Worked.Dept),
       Job.Code = case_when(
         paste0(DPT.WRKD, '-', Employee.Name) %in%
@@ -771,20 +775,26 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     select(Home.FacilityOR.Hospital.ID,
            DPT.HOME,
            DPT.WRKD) %>%
-    left_join(map_uni_reports %>%
-                select(ORACLE.COST.CENTER) %>%
-                rename(DPT.WRKD = ORACLE.COST.CENTER) %>%
+    left_join(report_list %>%
+                filter(Report.ID %in% dummy_report_ids) %>%
+                select(Site, Cost.Center) %>%
+                rename(Facility.Hospital.Id_Worked = Site,
+                       DPT.WRKD = Cost.Center) %>%
                 mutate(WRKD.DPT.in.Report = 1)) %>%
-    left_join(map_uni_reports %>%
-                select(ORACLE.COST.CENTER) %>%
-                rename(DPT.HOME = ORACLE.COST.CENTER) %>%
+    left_join(report_list %>%
+                filter(Report.ID %in% dummy_report_ids) %>%
+                select(Site, Cost.Center) %>%
+                rename(Home.FacilityOR.Hospital.ID = Site,
+                       DPT.HOME = Cost.Center) %>%
                 mutate(HOME.DPT.in.Report = 1)) %>%
     filter(WRKD.DPT.in.Report == 1,
            is.na(HOME.DPT.in.Report)) %>%
-    select(-DPT.WRKD, -WRKD.DPT.in.Report, -HOME.DPT.in.Report) %>%
+    select(-DPT.WRKD, -Facility.Hospital.Id_Worked, -WRKD.DPT.in.Report,
+           -HOME.DPT.in.Report) %>%
     rename(Site = Home.FacilityOR.Hospital.ID,
            Cost.Center = DPT.HOME)  %>%
-    rbind(dummy_report_list %>%
+    rbind(report_list %>%
+            filter(Report.ID %in% dummy_report_ids) %>%
             select(Site, Cost.Center)) %>%
       unique() %>%
       group_by(Site) %>%
