@@ -799,6 +799,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       unique() %>%
       group_by(Site) %>%
     summarize(Cost.Center = paste(Cost.Center, collapse = ':')) %>%
+    # there's an error on the next line
     left_join(dummy_reports %>% select(-contains('blank'), -Cost.Center)) %>%
     relocate(Site, .after = Corporation.Code) %>%
     relocate(Cost.Center, .after = Report.ID)
@@ -866,11 +867,20 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     ungroup() %>%
     mutate(dist_date = format(distribution_date, "%m/%d/%Y")) %>%
     relocate(dist_date, .before = Avg_FTEs_worked) %>%
-    mutate(capture_time = as.character(Sys.time()))
+    mutate(capture_time = as.character(Sys.time())) %>%
+    rename(Site = Facility.Hospital.Id_Worked,
+           Department = DPT.WRKD) %>%
+    mutate(Site = case_when(
+      Site == "630571" ~ "MSBIB",
+      Site == "NY2162" ~ "MSW",
+      Site == "NY2163" ~ "MSM",
+      TRUE ~ "Other")
+    )
   
   fte_summary_path <- paste0("//researchsan02b/shr2/deans/Presidents/",
                              "SixSigma/MSHS Productivity/Productivity/",
-                             "Labor - Data/Multi-site/BISLR/Quality Checks/")
+                             "Labor - Data/Multi-site/BISLR/Quality Checks/",
+                             "Source Data/")
   
   fte_summary <- rbind(fte_summary,
                        read.xlsx2(file = paste0(fte_summary_path,
@@ -879,7 +889,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                                  rep("numeric", 2),
                                                  "character"),
                                   sheetName = "fte_summary") %>%
-                         select(Facility.Hospital.Id_Worked, DPT.WRKD,
+                         select(Site, Department,
                                 dist_date, Avg_FTEs_worked, Avg_FTEs_paid,
                                 capture_time))
 
@@ -905,14 +915,20 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                        SERVICE.LINE, CORPORATE.SERVICE.LINE,
                        VP) %>%
                 distinct(),
-              by = c("DPT.WRKD" = "ORACLE.COST.CENTER"))  %>%
+              by = c("Department" = "ORACLE.COST.CENTER"))  %>%
     left_join(rbind(dict_premier_dpt %>%
-                      select(-Dpt_in_Dict),
+                      select(-Dpt_in_Dict) %>%
+                      mutate(Site = case_when(
+                        Site == "630571" ~ "MSBIB",
+                        Site == "NY2162" ~ "MSW",
+                        Site == "NY2163" ~ "MSM",
+                        TRUE ~ "Other"
+                      )),
                     upload_dict_dpt) %>%
                 select(-Corporation.Code),
-              by = c("Facility.Hospital.Id_Worked" = "Site",
-                     "DPT.WRKD" = "Cost.Center")) %>%
-    select(Facility.Hospital.Id_Worked, DPT.WRKD, Cost.Center.Description,
+              by = c("Site" = "Site",
+                     "Department" = "Cost.Center")) %>%
+    select(Site, Department, Cost.Center.Description,
            DEFINITION.CODE, DEFINITION.NAME, SERVICE.LINE,
            CORPORATE.SERVICE.LINE, VP, dist_date,
            Avg_FTEs_worked, Avg_FTEs_paid, capture_time)
@@ -931,7 +947,11 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   # re-writing the file will need to be refined and likely located to a
   # different section
-  # file.remove(paste0(fte_summary_path,"fte_summary.xlsx"))
+  # file.rename(from = paste0(fte_summary_path, "fte_summary.xlsx"),
+  #             to = paste0(fte_summary_path,
+  #                         "fte_summary_",
+  #                         as.character(Sys.Date(), format = "%Y-%m-%d"),
+  #                         ".xlsx"))
   # write.xlsx2(as.data.frame(fte_summary),
   #             file = paste0(fte_summary_path,"fte_summary.xlsx"),
   #             row.names = F,
