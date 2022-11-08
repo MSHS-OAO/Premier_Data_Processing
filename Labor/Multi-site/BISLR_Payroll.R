@@ -303,6 +303,33 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                        WRKJC_in_Dict = JC_in_Dict)) %>%
     mutate(Job.Code_up = substr(Job.Code, 1, 10))
   
+  # MM: I'd like to create an additional column on the bislr_payroll
+  # data.frame that is DPT.WRKD_orig before replacing cost centers backmapped
+  # to accrual.  To minimize data, we can only assign this column when the
+  # legacy cost center is accrual
+  # Alternatively, we can move the mutate() of the DPT.WRKD and
+  # Department.Name.Worked.Dept for accrual cost center to after everything else
+  # in the above pipeline,
+  # and save off a copy of bislr_payroll (filtered to accrual backmaps) as:
+  # bislr_payroll_accrual_bm
+  
+  # I also think we should not replace any DPT.WRKD when the
+  # Department.Name.Worked.Dept is already "ACCRUAL COST CENTER"
+  # because the department is properly backmapping to Accrual Cost Center.
+  # Using the coa.mountsinai.org tool,
+  # there are some other departments that are not named Accrual Cost Center
+  # that can be properly backmapped to an 8600 legacy Accrual Cost Center, so
+  # the above idea to look at the Department.Name.Worked.Dept might not
+  # cover all scenarios we encounter
+  
+  # it seems to be important to define the accrual dept as its own object
+  # in order for it to be referenced properly in mutate() or filter() because
+  # the replacement does not seem to be occurring.  Creating this below object
+  # and referencing accrual_depts$Cost.Center works well.
+  # accrual_depts <- report_list %>%
+  #   filter(Report.ID %in% accural_report_ids) %>%
+  #   select(Cost.Center)
+  
   if (nrow(bislr_payroll) != row_count) {
     showDialog(title = "Join error",
                message = paste("Row count failed at", "bislr_payroll"))
@@ -961,11 +988,15 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   ## 8600 Accrual Site Summary --------------------------------------------
 
+  accrual_depts <- report_list %>%
+    filter(Report.ID %in% accural_report_ids) %>%
+    select(Cost.Center)
+  
   accrual_summary <- bislr_payroll %>%
     left_join(filter_dates) %>%
     filter(!is.na(upload_date)) %>%
     filter(PROVIDER == 0) %>%
-    filter(DPT.WRKD %in% accural_legacy_cc) %>%
+    filter(DPT.WRKD %in% accrual_depts$Cost.Center) %>%
     group_by(
       Facility.Hospital.Id_Worked, DPT.WRKD,
       Start.Date, End.Date) %>%
@@ -973,16 +1004,41 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
               Expense = sum(Expense, na.rm = TRUE)) %>%
     ungroup()
   
-  # create a detailed view of the accrual depts?
+  # create a detailed view of the accrual depts
   # include: what the worked depts were originally mapped to?
-  #  (Worked Dept ID & Worked Dept Name)
 
-  # accrual_raw_detail <- raw_payroll %>%
-  #   filter(TBD)
-  # this results in error because the Legacy cost center is created in the
-  # bislr_payroll data.frame
+  accrual_raw_detail <- raw_payroll %>%
+    mutate(DPT.WRKD = paste0(substr(Full.COA.for.Worked,1,3),
+                             substr(Full.COA.for.Worked,41,44),
+                             substr(Full.COA.for.Worked,5,7),
+                             substr(Full.COA.for.Worked,12,16)),
+           DPT.HOME = paste0(substr(Full.COA.for.Home,1,3),
+                             substr(Full.COA.for.Home,41,44),
+                             substr(Full.COA.for.Home,5,7),
+                             substr(Full.COA.for.Home,12,16)),
+           DPT.WRKD.LEGACY = paste0(substr(Reverse.Map.for.Worked, 1, 4),
+                                    substr(Reverse.Map.for.Worked, 13, 14),
+                                    substr(Reverse.Map.for.Worked, 16, 19)),
+           DPT.HOME.LEGACY = paste0(substr(Reverse.Map.for.Home, 1, 4),
+                                    substr(Reverse.Map.for.Home, 13, 14),
+                                    substr(Reverse.Map.for.Home, 16, 19)),
+           Start.Date = as.Date(Start.Date, format = '%m/%d/%Y'),
+           End.Date = as.Date(End.Date, format = '%m/%d/%Y'),
+           Job.Code = str_trim(Job.Code),
+           Position.Code.Description = str_trim(Position.Code.Description)) %>%
+    mutate(DPT.WRKD = case_when(
+      trimws(Department.Name.Worked.Dept) == "" ~ as.character(Department.IdWHERE.Worked),
+      TRUE ~ DPT.WRKD),
+      DPT.HOME = case_when(
+        trimws(Department.Name.Home.Dept) == "" ~ as.character(Department.ID.Home.Department),
+        TRUE ~ DPT.HOME)) %>%
+    filter(DPT.WRKD.LEGACY %in% accrual_depts$Cost.Center)
+  # a summary on the 
+    
   # MM: I think we should save off the raw_accrual info in the midst of
-  # pre-processing.
+  # pre-processing so the same processing doesn't need to be repeated in
+  # this section.  See the MM comment at the end of the initial
+  # bislr_payroll pipeline
 
 # Visualizations ----------------------------------------------------------
 
