@@ -295,7 +295,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   raw_detail_data <- bislr_payroll
     
-  bislr_payroll_test <- bislr_payroll %>%
+  bislr_payroll <- bislr_payroll %>%
     mutate(DPT.WRKD = case_when(
       DPT.WRKD.LEGACY %in% subset(report_list,
                                   Report.ID %in% accural_report_ids)$Cost.Center & 
