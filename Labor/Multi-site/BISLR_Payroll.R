@@ -15,11 +15,11 @@ dir_universal <- paste0(dir, '/Universal Data')
 # Constants ---------------------------------------------------------------
 new_dpt_map <- 10095
 map_effective_date <- as.Date('2010-01-01')
-# MM: general improvement opportunity:
-# can we update the paycode mapping file to indicate productive vs. non-prod?
-productive_paycodes <- c('REGULAR', 'OVERTIME', 'EDUCATION', 'ORIENTATION',
-                        'OTHER_WORKED', 'AGENCY')
-accural_report_ids <- c('DNU_8600')
+
+accural_report_ids <- c('DNU_8600', 'DNU_MSM_8600', 'DNU_MSW_8600')
+true_accural_cc_desc <- c('ACCRUAL COST CENTER', 'SPECIAL FUNDS ACCOUNTING',
+                          'GENERAL ACCOUNTING', 'FPA BIMG')
+
 dummy_report_ids <- c('DNU_000', 'DNU_MSM000', 'DNU_MSW000')
 
 jc_desc_threshold <- 5
@@ -251,17 +251,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       DPT.HOME = case_when(
         trimws(Department.Name.Home.Dept) == "" ~ as.character(Department.ID.Home.Department),
         TRUE ~ DPT.HOME)) %>%
-    mutate(DPT.WRKD = case_when(
-      DPT.WRKD.LEGACY %in% subset(report_list,
-                                  Report.ID %in% accural_report_ids, 
-                                  select = Cost.Center) ~ DPT.WRKD.LEGACY,
-      TRUE ~ DPT.WRKD),
-      Department.Name.Worked.Dept = case_when(
-        DPT.WRKD.LEGACY %in% subset(report_list,
-                                    Report.ID %in% accural_report_ids, 
-                                    select = Cost.Center) ~ "ACCRUAL COST CENTER",
-        TRUE ~ Department.Name.Worked.Dept),
-      Job.Code = case_when(
+    mutate(Job.Code = case_when(
         paste0(DPT.WRKD, '-', Employee.Name) %in%
           paste0(msus_removal_list$`Department IdWHERE Worked`,
                  '-', msus_removal_list$`Employee Name`)
@@ -302,6 +292,22 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                        DPT.WRKD = Cost.Center,
                        WRKJC_in_Dict = JC_in_Dict)) %>%
     mutate(Job.Code_up = substr(Job.Code, 1, 10))
+  
+  raw_detail_data <- bislr_payroll
+    
+  bislr_payroll_test <- bislr_payroll %>%
+    mutate(DPT.WRKD = case_when(
+      DPT.WRKD.LEGACY %in% subset(report_list,
+                                  Report.ID %in% accural_report_ids)$Cost.Center & 
+        !Department.Name.Worked.Dept %in% true_accural_cc_desc
+      ~ DPT.WRKD.LEGACY,
+      TRUE ~ DPT.WRKD),
+      Department.Name.Worked.Dept = case_when(
+        DPT.WRKD.LEGACY %in% subset(report_list,
+                                    Report.ID %in% accural_report_ids)$Cost.Center & 
+          !Department.Name.Worked.Dept %in% true_accural_cc_desc
+        ~ "ACCRUAL COST CENTER",
+        TRUE ~ Department.Name.Worked.Dept))
   
   if (nrow(bislr_payroll) != row_count) {
     showDialog(title = "Join error",
