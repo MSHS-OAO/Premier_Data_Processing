@@ -252,6 +252,11 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
         trimws(Department.Name.Home.Dept) == "" ~ as.character(Department.ID.Home.Department),
         TRUE ~ DPT.HOME)) %>%
     mutate(DPT.WRKD = case_when(
+      # MM: %in% with subset doesn't seem to work on my machine
+      # I recommend we create a separate data frame in the
+      # Preprocessing > References section and use %in% with that data frame
+      # See the example in this section:
+      # Quality Checks > 8600 Accrual Site Summary
       DPT.WRKD.LEGACY %in% subset(report_list,
                                   Report.ID %in% accural_report_ids, 
                                   select = Cost.Center) ~ DPT.WRKD.LEGACY,
@@ -315,13 +320,26 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   # I also think we should not replace any DPT.WRKD when the
   # Department.Name.Worked.Dept is already "ACCRUAL COST CENTER"
-  # because the department is properly backmapping to Accrual Cost Center.
+  # because the department is properly backmapping to an Accrual Cost Center.
   # Using the coa.mountsinai.org tool,
   # there are some other departments that are not named Accrual Cost Center
   # that can be properly backmapped to an 8600 legacy Accrual Cost Center, so
   # the above idea to look at the Department.Name.Worked.Dept might not
   # cover all scenarios we encounter
-  
+  # 407-2101-410-37800	FPA BIMG
+  # 401-7112-404-57014	SPECIAL FUNDS ACCOUNTING
+  # 401-5901-404-57014	SPECIAL FUNDS ACCOUNTING
+  # 401-5103-404-57014	SPECIAL FUNDS ACCOUNTING
+  # 401-5103-404-57014	SPECIAL FUNDS ACCOUNTING
+  # 401-5103-404-57014	SPECIAL FUNDS ACCOUNTING
+  # 301-5901-301-57014	SPECIAL FUNDS ACCOUNTING
+  # 301-7112-301-57014	SPECIAL FUNDS ACCOUNTING
+  # 301-5103-301-57014	SPECIAL FUNDS ACCOUNTING
+  # 903-7105-955-57013	GENERAL ACCOUNTING
+  # 903-7105-955-57013	GENERAL ACCOUNTING
+  # 903-7105-955-57013	GENERAL ACCOUNTING
+  # 903-7105-955-57013	GENERAL ACCOUNTING
+
   # it seems to be important to define the accrual dept as its own object
   # in order for it to be referenced properly in mutate() or filter() because
   # the replacement does not seem to be occurring.  Creating this below object
@@ -992,6 +1010,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     filter(Report.ID %in% accural_report_ids) %>%
     select(Cost.Center)
   
+  # this is currently coming up empty because of a filter used in
+  # forming bislr_payroll
   accrual_summary <- bislr_payroll %>%
     left_join(filter_dates) %>%
     filter(!is.na(upload_date)) %>%
@@ -1027,13 +1047,25 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            Job.Code = str_trim(Job.Code),
            Position.Code.Description = str_trim(Position.Code.Description)) %>%
     mutate(DPT.WRKD = case_when(
-      trimws(Department.Name.Worked.Dept) == "" ~ as.character(Department.IdWHERE.Worked),
+      trimws(Department.Name.Worked.Dept) == "" ~
+        as.character(Department.IdWHERE.Worked),
       TRUE ~ DPT.WRKD),
       DPT.HOME = case_when(
-        trimws(Department.Name.Home.Dept) == "" ~ as.character(Department.ID.Home.Department),
+        trimws(Department.Name.Home.Dept) == "" ~
+          as.character(Department.ID.Home.Department),
         TRUE ~ DPT.HOME)) %>%
     filter(DPT.WRKD.LEGACY %in% accrual_depts$Cost.Center)
-  # a summary on the 
+  
+  accrual_raw_summary <- accrual_raw_detail %>%
+    # would prefer to use worked/paid pay code type for grouping instead of
+    # specific Pay.Code
+    group_by(Facility.Hospital.Id_Worked, DPT.WRKD,
+             Department.Name.Worked.Dept, DPT.WRKD.LEGACY, Start.Date, End.Date,
+             Pay.Code) %>%
+    summarize(Hours = sum(Hours, na.rm = TRUE),
+              Expense = sum(Expense, na.rm = TRUE)) %>%
+    ungroup()
+
     
   # MM: I think we should save off the raw_accrual info in the midst of
   # pre-processing so the same processing doesn't need to be repeated in
