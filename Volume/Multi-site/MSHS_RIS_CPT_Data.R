@@ -22,83 +22,33 @@
   
   diagnostic_scaling <- 2.69
   
-  # Import Data -------------------------------------------------------------
+  # Import References -------------------------------------------------------
   
-  ## OR Data -------------------------------------------------------------
-  import_recent_OR_file <- function(folder.path, place) {
-    #Importing File information from Folder
-    File.Name <- list.files(path = folder.path,pattern = 'csv$', full.names = F)
-    File.Path <- list.files(path = folder.path,pattern = 'csv$', full.names = T)
-    File.Date <- as.Date(sapply(File.Name, function(x) paste0('01', substr(x,nchar(x)-10, nchar(x)-4))),format = '%d%b%Y')
-    File.Table <- data.table::data.table(File.Name, File.Date, File.Path) %>%
-      arrange(desc(File.Date))
-    all_dates <- File.Table %>% select(File.Date) %>% unique()
-    File.Table <- File.Table %>% filter(File.Date %in% all_dates[place])
-    cat("OR file selected for ",
-        format(unique(File.Table$File.Date), format = '%B %Y'))
-    #Importing Data 
-    data_recent <- read.csv(File.Table$File.Path,
-      colClasses = c(rep("character",9))) %>%
-      select(MRN, Name, ACC, Date, Exam, Exam.Modifier, Org, Resource)
-    return(data_recent)
-  }
-  mshs_or_rad_data <- import_recent_OR_file(paste0(dir_data, '/OR Source Data'), 1)
-  
-  ## RIS Data ----------------------------------------------------------------
-  import_recent_RIS_files <- function(folder.path, place) {
-    #Importing File information from Folder
-    File.Name <- list.files(path = folder.path,pattern = 'xls$', full.names = F)
-    File.Path <- list.files(path = folder.path,pattern = 'xls$', full.names = T)
-    File.Date <- as.Date(sapply(File.Name, function(x) paste0('01', substr(x,nchar(x)-9, nchar(x)-4))),format = '%d%m%Y')
-    File.Table <- data.table::data.table(File.Name, File.Date, File.Path) %>%
-      arrange(desc(File.Date))
-    all_dates <- File.Table %>% select(File.Date) %>% unique()
-    File.Table <- File.Table %>% filter(File.Date %in% all_dates[place])
-    #Quality Check on # of files
-    if (nrow(File.Table) %% 11 != 0) {
-      stop("Unexpected number of files in selected folder. There are ",
-           nrow(File.Table),
-           " files for ",
-           format(unique(File.Table$File.Date), format = '%B %Y') ,
-           " and there should be a total of 11 files for each month.")
-    }
-    File.Table <<- File.Table
-    #Importing Data 
-    data_recent <- lapply(File.Table$File.Path,read_xls)
-  return(data_recent)
-  }
-  
-  mshs_rad_data <- import_recent_RIS_files(paste0(dir_data, '/Source Data'), 1)
-  cat('Data files selected for the month',
-      format(unique(File.Table$File.Date), format = '%B %Y'))
-
-# Import References -------------------------------------------------------
-
   ## Mapping Files -----------------------------------------------------------
   map_premier_sites <-read_xlsx(path = paste0(dir_data,
                                               "/References/Radiology RIS Mappings.xlsx"),
                                 sheet = "Premier Sites")
   map_cost_centers <- read_xlsx(path = paste0(dir_data,
-                                    "/References/Radiology RIS Mappings.xlsx"),
-                      sheet = "Cost Centers")
+                                              "/References/Radiology RIS Mappings.xlsx"),
+                                sheet = "Cost Centers")
   map_pat_setting <- read_xlsx(path = paste0(dir_data,
-                                     "/References/Radiology RIS Mappings.xlsx"),
-                       sheet = "PAT Setting")
+                                             "/References/Radiology RIS Mappings.xlsx"),
+                               sheet = "PAT Setting")
   map_charge_class <- read_xlsx(path = paste0(dir_data,
-                                     "/References/Radiology RIS Mappings.xlsx"),
-                       sheet = "Charge Class")
+                                              "/References/Radiology RIS Mappings.xlsx"),
+                                sheet = "Charge Class")
   map_cpt_mod <- read_xlsx(path = paste0(dir_data,
-                                     "/References/Radiology RIS Mappings.xlsx"),
-                       sheet = "Select Mod")
-  map_msbi_special <- read_xlsx(path = paste0(dir_data,
                                          "/References/Radiology RIS Mappings.xlsx"),
-                           sheet = "MSBI Update Charge Class")
+                           sheet = "Select Mod")
+  map_msbi_special <- read_xlsx(path = paste0(dir_data,
+                                              "/References/Radiology RIS Mappings.xlsx"),
+                                sheet = "MSBI Update Charge Class")
   map_paycycle <- read_xlsx(path = paste0(dir_universal,
                                           "/Mapping/MSHS_Pay_Cycle.xlsx"))
   map_report <- read_xlsx(path = paste0(dir_universal,
                                         "/Mapping",
                                         "/MSHS_Reporting_Definition_Mapping.xlsx"))
-
+  
   ## CDMs --------------------------------------------------------------------
   import_recent_cdm <- function(dir, site_cdm, file_type) {
     #Compiling Data on Files
@@ -138,10 +88,94 @@
   }
   
   cdm_msmsw <- import_recent_cdm(paste0(dir_cdm, "/MSMW"), "SLR", "csv")
-    cat("MSMW CDM File Used:", cdm_file_import$name)
+  cat("MSMW CDM File Used:", cdm_file_import$name)
   
   cdm_msbib <- import_recent_cdm(paste0(dir_cdm, "/BIB"), "BI", "xlsx")
-    cat("MSBIB CDM File Used:", cdm_file_import$name)
+  cat("MSBIB CDM File Used:", cdm_file_import$name)
+  
+  # Import Data -------------------------------------------------------------
+  
+  ## OR Data -------------------------------------------------------------
+  import_recent_OR_file <- function(folder.path, place) {
+    #Importing File information from Folder
+    File.Name <- list.files(path = folder.path,pattern = 'csv$', full.names = F)
+    File.Path <- list.files(path = folder.path,pattern = 'csv$', full.names = T)
+    File.Date <- as.Date(sapply(File.Name, function(x) paste0('01', substr(x,nchar(x)-10, nchar(x)-4))),format = '%d%b%Y')
+    File.Table <- data.table::data.table(File.Name, File.Date, File.Path) %>%
+      arrange(desc(File.Date))
+    all_dates <- File.Table %>% select(File.Date) %>% unique()
+    File.Table <- File.Table %>% filter(File.Date %in% all_dates[place])
+    cat("OR file selected for ",
+        format(unique(File.Table$File.Date), format = '%B %Y'))
+    #Importing Data 
+    data_recent <- read.csv(File.Table$File.Path,
+      colClasses = c(rep("character",9))) %>%
+      select(MRN, Name, ACC, Date, Exam, Exam.Modifier, Org, Resource)
+    return(data_recent)
+  }
+  mshs_or_rad_data <- import_recent_OR_file(paste0(dir_data, '/OR Source Data'), 1)
+  
+  ## RIS Data ----------------------------------------------------------------
+  import_recent_RIS_files <- function(folder.path,
+                                      most_recent_files = 1,
+                                      sites = 'All Sites') {
+    #Importing File information from Folder
+    File.Name <- list.files(path = folder.path,pattern = 'xls$', full.names = F)
+    File.Site <- sapply(File.Name, function(x) unlist(str_split(x,
+                                                                pattern = " "))[3])
+    File.Path <- list.files(path = folder.path,pattern = 'xls$', full.names = T)
+    File.Date <- as.Date(sapply(File.Name,
+                                function(x) paste0('01',
+                                                   substr(x,nchar(x)-9,
+                                                          nchar(x)-4))),
+                         format = '%d%m%Y')
+    File.Table <- data.table::data.table(File.Name, File.Site, File.Date,
+                                         File.Path) %>%
+      arrange(desc(File.Date))
+    all_dates <- File.Table %>% select(File.Date) %>% unique()
+    #File.Table <- File.Table %>% filter(File.Date %in% all_dates[place])
+    if(most_recent_files == 0){
+      selected_month <- select.list(choices = format(all_dates, '%B %Y'),
+                                    multiple = F,
+                                    title = 'Select month of data needed',
+                                    graphics = T)
+    }else{selected_month <- format(max(all_dates$File.Date), "%B %Y")}
+    
+    if(sites != 'All Sites'){
+      user_selected_sites <- select.list(choices = map_premier_sites$`Site Name`,
+                                   multiple = T,
+                                   title = 'Select sites needed',
+                                   graphics = T)
+      selected_sites <- subset(map_premier_sites,
+                               subset = `Site Name`%in% user_selected_sites)$Org
+    }else{selected_sites <- map_premier_sites$Org}
+    
+    #Quality Check on # of files TBD based on incorporation of MSH
+    #this check works for all data files "all sites" selected
+    # if(nrow(File.Table) %% 11 != 0) {
+    #   stop("Unexpected number of files in selected folder. There are ",
+    #        nrow(File.Table),
+    #        " files for ",
+    #        format(unique(File.Table$File.Date), format = '%B %Y') ,
+    #        " and there should be a total of 11 files for each month.")
+    # }
+    File.Table <<- File.Table
+    #Importing Data 
+    data_files <- File.Table %>%
+      filter(File.Date == as.Date(paste('01',
+                                        selected_month),
+                                  format = "%d %B %Y"),
+             File.Site %in% selected_sites)
+    data_recent <- lapply(data_files$File.Path, read_xls)
+  return(data_recent)
+  }
+  #leave argument sites blank if you want all sites to be selected or put
+  #'other' to select sites you want
+  #mshs_rad_data <- import_recent_RIS_files(paste0(dir_data, '/Source Data'), 1)
+  mshs_rad_data_test <- import_recent_RIS_files(folder.path = paste0(dir_data, '/Source Data'),
+                                                most_recent_files = 1)
+  cat('Data files selected for the month',
+      format(unique(File.Table$File.Date), format = '%B %Y'))
 
 # Processing Data ---------------------------------------------------------
 
@@ -255,7 +289,7 @@
                                        end_date = selected_end_date)
   
   ## Quality Charts ----------------------------------------------------------
-
+  quality_chart <- rbind(msmw_upload, msbib_upload)
   
 # Outputs -----------------------------------------------------------------
 write.csv(msmw_upload,
