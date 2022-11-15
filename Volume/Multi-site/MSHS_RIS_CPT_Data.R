@@ -180,17 +180,16 @@
                                  collapse = ', ')))
     }
     data_files <- data_files %>% filter(File.Site %in% selected_sites)
-    data_recent <- lapply(data_files$File.Path, read_xls)
-  return(data_recent)
+    cat('Data files selected for the month',
+        format(unique(data_files$File.Date), format = '%B %Y'))
+    data_files <- lapply(data_files$File.Path, read_xls)
+  return(data_files)
   }
   #leave argument sites blank if you want all sites to be selected or put
   #'other' to select sites you want
-  #mshs_rad_data <- import_recent_RIS_files(paste0(dir_data, '/Source Data'), 1)
   mshs_rad_data <- import_recent_RIS_files(folder.path = paste0(dir_data,
                                                                 '/Source Data'),
                                            most_recent_files = 1)
-  cat('Data files selected for the month',
-      format(unique(File.Table$File.Date), format = '%B %Y'))
 
 # Processing Data ---------------------------------------------------------
 
