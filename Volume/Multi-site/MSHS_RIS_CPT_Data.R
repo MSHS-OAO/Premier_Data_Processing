@@ -120,10 +120,14 @@
                                       most_recent_files = 1,
                                       sites = 'All Sites') {
     #Importing File information from Folder
-    File.Name <- list.files(path = folder.path,pattern = 'xls$', full.names = F)
+    File.Name <- list.files(path = folder.path,
+                            pattern = 'xls$',
+                            full.names = F)
     File.Site <- sapply(File.Name, function(x) unlist(str_split(x,
                                                                 pattern = " "))[3])
-    File.Path <- list.files(path = folder.path,pattern = 'xls$', full.names = T)
+    File.Path <- list.files(path = folder.path,
+                            pattern = 'xls$',
+                            full.names = T)
     File.Date <- as.Date(sapply(File.Name,
                                 function(x) paste0('01',
                                                    substr(x,nchar(x)-9,
@@ -164,16 +168,27 @@
     data_files <- File.Table %>%
       filter(File.Date == as.Date(paste('01',
                                         selected_month),
-                                  format = "%d %B %Y"),
-             File.Site %in% selected_sites)
+                                  format = "%d %B %Y"))
+    #Alert if there are missing data files
+    if(sites == 'All Sites' & any(!data_files$File.Site %in% selected_sites)){
+      missing_data_files <- selected_sites[!selected_sites %in% data_files$File.Site]
+      missing_data_files <- map_premier_sites %>%
+        filter(Org %in% missing_data_files)
+      showDialog(title = "Data Files Missing!",
+                 message = paste('Sites Missing:',
+                                 paste(missing_data_files$`Site Name`,
+                                 collapse = ', ')))
+    }
+    data_files <- data_files %>% filter(File.Site %in% selected_sites)
     data_recent <- lapply(data_files$File.Path, read_xls)
   return(data_recent)
   }
   #leave argument sites blank if you want all sites to be selected or put
   #'other' to select sites you want
   #mshs_rad_data <- import_recent_RIS_files(paste0(dir_data, '/Source Data'), 1)
-  mshs_rad_data_test <- import_recent_RIS_files(folder.path = paste0(dir_data, '/Source Data'),
-                                                most_recent_files = 1)
+  mshs_rad_data <- import_recent_RIS_files(folder.path = paste0(dir_data,
+                                                                '/Source Data'),
+                                           most_recent_files = 1)
   cat('Data files selected for the month',
       format(unique(File.Table$File.Date), format = '%B %Y'))
 
