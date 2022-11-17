@@ -293,7 +293,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                        WRKJC_in_Dict = JC_in_Dict)) %>%
     mutate(Job.Code_up = substr(Job.Code, 1, 10))
   
-  raw_detail_data <- bislr_payroll
+  accrual_raw_detail <- bislr_payroll
     
   bislr_payroll <- bislr_payroll %>%
     mutate(DPT.WRKD = case_when(
