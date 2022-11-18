@@ -293,7 +293,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                        WRKJC_in_Dict = JC_in_Dict)) %>%
     mutate(Job.Code_up = substr(Job.Code, 1, 10))
   
-  accrual_raw_detail <- bislr_payroll
+  accrual_raw_detail <- bislr_payroll %>%
+    filter(DPT.WRKD.LEGACY %in% 
+             subset(report_list,
+                    Report.ID %in% accural_report_ids)$Cost.Center)
     
   bislr_payroll <- bislr_payroll %>%
     mutate(DPT.WRKD = case_when(
@@ -967,17 +970,13 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   ## 8600 Accrual Site Summary --------------------------------------------
 
-  accrual_depts <- report_list %>%
-    filter(Report.ID %in% accural_report_ids) %>%
-    select(Cost.Center)
-  
-  # this is currently coming up empty because of a filter used in
-  # forming bislr_payroll
   accrual_summary <- bislr_payroll %>%
     left_join(filter_dates) %>%
     filter(!is.na(upload_date)) %>%
     filter(PROVIDER == 0) %>%
-    filter(DPT.WRKD %in% accrual_depts$Cost.Center) %>%
+    filter(DPT.WRKD %in% 
+             subset(report_list,
+                    Report.ID %in% accural_report_ids)$Cost.Center) %>%
     group_by(
       Facility.Hospital.Id_Worked, DPT.WRKD,
       Start.Date, End.Date) %>%
@@ -985,48 +984,44 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
               Expense = sum(Expense, na.rm = TRUE)) %>%
     ungroup()
   
-  # create a detailed view of the accrual depts
-  # include: what the worked depts were originally mapped to?
-
-  # accrual_raw_detail <- raw_payroll %>%
-  #   mutate(DPT.WRKD = paste0(substr(Full.COA.for.Worked,1,3),
-  #                            substr(Full.COA.for.Worked,41,44),
-  #                            substr(Full.COA.for.Worked,5,7),
-  #                            substr(Full.COA.for.Worked,12,16)),
-  #          DPT.HOME = paste0(substr(Full.COA.for.Home,1,3),
-  #                            substr(Full.COA.for.Home,41,44),
-  #                            substr(Full.COA.for.Home,5,7),
-  #                            substr(Full.COA.for.Home,12,16)),
-  #          DPT.WRKD.LEGACY = paste0(substr(Reverse.Map.for.Worked, 1, 4),
-  #                                   substr(Reverse.Map.for.Worked, 13, 14),
-  #                                   substr(Reverse.Map.for.Worked, 16, 19)),
-  #          DPT.HOME.LEGACY = paste0(substr(Reverse.Map.for.Home, 1, 4),
-  #                                   substr(Reverse.Map.for.Home, 13, 14),
-  #                                   substr(Reverse.Map.for.Home, 16, 19)),
-  #          Start.Date = as.Date(Start.Date, format = '%m/%d/%Y'),
-  #          End.Date = as.Date(End.Date, format = '%m/%d/%Y'),
-  #          Job.Code = str_trim(Job.Code),
-  #          Position.Code.Description = str_trim(Position.Code.Description)) %>%
-  #   mutate(DPT.WRKD = case_when(
-  #     trimws(Department.Name.Worked.Dept) == "" ~
-  #       as.character(Department.IdWHERE.Worked),
-  #     TRUE ~ DPT.WRKD),
-  #     DPT.HOME = case_when(
-  #       trimws(Department.Name.Home.Dept) == "" ~
-  #         as.character(Department.ID.Home.Department),
-  #       TRUE ~ DPT.HOME)) %>%
-  #   filter(DPT.WRKD.LEGACY %in% accrual_depts$Cost.Center)
+  # row count check not required for joining filter_dates
+  # MM: Anjelica, any concerns?
+  accrual_raw_detail <- accrual_raw_detail %>%
+    left_join(filter_dates) %>%
+    filter(!is.na(upload_date))
+  
+  row_count <- nrow(accrual_raw_detail)
+  accrual_raw_detail <- accrual_raw_detail %>%
+    left_join(map_uni_paycodes %>%
+                select(RAW.PAY.CODE, INCLUDE.HOURS,
+                       INCLUDE.EXPENSES, WORKED.PAY.CODE),
+              by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
+    mutate(INCLUDE.HOURS = as.integer(INCLUDE.HOURS),
+           INCLUDE.EXPENSES = as.integer(INCLUDE.EXPENSES),
+           WORKED.PAY.CODE = as.integer(WORKED.PAY.CODE))
+  if (nrow(accrual_raw_detail) != row_count) {
+    showDialog(title = "Join error",
+               message = paste("Row count failed at", "accrual_raw_detail"))
+    stop(paste("Row count failed at", "accrual_raw_detail"))
+  }
   
   accrual_raw_summary <- accrual_raw_detail %>%
-    # would prefer to use worked/paid pay code type for grouping instead of
-    # specific Pay.Code
+    mutate(Hours_Worked = Hours * INCLUDE.HOURS * WORKED.PAY.CODE,
+           Expense_Worked = Expense * INCLUDE.EXPENSES * WORKED.PAY.CODE,
+           Hours_Paid = Hours * INCLUDE.HOURS,
+           Expense_Paid = Expense * INCLUDE.EXPENSES
+    ) %>%
     group_by(Facility.Hospital.Id_Worked, DPT.WRKD,
              Department.Name.Worked.Dept, DPT.WRKD.LEGACY, Start.Date, End.Date,
-             Pay.Code) %>%
-    summarize(Hours = sum(Hours, na.rm = TRUE),
-              Expense = sum(Expense, na.rm = TRUE)) %>%
+             ) %>%
+    summarize(Hours_Worked = sum(Hours_Worked, na.rm = TRUE),
+              Expense_Worked = sum(Expense_Worked, na.rm = TRUE),
+              Hours_Paid = sum(Hours_Paid, na.rm = TRUE),
+              Expense_Paid = sum(Expense_Paid, na.rm = TRUE)
+              ) %>%
     ungroup()
-
+  
+  View(accrual_raw_summary)
 
 # Visualizations ----------------------------------------------------------
 
