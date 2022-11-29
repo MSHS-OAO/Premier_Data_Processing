@@ -808,7 +808,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       unique() %>%
       group_by(Site) %>%
     summarize(Cost.Center = paste(Cost.Center, collapse = ':')) %>%
-    left_join(dummy_reports %>% select(-contains('blank'), -Cost.Center)) %>%
+    left_join(dict_premier_report %>%
+                filter(Report.ID %in% dummy_report_ids) %>% 
+                select(-contains('blank'), -Cost.Center) %>%
+                distinct_at(vars(Site), .keep_all = T)) %>%
     relocate(Site, .after = Corporation.Code) %>%
     relocate(Cost.Center, .after = Report.ID)
 
@@ -1022,6 +1025,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                             '.csv'),
               row.names = F,
               sep = ',')
+  
   if (exists("new_paycodes")){
     write.table(upload_dict_paycode,
                 file = paste0(dir_BISLR,
@@ -1046,6 +1050,18 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     #             row.names = F,
     #             sep = ',') 
   }
+  
+  write.table(upload_report_dict,
+              file = paste0(dir_BISLR,
+                            '/BISLR_Dummy Report Dictionary_',
+                            paste(format(as.Date(range(upload_payroll$End.Date),
+                                                 format = '%m/%d/%Y'),
+                                         '%d%b%y'),
+                                  collapse = ' to '),
+                            '.csv'),
+              row.names = F,
+              sep = ',')
+  
   ## Payroll Files --------------------------------------------------------------
   sapply(1:length(unique(upload_payroll$Facility.Hospital.Id_Worked)),
          function(x) write.table(
