@@ -1081,15 +1081,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            sep = ','))
   
   ## Quality Files --------------------------------------------------------------
-  # write.table(upload_dict_dpt,
-  #             file = paste0(dir_BISLR,
-  #                           '/BISLR_Department Dictionary_',
-  #                           paste(format(as.Date(range(upload_payroll$End.Date),
-  #                                                format = '%m/%d/%Y'),
-  #                                        '%d%b%y'),
-  #                                 collapse = ' to '),
-  #                           '.csv'),
-  #             row.names = F,
-  #             sep = ',')
-  
-  # remember to output Site Hours Quality Check
+  #accrual raw data rds
+  # write_rds(accrual_raw_payroll,
+  #           file =  paste0(dir_BISLR,'/Raw Accrual Payroll.rds'))
+  #site quality chart
+  #what format csv or excel?
+
