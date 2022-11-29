@@ -252,13 +252,13 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
         trimws(Department.Name.Home.Dept) == "" ~ as.character(Department.ID.Home.Department),
         TRUE ~ DPT.HOME)) %>%
     mutate(Job.Code = case_when(
-        paste0(DPT.WRKD, '-', Employee.Name) %in%
+        paste0(DPT.WRKD, '-', toupper(Employee.Name)) %in%
           paste0(msus_removal_list$`Department IdWHERE Worked`,
                  '-', msus_removal_list$`Employee Name`)
         ~ unique(msus_removal_list$`New Job Code`),
         TRUE ~ Job.Code),
       Position.Code.Description = case_when(
-        paste0(DPT.WRKD, '-', Employee.Name) %in%
+        paste0(DPT.WRKD, '-', toupper(Employee.Name)) %in%
           paste0(msus_removal_list$`Department IdWHERE Worked`,
                  '-', msus_removal_list$`Employee Name`)
         ~ unique(msus_removal_list$`New Job Code Description`),
