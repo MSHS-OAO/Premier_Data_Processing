@@ -291,7 +291,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                 rename(Facility.Hospital.Id_Worked = Site,
                        DPT.WRKD = Cost.Center,
                        WRKJC_in_Dict = JC_in_Dict)) %>%
-    mutate(Job.Code_up = substr(Job.Code, 1, 10))
+    mutate(Job.Code_up = substr(Job.Code, 1, 10),
+           Approved.Hours.per.Pay.Period = case_when(
+             is.na(Approved.Hours.per.Pay.Period) ~ 0,
+             TRUE ~ Approved.Hours.per.Pay.Period))
   
   accrual_raw_detail <- bislr_payroll
     
@@ -974,5 +977,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
 
 # Exporting Data ----------------------------------------------------------
-
+write.table(msm_payroll,
+            file = paste0(dir_BISLR,
+                          "/Quality Checks/testing",
+                          '/MSM Payroll R Output_Sep.csv'),
+            row.names = F,
+            sep = ',')
   # remember to output Site Hours Quality Check
