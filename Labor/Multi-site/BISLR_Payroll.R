@@ -977,10 +977,103 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
 
 # Exporting Data ----------------------------------------------------------
-write.table(msm_payroll,
-            file = paste0(dir_BISLR,
-                          "/Quality Checks/testing",
-                          '/MSM Payroll R Output_Sep.csv'),
-            row.names = F,
-            sep = ',')
+
+  ## Reference Files --------------------------------------------------------------
+  write.table(upload_dict_dpt,
+              file = paste0(dir_BISLR,
+                            '/BISLR_Department Dictionary_',
+                            paste(format(as.Date(range(upload_payroll$End.Date),
+                                                 format = '%m/%d/%Y'),
+                                         '%d%b%y'),
+                                  collapse = ' to '),
+                            '.csv'),
+              row.names = F,
+              sep = ',')
+  
+  write.table(upload_map_dpt,
+              file = paste0(dir_BISLR,
+                            '/BISLR_Department Map_',
+                            paste(format(as.Date(range(upload_payroll$End.Date),
+                                                 format = '%m/%d/%Y'),
+                                         '%d%b%y'),
+                                  collapse = ' to '),
+                            '.csv'),
+              row.names = F,
+              sep = ',')
+  
+  write.table(upload_dict_dpt_jc,
+              file = paste0(dir_BISLR,
+                            '/BISLR_Department Job Code Dictionary_',
+                            paste(format(as.Date(range(upload_payroll$End.Date),
+                                                 format = '%m/%d/%Y'),
+                                         '%d%b%y'),
+                                  collapse = ' to '),
+                            '.csv'),
+              row.names = F,
+              sep = ',')
+  
+  write.table(upload_map_dpt_jc,
+              file = paste0(dir_BISLR,
+                            '/BISLR_Department Job Code Map_',
+                            paste(format(as.Date(range(upload_payroll$End.Date),
+                                                 format = '%m/%d/%Y'),
+                                         '%d%b%y'),
+                                  collapse = ' to '),
+                            '.csv'),
+              row.names = F,
+              sep = ',')
+  if (exists("new_paycodes")){
+    write.table(upload_dict_paycode,
+                file = paste0(dir_BISLR,
+                              '/BISLR_Pay Code Dictionary_',
+                              paste(format(as.Date(range(upload_payroll$End.Date),
+                                                   format = '%m/%d/%Y'),
+                                           '%d%b%y'),
+                                    collapse = ' to '),
+                              '.csv'),
+                row.names = F,
+                sep = ',') 
+    #creation of pay code mapping file missing
+    
+    # write.table(upload_map_paycode,
+    #             file = paste0(dir_BISLR,
+    #                           '/BISLR_Pay Code Map_',
+    #                           paste(format(as.Date(range(upload_payroll$End.Date),
+    #                                                format = '%m/%d/%Y'),
+    #                                        '%d%b%y'),
+    #                                 collapse = ' to '),
+    #                           '.csv'),
+    #             row.names = F,
+    #             sep = ',') 
+  }
+  ## Payroll Files --------------------------------------------------------------
+  sapply(1:length(unique(upload_payroll$Facility.Hospital.Id_Worked)),
+         function(x) write.table(
+           filter(upload_payroll,
+                  Facility.Hospital.Id_Worked ==
+                    unique(upload_payroll$Facility.Hospital.Id_Worked)[x]),
+           file = paste0(dir_BISLR,
+                         '/',
+                         unique(upload_payroll$Facility.Hospital.Id_Worked)[x],
+                         '_Payroll_',
+                         paste(format(as.Date(range(upload_payroll$End.Date),
+                                              format = '%m/%d/%Y'),
+                                      '%d%b%y'),
+                               collapse = ' to '),
+                         '.csv'),
+           row.names = F,
+           sep = ','))
+  
+  ## Quality Files --------------------------------------------------------------
+  # write.table(upload_dict_dpt,
+  #             file = paste0(dir_BISLR,
+  #                           '/BISLR_Department Dictionary_',
+  #                           paste(format(as.Date(range(upload_payroll$End.Date),
+  #                                                format = '%m/%d/%Y'),
+  #                                        '%d%b%y'),
+  #                                 collapse = ' to '),
+  #                           '.csv'),
+  #             row.names = F,
+  #             sep = ',')
+  
   # remember to output Site Hours Quality Check
