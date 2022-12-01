@@ -219,7 +219,14 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   View(piv_wide_check)
   
-
+  current_paycycles <- raw_payroll %>%
+    filter(as.Date(End.Date, "%m/%d/%Y") >= dist_prev &
+             as.Date(End.Date, "%m/%d/%Y") <= distribution_date +
+             lubridate::days(7))
+  
+    #import previous payroll file
+    #filter previous to include current paycycles based on Start and End Date
+  
   ## Data  --------------------------------------------------------------------
   row_count <- nrow(raw_payroll)
   
@@ -729,7 +736,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       stop("Fix paycode errors and restart")
     }
     
-    # update paycode dict
+    # update paycode map
     row_count <- nrow(upload_dict_paycode)
     upload_map_paycode <- upload_dict_paycode %>%
       left_join(map_uni_paycodes %>%
@@ -1037,18 +1044,17 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                               '.csv'),
                 row.names = F,
                 sep = ',') 
-    #creation of pay code mapping file missing
     
-    # write.table(upload_map_paycode,
-    #             file = paste0(dir_BISLR,
-    #                           '/BISLR_Pay Code Map_',
-    #                           paste(format(as.Date(range(upload_payroll$End.Date),
-    #                                                format = '%m/%d/%Y'),
-    #                                        '%d%b%y'),
-    #                                 collapse = ' to '),
-    #                           '.csv'),
-    #             row.names = F,
-    #             sep = ',') 
+    write.table(upload_map_paycode,
+                file = paste0(dir_BISLR,
+                              '/BISLR_Pay Code Map_',
+                              paste(format(as.Date(range(upload_payroll$End.Date),
+                                                   format = '%m/%d/%Y'),
+                                           '%d%b%y'),
+                                    collapse = ' to '),
+                              '.csv'),
+                row.names = F,
+                sep = ',')
   }
   
   write.table(upload_report_dict,
@@ -1081,9 +1087,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
            sep = ','))
   
   ## Quality Files --------------------------------------------------------------
-  #accrual raw data rds
-  # write_rds(accrual_raw_payroll,
-  #           file =  paste0(dir_BISLR,'/Raw Accrual Payroll.rds'))
-  #site quality chart
-  #what format csv or excel?
-
+  write_rds(accrual_raw_detail,
+            file =  paste0(dir_BISLR,
+                           '/Quality Checks/Accrual Issue Raw Payroll',
+                           '/Raw Accrual Oringial Payroll.rds'))
