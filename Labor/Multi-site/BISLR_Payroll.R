@@ -15,6 +15,7 @@ dir_universal <- paste0(dir, '/Universal Data')
 # Constants ---------------------------------------------------------------
 new_dpt_map <- 10095
 map_effective_date <- as.Date('2010-01-01')
+corp_code <- 729805
 
 accural_report_ids <- c('DNU_8600', 'DNU_MSM_8600', 'DNU_MSW_8600')
 true_accural_cc_desc <- c('ACCRUAL COST CENTER', 'SPECIAL FUNDS ACCOUNTING',
@@ -143,6 +144,19 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                   sep = ',',
                                   fill = T)
 
+  dict_premier_paycode <- read.csv(paste0(dir_universal,
+                                          "/Premier/Dictionary Exports",
+                                          "/PayCodeDictionaryExport.csv"),
+                                   header = TRUE,
+                                   sep = ","
+                                   )
+  
+  map_premier_paycode <- read.csv(paste0(dir_universal,
+                                         "/Premier/Mapping Exports",
+                                         "/PayCodeMappingExport.csv"),
+                                  header = TRUE,
+                                  sep = ","
+                                  )
 
 # Preprocessing --------------------------------------------------------------
 
@@ -699,26 +713,61 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   #   tail()
   # ##
   
-  if (exists("new_paycodes")) {
+  premier_missing_paycode <- anti_join(upload_payroll %>%
+                                         # ignore Facility ID?
+                                         select(Facility.Hospital.Id_Worked,
+                                                Pay.Code) %>%
+                                         distinct(),
+                                       dict_premier_paycode %>%
+                                         # ignore Facility ID?
+                                         select(Facility.or.Hospital.ID,
+                                                Pay.Code))
+  
+  # this should go in the Constants section
+  corp_site <- data.frame(cbind(Corporation.Code = 729805,
+                       Site = c("630571", "NY2162", "NY2163"))) %>%
+    mutate(Corporation.Code = as.integer(Corporation.Code))
+  # possible to get corp_site from a dictionary file?
+  # do we want to include MSH?  If MSH already has the paycode we should just
+  # be overwriting it with the same values.
+  
+  if (nrow(premier_missing_paycode) > 0) {
+    
+    # any new paycodes found, the dictionary and map are formed based on the
+    # map_uni_paycodes
+    
+    # if there's a new paycode at one site, we should upload it for all sites
+    # so it's ready for the future instances of it in data
+    
     # update paycode dict
-    row_count <- nrow(new_paycodes)
-    upload_dict_paycode <- new_paycodes %>%
-      left_join(map_uni_paycodes %>%
-                  select(RAW.PAY.CODE, PAY.CODE, PAY.CODE.NAME),
-                by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
-      # Corporation.Code can come from somewhere else, but it doesn't
-      # naturally come in from a join like with other dictionaries.
-      # perhaps make it a constant
-      mutate(Corporation.Code = 729805) %>%
-      rename(Site = Facility.Hospital.Id_Worked) %>%
-      relocate(Corporation.Code, .before = Site) %>%
-      mutate(Pay.Code = NULL)
-    if (nrow(upload_dict_paycode) != row_count) {
-      showDialog(title = "Join error",
-                 message = paste("Row count failed at", "upload_dict_paycode"))
-      stop(paste("Row count failed at", "upload_dict_paycode"))
-      }
+    upload_dict_paycode <- map_uni_paycodes %>%
+      filter(PAY.CODE %in% premier_missing_paycode$Pay.Code) %>%
+      mutate(Partner.or.Health.System.ID = corp_code) %>%
+      # rowcount check is not needed because this is intended to increase
+      # the number of rows
+      left_join(corp_site, by = c("Partner.or.Health.System.ID" = 
+                                    "Corporation.Code")) %>%
+      select(Partner.or.Health.System.ID, Site, PAY.CODE, PAY.CODE.NAME)
+      
+    
+    # update paycode dict (old)
+    # row_count <- nrow(new_paycodes)
+    # upload_dict_paycode <- new_paycodes %>%
+    #   left_join(map_uni_paycodes %>%
+    #               select(RAW.PAY.CODE, PAY.CODE, PAY.CODE.NAME),
+    #             by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
+    #   mutate(Corporation.Code = corp_code) %>%
+    #   rename(Site = Facility.Hospital.Id_Worked) %>%
+    #   relocate(Corporation.Code, .before = Site) %>%
+    #   mutate(Pay.Code = NULL)
+    # if (nrow(upload_dict_paycode) != row_count) {
+    #   showDialog(title = "Join error",
+    #              message = paste("Row count failed at", "upload_dict_paycode"))
+    #   stop(paste("Row count failed at", "upload_dict_paycode"))
+    #   }
 
+    # should this check be part of the Preprocessing > Update Universal Files
+    # section?
     if (max(nchar(upload_dict_paycode$PAY.CODE)) > char_len_paycode |
         max(nchar(upload_dict_paycode$PAY.CODE.NAME)) > char_len_paycode_name) {
       showDialog(title = "Paycode field error",
@@ -729,53 +778,42 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       stop("Fix paycode errors and restart")
     }
     
-    # update paycode dict
-    row_count <- nrow(upload_dict_paycode)
+    # update paycode map
+    
     upload_map_paycode <- upload_dict_paycode %>%
+      select(-PAY.CODE.NAME) %>%
+      # is a rowcount check needed for this join?
       left_join(map_uni_paycodes %>%
-                  select(-RAW.PAY.CODE, -Paycode_in_Universal)) %>%
-      mutate(PAY.CODE.NAME = NULL) %>%
-      # effective date should be the beginning of data file to be uploaded
-      mutate(effective_date =
-               # the date in upload_payroll has already been formatted
-               # as a text string so it has to be converted back in
-               # order to ensure the oldest value is selected
-               format(min(as.Date(upload_payroll$Start.Date, "%m/%d/%Y")),
-                      "%m/%d/%Y"),
-             # should allocation percent be a constant set at beginning of
-             # the script?
-             allocation_pct = 100) %>%
-      relocate(effective_date, .before = Corporation.Code)
-    if (nrow(upload_map_paycode) != row_count) {
-      showDialog(title = "Join error",
-                 message = paste("Row count failed at", "upload_map_paycode"))
-      stop(paste("Row count failed at", "upload_map_paycode"))
-      }
-
-    # FYI:
-    # if there's a new paycode at one site, we should upload it for all sites,
-    # correct? including MSH?
-    # the below code will ensure this, and can be appended to the pipelines
-    # above if preferred
-    # Would need to be mindful of incorporating join row count checks
+                  select(PAY.CODE, PAY.CODE.CATEGORY,
+                         INCLUDE.HOURS, INCLUDE.EXPENSES),
+                by = c("PAY.CODE" = "PAY.CODE")) %>%
+      mutate(eff_date = as.character(dist_prev + lubridate::days(1),
+                                     "%m/%d/%Y"),
+             alloc_pct = 100) %>%
+      relocate(eff_date, .before = Partner.or.Health.System.ID)
     
-    # corp_site <- data.frame(cbind(Corporation.Code = 729805,
-    #                      Site = c("630571", "NY2162", "NY2163"))) %>%
-    #   mutate(Corporation.Code = as.double(Corporation.Code))
-    # possible to get corp_site from a dictionary file?
-    # do we want to include MSH?
-    
-    # dict
-    # upload_dict_paycode <- upload_dict_paycode %>%
-    #   select(-Site) %>%
-    #   left_join(corp_site) %>%
-    #   relocate(Site, .after = Corporation.Code)
-      
-    # map
-    # upload_map_paycode <- upload_map_paycode %>%
-    #   select(-Site) %>%
-    #   left_join(corp_site) %>%
-    #   relocate(Site, .after = Corporation.Code)
+    # update paycode map (old)
+    # row_count <- nrow(upload_dict_paycode)
+    # upload_map_paycode <- upload_dict_paycode %>%
+    #   left_join(map_uni_paycodes %>%
+    #               select(-RAW.PAY.CODE, -Paycode_in_Universal)) %>%
+    #   mutate(PAY.CODE.NAME = NULL) %>%
+    #   # effective date should be the beginning of data file to be uploaded
+    #   mutate(effective_date =
+    #            # the date in upload_payroll has already been formatted
+    #            # as a text string so it has to be converted back in
+    #            # order to ensure the oldest value is selected
+    #            format(min(as.Date(upload_payroll$Start.Date, "%m/%d/%Y")),
+    #                   "%m/%d/%Y"),
+    #          # should allocation percent be a constant set at beginning of
+    #          # the script?
+    #          allocation_pct = 100) %>%
+    #   relocate(effective_date, .before = Corporation.Code)
+    # if (nrow(upload_map_paycode) != row_count) {
+    #   showDialog(title = "Join error",
+    #              message = paste("Row count failed at", "upload_map_paycode"))
+    #   stop(paste("Row count failed at", "upload_map_paycode"))
+    #   }
 
   }
   
@@ -985,7 +1023,6 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     ungroup()
   
   # row count check not required for joining filter_dates
-  # MM: Anjelica, any concerns?
   accrual_raw_detail <- accrual_raw_detail %>%
     left_join(filter_dates) %>%
     filter(!is.na(upload_date))
