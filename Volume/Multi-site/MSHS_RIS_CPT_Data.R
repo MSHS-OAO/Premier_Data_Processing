@@ -309,7 +309,7 @@
   quality_chart <- rbind(msmw_upload, msbib_upload)
   
 # Outputs -----------------------------------------------------------------
-write.csv(msmw_upload,
+write.table(msmw_upload,
           file = paste0(dir_data,
                         '/Upload Files',
                         '/MSMW RIS CPT_',
@@ -321,13 +321,14 @@ write.csv(msmw_upload,
                                        format = '%m/%d/%Y'),
                                '%d%b%y'),
                         '.csv'),
+          sep = ',',
           row.names = F,
           col.names = F)
-  write.csv(msbib_upload,
+  write.table(msbib_upload,
             file = paste0(dir_data,
                           '/Upload Files',
-                          '/MSMW RIS CPT_','MSBIB RIS CPT_',
-                          format(as.Date(min(msbib_upload_upload$`End Date`),
+                          '/MSBIB RIS CPT_',
+                          format(as.Date(min(msbib_upload$`End Date`),
                                          format = '%m/%d/%Y'),
                                  '%d%b%y'),
                           ' to ',
@@ -335,5 +336,8 @@ write.csv(msmw_upload,
                                          format = '%m/%d/%Y'),
                                  '%d%b%y'),
                           '.csv'),
+            sep = ',',
             row.names = F,
             col.names = F)
+
+  
