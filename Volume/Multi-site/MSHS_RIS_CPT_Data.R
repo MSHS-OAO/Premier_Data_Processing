@@ -14,8 +14,8 @@
   
   # Constants ---------------------------------------------------------------
   #Dates needed for Premier Upload
-  selected_start_date <- as.Date('2022-07-03')
-  selected_end_date <- as.Date('2022-07-30')
+  selected_start_date <- as.Date('2022-09-25')
+  selected_end_date <- as.Date('2022-10-22')
   
   premier_corp <- '729805'
   premier_budget <- 0
@@ -189,7 +189,8 @@
   #'other' to select sites you want
   mshs_rad_data <- import_recent_RIS_files(folder.path = paste0(dir_data,
                                                                 '/Source Data'),
-                                           most_recent_files = 1)
+                                           most_recent_files = 0,
+                                           sites = 'other')
 
 # Processing Data ---------------------------------------------------------
 
@@ -301,13 +302,17 @@
                                        selected_sites = c('630571'),
                                        start_date = selected_start_date,
                                        end_date = selected_end_date)
+  # msh_upload
+  # msq_upload
   
   ## Quality Charts ----------------------------------------------------------
   quality_chart <- rbind(msmw_upload, msbib_upload)
   
 # Outputs -----------------------------------------------------------------
 write.csv(msmw_upload,
-          file = paste0('MSMW RIS CPT_',
+          file = paste0(dir_data,
+                        '/Upload Files',
+                        '/MSMW RIS CPT_',
                         format(as.Date(min(msmw_upload$`End Date`),
                                        format = '%m/%d/%Y'),
                                '%d%b%y'),
@@ -319,7 +324,9 @@ write.csv(msmw_upload,
           row.names = F,
           col.names = F)
   write.csv(msbib_upload,
-            file = paste0('MSBIB RIS CPT_',
+            file = paste0(dir_data,
+                          '/Upload Files',
+                          '/MSMW RIS CPT_','MSBIB RIS CPT_',
                           format(as.Date(min(msbib_upload_upload$`End Date`),
                                          format = '%m/%d/%Y'),
                                  '%d%b%y'),
