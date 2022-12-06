@@ -320,7 +320,8 @@ jc_dict_upload <- processed_data %>%
   select(hospital, wrkd_dept_oracle, jobcode, Job.Title) %>%
   mutate(system = "729805") %>%
   relocate(system, .before = hospital) %>%
-  distinct()
+  distinct() %>%
+  mutate(Job.Title = substr(Job.Title, 1, 50))
 
 
 ## Summarizing Hours and Expenses-------------------------------------------
