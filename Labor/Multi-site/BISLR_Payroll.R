@@ -14,7 +14,8 @@ dir_universal <- paste0(dir, '/Universal Data')
   
 # Constants ---------------------------------------------------------------
 new_dpt_map <- 10095
-map_effective_date <- as.Date('2010-01-01')
+map_effective_date_dpt <- as.Date('2010-01-01')
+corp_code <- 729805
 
 accural_report_ids <- c('DNU_8600', 'DNU_MSM_8600', 'DNU_MSW_8600')
 true_accural_cc_desc <- c('ACCRUAL COST CENTER', 'SPECIAL FUNDS ACCOUNTING',
@@ -143,7 +144,13 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                   sep = ',',
                                   fill = T)
 
-
+  dict_premier_paycode <- read.csv(paste0(dir_universal,
+                                          "/Premier/Dictionary Exports",
+                                          "/PayCodeDictionaryExport.csv"),
+                                   header = TRUE,
+                                   sep = ","
+                                   )
+  
 # Preprocessing --------------------------------------------------------------
 
 
@@ -303,7 +310,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
              is.na(Approved.Hours.per.Pay.Period) ~ 0,
              TRUE ~ Approved.Hours.per.Pay.Period))
   
-  accrual_raw_detail <- bislr_payroll
+  accrual_raw_detail <- bislr_payroll %>%
+    filter(DPT.WRKD.LEGACY %in% 
+             subset(report_list,
+                    Report.ID %in% accural_report_ids)$Cost.Center)
     
   bislr_payroll <- bislr_payroll %>%
     mutate(DPT.WRKD = case_when(
@@ -614,7 +624,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       filter(is.na(Dpt_in_Dict)) %>%
       mutate(Dpt_in_Dict = NULL,
              Cost.Center.Description = NULL) %>%
-      mutate(effective_date = format(map_effective_date, "%m/%d/%Y"),
+      mutate(effective_date = format(map_effective_date_dpt, "%m/%d/%Y"),
              prem_map = new_dpt_map) %>%
       relocate(effective_date, .before = Corporation.Code) %>%
       distinct()
@@ -676,7 +686,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                   # length
                   mutate(J.C.prem = substr(J.C, 1, 10)),
                 by = c("Job.Code" = "J.C.prem")) %>%
-      mutate(effective_date = format(map_effective_date, "%m/%d/%Y")) %>%
+      mutate(effective_date = format(map_effective_date_dpt, "%m/%d/%Y")) %>%
       relocate(effective_date, .before = Corporation.Code) %>%
       distinct()
     # when running the code live, new jobcodes that have not been updated in the
@@ -706,26 +716,26 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   #   tail()
   # ##
   
-  if (exists("new_paycodes")) {
+  premier_missing_paycode <- anti_join(upload_payroll %>%
+                                         select(Pay.Code) %>%
+                                         distinct(),
+                                       dict_premier_paycode %>%
+                                         select(Pay.Code))
+  
+  if (nrow(premier_missing_paycode) > 0) {
+    
     # update paycode dict
-    row_count <- nrow(new_paycodes)
-    upload_dict_paycode <- new_paycodes %>%
+    upload_dict_paycode <- premier_missing_paycode %>%
       left_join(map_uni_paycodes %>%
-                  select(RAW.PAY.CODE, PAY.CODE, PAY.CODE.NAME),
-                by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
-      # Corporation.Code can come from somewhere else, but it doesn't
-      # naturally come in from a join like with other dictionaries.
-      # perhaps make it a constant
-      mutate(Corporation.Code = 729805) %>%
-      rename(Site = Facility.Hospital.Id_Worked) %>%
-      relocate(Corporation.Code, .before = Site) %>%
-      mutate(Pay.Code = NULL)
-    if (nrow(upload_dict_paycode) != row_count) {
-      showDialog(title = "Join error",
-                 message = paste("Row count failed at", "upload_dict_paycode"))
-      stop(paste("Row count failed at", "upload_dict_paycode"))
-      }
-
+                  select(PAY.CODE, PAY.CODE.NAME),
+                by = c("Pay.Code" = "PAY.CODE")) %>%
+      merge(unique(upload_payroll$Facility.Hospital.Id_Worked)) %>%
+      rename(Site = y) %>%
+      mutate(Corp = corp_code) %>%
+      relocate(c(Corp, Site), .before = Pay.Code)
+      
+    # should this check be part of the Preprocessing > Update Universal Files
+    # section?
     if (max(nchar(upload_dict_paycode$PAY.CODE)) > char_len_paycode |
         max(nchar(upload_dict_paycode$PAY.CODE.NAME)) > char_len_paycode_name) {
       showDialog(title = "Paycode field error",
@@ -737,54 +747,23 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     }
     
     # update paycode map
+
     row_count <- nrow(upload_dict_paycode)
+    # add join rowcount check!
     upload_map_paycode <- upload_dict_paycode %>%
+      select(-PAY.CODE.NAME) %>%
+      # is a rowcount check needed for this join?
       left_join(map_uni_paycodes %>%
-                  select(-RAW.PAY.CODE, -Paycode_in_Universal)) %>%
-      mutate(PAY.CODE.NAME = NULL) %>%
-      # effective date should be the beginning of data file to be uploaded
-      mutate(effective_date =
-               # the date in upload_payroll has already been formatted
-               # as a text string so it has to be converted back in
-               # order to ensure the oldest value is selected
-               format(min(as.Date(upload_payroll$Start.Date, "%m/%d/%Y")),
-                      "%m/%d/%Y"),
-             # should allocation percent be a constant set at beginning of
-             # the script?
-             allocation_pct = 100) %>%
-      relocate(effective_date, .before = Corporation.Code)
-    if (nrow(upload_map_paycode) != row_count) {
-      showDialog(title = "Join error",
-                 message = paste("Row count failed at", "upload_map_paycode"))
-      stop(paste("Row count failed at", "upload_map_paycode"))
-      }
-
-    # FYI:
-    # if there's a new paycode at one site, we should upload it for all sites,
-    # correct? including MSH?
-    # the below code will ensure this, and can be appended to the pipelines
-    # above if preferred
-    # Would need to be mindful of incorporating join row count checks
-    
-    # corp_site <- data.frame(cbind(Corporation.Code = 729805,
-    #                      Site = c("630571", "NY2162", "NY2163"))) %>%
-    #   mutate(Corporation.Code = as.double(Corporation.Code))
-    # possible to get corp_site from a dictionary file?
-    # do we want to include MSH?
-    
-    # dict
-    # upload_dict_paycode <- upload_dict_paycode %>%
-    #   select(-Site) %>%
-    #   left_join(corp_site) %>%
-    #   relocate(Site, .after = Corporation.Code)
-      
-    # map
-    # upload_map_paycode <- upload_map_paycode %>%
-    #   select(-Site) %>%
-    #   left_join(corp_site) %>%
-    #   relocate(Site, .after = Corporation.Code)
-
+                  select(PAY.CODE, PAY.CODE.CATEGORY,
+                         INCLUDE.HOURS, INCLUDE.EXPENSES),
+                by = c("Pay.Code" = "PAY.CODE")) %>%
+      mutate(eff_date = as.character(dist_prev - lubridate::days(6),
+                                     "%m/%d/%Y"),
+             alloc_pct = 100) %>%
+      relocate(eff_date, .before = Corp)
+    # add join rowcount check messaging
   }
+  
   
   #dummy report upload
   upload_report_dict <- bislr_payroll %>%
@@ -885,11 +864,20 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     ungroup() %>%
     mutate(dist_date = format(distribution_date, "%m/%d/%Y")) %>%
     relocate(dist_date, .before = Avg_FTEs_worked) %>%
-    mutate(capture_time = as.character(Sys.time()))
+    mutate(capture_time = as.character(Sys.time())) %>%
+    rename(Site = Facility.Hospital.Id_Worked,
+           Department = DPT.WRKD) %>%
+    mutate(Site = case_when(
+      Site == "630571" ~ "MSBIB",
+      Site == "NY2162" ~ "MSW",
+      Site == "NY2163" ~ "MSM",
+      TRUE ~ "Other")
+    )
   
   fte_summary_path <- paste0("//researchsan02b/shr2/deans/Presidents/",
                              "SixSigma/MSHS Productivity/Productivity/",
-                             "Labor - Data/Multi-site/BISLR/Quality Checks/")
+                             "Labor - Data/Multi-site/BISLR/Quality Checks/",
+                             "Source Data/")
   
   fte_summary <- rbind(fte_summary,
                        read.xlsx2(file = paste0(fte_summary_path,
@@ -898,7 +886,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                                  rep("numeric", 2),
                                                  "character"),
                                   sheetName = "fte_summary") %>%
-                         select(Facility.Hospital.Id_Worked, DPT.WRKD,
+                         select(Site, Department,
                                 dist_date, Avg_FTEs_worked, Avg_FTEs_paid,
                                 capture_time))
 
@@ -924,14 +912,20 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                        SERVICE.LINE, CORPORATE.SERVICE.LINE,
                        VP) %>%
                 distinct(),
-              by = c("DPT.WRKD" = "ORACLE.COST.CENTER"))  %>%
+              by = c("Department" = "ORACLE.COST.CENTER"))  %>%
     left_join(rbind(dict_premier_dpt %>%
-                      select(-Dpt_in_Dict),
+                      select(-Dpt_in_Dict) %>%
+                      mutate(Site = case_when(
+                        Site == "630571" ~ "MSBIB",
+                        Site == "NY2162" ~ "MSW",
+                        Site == "NY2163" ~ "MSM",
+                        TRUE ~ "Other"
+                      )),
                     upload_dict_dpt) %>%
                 select(-Corporation.Code),
-              by = c("Facility.Hospital.Id_Worked" = "Site",
-                     "DPT.WRKD" = "Cost.Center")) %>%
-    select(Facility.Hospital.Id_Worked, DPT.WRKD, Cost.Center.Description,
+              by = c("Site" = "Site",
+                     "Department" = "Cost.Center")) %>%
+    select(Site, Department, Cost.Center.Description,
            DEFINITION.CODE, DEFINITION.NAME, SERVICE.LINE,
            CORPORATE.SERVICE.LINE, VP, dist_date,
            Avg_FTEs_worked, Avg_FTEs_paid, capture_time)
@@ -950,7 +944,11 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   # re-writing the file will need to be refined and likely located to a
   # different section
-  # file.remove(paste0(fte_summary_path,"fte_summary.xlsx"))
+  # file.rename(from = paste0(fte_summary_path, "fte_summary.xlsx"),
+  #             to = paste0(fte_summary_path,
+  #                         "fte_summary_",
+  #                         as.character(Sys.Date(), format = "%Y-%m-%d"),
+  #                         ".xlsx"))
   # write.xlsx2(as.data.frame(fte_summary),
   #             file = paste0(fte_summary_path,"fte_summary.xlsx"),
   #             row.names = F,
@@ -964,7 +962,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     left_join(filter_dates) %>%
     filter(!is.na(upload_date)) %>%
     filter(PROVIDER == 0) %>%
-    filter(DPT.WRKD %in% accural_legacy_cc) %>%
+    filter(DPT.WRKD %in% 
+             subset(report_list,
+                    Report.ID %in% accural_report_ids)$Cost.Center) %>%
     group_by(
       Facility.Hospital.Id_Worked, DPT.WRKD,
       Start.Date, End.Date) %>%
@@ -972,16 +972,43 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
               Expense = sum(Expense, na.rm = TRUE)) %>%
     ungroup()
   
-  # create a detailed view of the accrual depts?
-  # include: what the worked depts were originally mapped to?
-  #  (Worked Dept ID & Worked Dept Name)
-
-  # accrual_raw_detail <- raw_payroll %>%
-  #   filter(TBD)
-  # this results in error because the Legacy cost center is created in the
-  # bislr_payroll data.frame
-  # MM: I think we should save off the raw_accrual info in the midst of
-  # pre-processing.
+  # row count check not required for joining filter_dates
+  accrual_raw_detail <- accrual_raw_detail %>%
+    left_join(filter_dates) %>%
+    filter(!is.na(upload_date))
+  
+  row_count <- nrow(accrual_raw_detail)
+  accrual_raw_detail <- accrual_raw_detail %>%
+    left_join(map_uni_paycodes %>%
+                select(RAW.PAY.CODE, INCLUDE.HOURS,
+                       INCLUDE.EXPENSES, WORKED.PAY.CODE),
+              by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
+    mutate(INCLUDE.HOURS = as.integer(INCLUDE.HOURS),
+           INCLUDE.EXPENSES = as.integer(INCLUDE.EXPENSES),
+           WORKED.PAY.CODE = as.integer(WORKED.PAY.CODE))
+  if (nrow(accrual_raw_detail) != row_count) {
+    showDialog(title = "Join error",
+               message = paste("Row count failed at", "accrual_raw_detail"))
+    stop(paste("Row count failed at", "accrual_raw_detail"))
+  }
+  
+  accrual_raw_summary <- accrual_raw_detail %>%
+    mutate(Hours_Worked = Hours * INCLUDE.HOURS * WORKED.PAY.CODE,
+           Expense_Worked = Expense * INCLUDE.EXPENSES * WORKED.PAY.CODE,
+           Hours_Paid = Hours * INCLUDE.HOURS,
+           Expense_Paid = Expense * INCLUDE.EXPENSES
+    ) %>%
+    group_by(Facility.Hospital.Id_Worked, DPT.WRKD,
+             Department.Name.Worked.Dept, DPT.WRKD.LEGACY, Start.Date, End.Date,
+             ) %>%
+    summarize(Hours_Worked = sum(Hours_Worked, na.rm = TRUE),
+              Expense_Worked = sum(Expense_Worked, na.rm = TRUE),
+              Hours_Paid = sum(Hours_Paid, na.rm = TRUE),
+              Expense_Paid = sum(Expense_Paid, na.rm = TRUE)
+              ) %>%
+    ungroup()
+  
+  View(accrual_raw_summary)
 
 # Visualizations ----------------------------------------------------------
 
