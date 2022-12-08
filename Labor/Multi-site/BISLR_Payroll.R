@@ -226,7 +226,14 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   View(piv_wide_check)
   
-
+  current_paycycles <- raw_payroll %>%
+    filter(as.Date(End.Date, "%m/%d/%Y") >= dist_prev &
+             as.Date(End.Date, "%m/%d/%Y") <= distribution_date +
+             lubridate::days(7))
+  
+    #import previous payroll file
+    #filter previous to include current paycycles based on Start and End Date
+  
   ## Data  --------------------------------------------------------------------
   row_count <- nrow(raw_payroll)
   
@@ -259,13 +266,13 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
         trimws(Department.Name.Home.Dept) == "" ~ as.character(Department.ID.Home.Department),
         TRUE ~ DPT.HOME)) %>%
     mutate(Job.Code = case_when(
-        paste0(DPT.WRKD, '-', Employee.Name) %in%
+        paste0(DPT.WRKD, '-', toupper(Employee.Name)) %in%
           paste0(msus_removal_list$`Department IdWHERE Worked`,
                  '-', msus_removal_list$`Employee Name`)
         ~ unique(msus_removal_list$`New Job Code`),
         TRUE ~ Job.Code),
       Position.Code.Description = case_when(
-        paste0(DPT.WRKD, '-', Employee.Name) %in%
+        paste0(DPT.WRKD, '-', toupper(Employee.Name)) %in%
           paste0(msus_removal_list$`Department IdWHERE Worked`,
                  '-', msus_removal_list$`Employee Name`)
         ~ unique(msus_removal_list$`New Job Code Description`),
@@ -298,7 +305,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                 rename(Facility.Hospital.Id_Worked = Site,
                        DPT.WRKD = Cost.Center,
                        WRKJC_in_Dict = JC_in_Dict)) %>%
-    mutate(Job.Code_up = substr(Job.Code, 1, 10))
+    mutate(Job.Code_up = substr(Job.Code, 1, 10),
+           Approved.Hours.per.Pay.Period = case_when(
+             is.na(Approved.Hours.per.Pay.Period) ~ 0,
+             TRUE ~ Approved.Hours.per.Pay.Period))
   
   accrual_raw_detail <- bislr_payroll %>%
     filter(DPT.WRKD.LEGACY %in% 
@@ -737,7 +747,8 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     }
     
     # update paycode map
-    
+
+    row_count <- nrow(upload_dict_paycode)
     # add join rowcount check!
     upload_map_paycode <- upload_dict_paycode %>%
       select(-PAY.CODE.NAME) %>%
@@ -750,8 +761,9 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                      "%m/%d/%Y"),
              alloc_pct = 100) %>%
       relocate(eff_date, .before = Corp)
-    
+    # add join rowcount check messaging
   }
+  
   
   #dummy report upload
   upload_report_dict <- bislr_payroll %>%
@@ -782,8 +794,10 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       unique() %>%
       group_by(Site) %>%
     summarize(Cost.Center = paste(Cost.Center, collapse = ':')) %>%
-    # there's an error on the next line
-    left_join(dummy_reports %>% select(-contains('blank'), -Cost.Center)) %>%
+    left_join(dict_premier_report %>%
+                filter(Report.ID %in% dummy_report_ids) %>% 
+                select(-contains('blank'), -Cost.Center) %>%
+                distinct_at(vars(Site), .keep_all = T)) %>%
     relocate(Site, .after = Corporation.Code) %>%
     relocate(Cost.Center, .after = Report.ID)
 
@@ -1001,4 +1015,106 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
 
 # Exporting Data ----------------------------------------------------------
 
-  # remember to output Site Hours Quality Check
+  ## Reference Files --------------------------------------------------------------
+  write.table(upload_dict_dpt,
+              file = paste0(dir_BISLR,
+                            '/BISLR_Department Dictionary_',
+                            paste(format(as.Date(range(upload_payroll$End.Date),
+                                                 format = '%m/%d/%Y'),
+                                         '%d%b%y'),
+                                  collapse = ' to '),
+                            '.csv'),
+              row.names = F,
+              sep = ',')
+  
+  write.table(upload_map_dpt,
+              file = paste0(dir_BISLR,
+                            '/BISLR_Department Map_',
+                            paste(format(as.Date(range(upload_payroll$End.Date),
+                                                 format = '%m/%d/%Y'),
+                                         '%d%b%y'),
+                                  collapse = ' to '),
+                            '.csv'),
+              row.names = F,
+              sep = ',')
+  
+  write.table(upload_dict_dpt_jc,
+              file = paste0(dir_BISLR,
+                            '/BISLR_Department Job Code Dictionary_',
+                            paste(format(as.Date(range(upload_payroll$End.Date),
+                                                 format = '%m/%d/%Y'),
+                                         '%d%b%y'),
+                                  collapse = ' to '),
+                            '.csv'),
+              row.names = F,
+              sep = ',')
+  
+  write.table(upload_map_dpt_jc,
+              file = paste0(dir_BISLR,
+                            '/BISLR_Department Job Code Map_',
+                            paste(format(as.Date(range(upload_payroll$End.Date),
+                                                 format = '%m/%d/%Y'),
+                                         '%d%b%y'),
+                                  collapse = ' to '),
+                            '.csv'),
+              row.names = F,
+              sep = ',')
+  
+  if (exists("new_paycodes")){
+    write.table(upload_dict_paycode,
+                file = paste0(dir_BISLR,
+                              '/BISLR_Pay Code Dictionary_',
+                              paste(format(as.Date(range(upload_payroll$End.Date),
+                                                   format = '%m/%d/%Y'),
+                                           '%d%b%y'),
+                                    collapse = ' to '),
+                              '.csv'),
+                row.names = F,
+                sep = ',') 
+    
+    write.table(upload_map_paycode,
+                file = paste0(dir_BISLR,
+                              '/BISLR_Pay Code Map_',
+                              paste(format(as.Date(range(upload_payroll$End.Date),
+                                                   format = '%m/%d/%Y'),
+                                           '%d%b%y'),
+                                    collapse = ' to '),
+                              '.csv'),
+                row.names = F,
+                sep = ',')
+  }
+  
+  write.table(upload_report_dict,
+              file = paste0(dir_BISLR,
+                            '/BISLR_Dummy Report Dictionary_',
+                            paste(format(as.Date(range(upload_payroll$End.Date),
+                                                 format = '%m/%d/%Y'),
+                                         '%d%b%y'),
+                                  collapse = ' to '),
+                            '.csv'),
+              row.names = F,
+              sep = ',')
+  
+  ## Payroll Files --------------------------------------------------------------
+  sapply(1:length(unique(upload_payroll$Facility.Hospital.Id_Worked)),
+         function(x) write.table(
+           filter(upload_payroll,
+                  Facility.Hospital.Id_Worked ==
+                    unique(upload_payroll$Facility.Hospital.Id_Worked)[x]),
+           file = paste0(dir_BISLR,
+                         '/',
+                         unique(upload_payroll$Facility.Hospital.Id_Worked)[x],
+                         '_Payroll_',
+                         paste(format(as.Date(range(upload_payroll$End.Date),
+                                              format = '%m/%d/%Y'),
+                                      '%d%b%y'),
+                               collapse = ' to '),
+                         '.csv'),
+           row.names = F,
+           sep = ','))
+  
+  ## Quality Files --------------------------------------------------------------
+  write_rds(accrual_raw_detail,
+            file =  paste0(dir_BISLR,
+                           '/Quality Checks/Accrual Issue Raw Payroll',
+                           '/Raw Accrual Oringial Payroll.rds'))
