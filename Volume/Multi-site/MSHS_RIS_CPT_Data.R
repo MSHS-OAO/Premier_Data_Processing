@@ -15,10 +15,6 @@
                           '/Productivity/Universal Data')
   
   # Constants ---------------------------------------------------------------
-  #Dates needed for Premier Upload
-  # selected_start_date <- as.Date('2022-09-25')
-  # selected_end_date <- as.Date('2022-10-22')
-  # 
   premier_corp <- '729805'
   premier_budget <- 0
   
