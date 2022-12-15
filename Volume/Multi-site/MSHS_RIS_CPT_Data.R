@@ -16,9 +16,9 @@
   
   # Constants ---------------------------------------------------------------
   #Dates needed for Premier Upload
-  selected_start_date <- as.Date('2022-09-25')
-  selected_end_date <- as.Date('2022-10-22')
-  
+  # selected_start_date <- as.Date('2022-09-25')
+  # selected_end_date <- as.Date('2022-10-22')
+  # 
   premier_corp <- '729805'
   premier_budget <- 0
   
@@ -287,14 +287,12 @@
 # Creating Outputs --------------------------------------------------------
 
   ## Premier Upload Files ----------------------------------------------------
-  create_premier_upload <- function(df, selected_sites, start_date, end_date){
+  create_premier_upload <- function(df, selected_sites){
     return_df <- df %>% 
       select(`Premier Site`, `Cost Center`, Date, `CPT Code & Mod`) %>%
       mutate(Volume = 1) %>%
       #Filtering on dates needed for upload
-      filter(`Premier Site`%in% selected_sites,
-             Date <= end_date,
-             Date >= start_date) %>%
+      filter(`Premier Site`%in% selected_sites) %>%
       #Dropping blank CPT codes and unmapped Cost Centers
       drop_na(`Cost Center`,`CPT Code & Mod`) %>%
       #Summing up all the charges by date, cost center, and cpt code
@@ -313,13 +311,9 @@
   }
   
   msmw_upload <- create_premier_upload(df = mshs_rad_data,
-                                       selected_sites = c('NY2162', 'NY2163'),
-                                       start_date = selected_start_date,
-                                       end_date = selected_end_date)
+                                       selected_sites = c('NY2162', 'NY2163'))
   msbib_upload <- create_premier_upload(df = mshs_rad_data,
-                                       selected_sites = c('630571'),
-                                       start_date = selected_start_date,
-                                       end_date = selected_end_date)
+                                       selected_sites = c('630571'))
   # msh_upload
   # msq_upload
   
