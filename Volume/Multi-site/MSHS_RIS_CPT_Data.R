@@ -2,6 +2,8 @@
 # Libraries  --------------------------------------------------------------
   library(tidyverse)
   library(readxl)
+  library(readxl)
+  library(openxlsx)
   
   # Directories -------------------------------------------------------------
   dir_data <- paste0('J:/deans/Presidents/SixSigma/MSHS Productivity',
@@ -182,14 +184,18 @@
     data_files <- data_files %>% filter(File.Site %in% selected_sites)
     cat('Data files selected for the month',
         format(unique(data_files$File.Date), format = '%B %Y'))
-    data_files <- lapply(data_files$File.Path, read_xls)
+    data_files <- lapply(data_files$File.Path,
+                         function(x) read_xls(x,
+                                              col_types = c('text',
+                                                            'date',
+                                                            rep('text', 19))))
   return(data_files)
   }
   #leave argument sites blank if you want all sites to be selected or put
   #'other' to select sites you want
+  # most_recent_files = 0 will allow you to selct any time period of file
   mshs_rad_data <- import_recent_RIS_files(folder.path = paste0(dir_data,
                                                                 '/Source Data'),
-                                           most_recent_files = 0,
                                            sites = 'other')
 
 # Processing Data ---------------------------------------------------------
