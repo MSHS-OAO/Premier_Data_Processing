@@ -156,15 +156,27 @@
                                subset = `Site Name`%in% user_selected_sites)$Org
     }else{selected_sites <- map_premier_sites$Org}
     
-    #Quality Check on # of files TBD based on incorporation of MSH
-    #this check works for all data files "all sites" selected
-    # if(nrow(File.Table) %% 11 != 0) {
-    #   stop("Unexpected number of files in selected folder. There are ",
-    #        nrow(File.Table),
-    #        " files for ",
-    #        format(unique(File.Table$File.Date), format = '%B %Y') ,
-    #        " and there should be a total of 11 files for each month.")
-    # }
+    #Quality Check on # of files: if # files selected doesn't match # sites selected
+    if(sites == 'All Sites'){
+      if(nrow(File.Table) %% 11 != 0) {
+        stop("Unexpected number of files in selected folder. There are ",
+             nrow(File.Table),
+             " files for ",
+             format(unique(File.Table$File.Date), format = '%B %Y') ,
+             " and there should be a total of 11 files for each month.")
+      }
+    }else{
+      if(nrow(File.Table) %% length(selected_sites) != 0) {
+        stop("Unexpected number of files in selected folder. There are ",
+             nrow(File.Table),
+             " files for ",
+             format(unique(File.Table$File.Date), format = '%B %Y') ,
+             " and there should be a total of",
+             length(selected_sites),
+             "files for each month.")
+      }
+    }
+    
     File.Table <<- File.Table
     #Importing Data 
     data_files <- File.Table %>%
