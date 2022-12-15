@@ -1102,7 +1102,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   write.xlsx(pay_cycles_uploaded,
               file = paste0(dir_BISLR,
                             '/Reference',
-                            '/Pay cycles uploaded_Tracker Test_',
+                            '/Pay cycles uploaded_Tracker',
                             '.xlsx'),
               row.names = F)
   ## Payroll Files --------------------------------------------------------------
