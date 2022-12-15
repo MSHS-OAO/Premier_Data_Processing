@@ -465,6 +465,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     mutate(upload_date = 1) %>%
     arrange(Start.Date, End.Date)
   #Updating pay cycles filter dates dictionary
+  #Add in a column with time stamp when new filter dates are added to the tracker
   pay_cycles_uploaded_test <- rbind(pay_cycles_uploaded,
                                rename(filter_dates,
                                       Pay_Cycle_Uploaded = upload_date)) %>%
