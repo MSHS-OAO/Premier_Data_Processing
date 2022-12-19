@@ -453,14 +453,11 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   
   #Paycycles to filter on
   filter_dates <- bislr_payroll %>%
-    # filter commented out for generating historical
-    # fte_summary file
-    # filter(is.na(Pay_Cycle_Uploaded)) %>%
+    filter(is.na(Pay_Cycle_Uploaded)) %>% # comment out this line if working with an older file
     select(Start.Date, End.Date) %>%
     unique() %>%
     arrange(Start.Date) %>%
-    # End.Date changed to Start.Date for generating historical
-    filter(Start.Date > dist_prev,
+    filter(End.Date > dist_prev, # change End.Date to Start.Date if working with an older file
            !Start.Date > distribution_date) %>%
     mutate(upload_date = 1) %>%
     arrange(Start.Date, End.Date)
@@ -742,7 +739,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
       
     # should this check be part of the Preprocessing > Update Universal Files
     # section?
-    if (max(nchar(upload_dict_paycode$PAY.CODE)) > char_len_paycode |
+    if (max(nchar(upload_dict_paycode$Pay.Code)) > char_len_paycode |
         max(nchar(upload_dict_paycode$PAY.CODE.NAME)) > char_len_paycode_name) {
       showDialog(title = "Paycode field error",
                  message = paste0("Either a paycode or paycode name has more ",
@@ -957,6 +954,7 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
   #                         ".xlsx"))
   # write.xlsx2(as.data.frame(fte_summary),
   #             file = paste0(fte_summary_path,"fte_summary.xlsx"),
+  #             # file = "fte_summary.xlsx",
   #             row.names = F,
   #             sheetName = "fte_summary",
   #             append = FALSE)
