@@ -459,7 +459,14 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
     arrange(Start.Date) %>%
     filter(End.Date > dist_prev, # change End.Date to Start.Date if working with an older file
            !Start.Date > distribution_date) %>%
-    mutate(upload_date = 1)
+    mutate(upload_date = 1) %>%
+    arrange(Start.Date, End.Date)
+  #Updating pay cycles filter dates dictionary
+  #Add in a column with time stamp when new filter dates are added to the tracker
+  pay_cycles_uploaded_test <- rbind(pay_cycles_uploaded,
+                               rename(filter_dates,
+                                      Pay_Cycle_Uploaded = upload_date)) %>%
+    select(-Pay_Cycle_Uploaded)
   
   ## JC ID check ----------------------------------------------------
   # this section is here because if any job codes become duplicates after
@@ -1091,7 +1098,12 @@ msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                             '.csv'),
               row.names = F,
               sep = ',')
-  
+  write.xlsx(pay_cycles_uploaded,
+              file = paste0(dir_BISLR,
+                            '/Reference',
+                            '/Pay cycles uploaded_Tracker',
+                            '.xlsx'),
+              row.names = F)
   ## Payroll Files --------------------------------------------------------------
   sapply(1:length(unique(upload_payroll$Facility.Hospital.Id_Worked)),
          function(x) write.table(
