@@ -195,6 +195,12 @@ prev_0_max_date_msbib <- max(mdy(msbib_zero_old$date.end))
 week_reg_hr_indiv_emp_qc <- 40
 week_hr_indiv_emp_qc <- 55
 
+# constant for name of employee that needs to be removed fromd data
+employee_removal <- "Vistharla, Moses"
+
+# regular rate threshold for exempt employees
+exempt_payrate <- 1000
+
 # Data Pre-processing -----------------------------------------------------
 
 ## New Zero Upload ---------------------------------------------------------
@@ -213,11 +219,15 @@ mshq_zero_new <- mshq_upload_old %>%
 
 ## New Upload Preprocessing --------------------------------------------------
 
-# filter raw data on date range needed for upload
+# apply employee removal filter
 processed_data <- raw_data %>%
-  filter(mdy(Date.Worked) > min(c(prev_0_max_date_mshq,
+  filter(!Worker.Name %in% employee_removal)
+
+# filter raw data on date range needed for upload
+processed_data <- processed_data %>%
+  filter(mdy(Earnings.E.D) > min(c(prev_0_max_date_mshq,
                                   prev_0_max_date_msbib)),
-         mdy(Date.Worked) <= distribution_date)
+         mdy(Earnings.E.D) <= distribution_date)
 
 # process department.billed to get oracle home and legacy worked department
 processed_data <- processed_data %>%
@@ -330,15 +340,31 @@ jc_dict_upload <- processed_data %>%
 processed_data <- processed_data %>%
   rowwise() %>%
   mutate(daily_hours =
-           sum(Regular.Hours, OT.Hours, Holiday.Hours, Call.Back.Hours,
-               na.rm = T))
-
+           case_when(Bill.Type == "Time" ~ sum(Regular.Hours, OT.Hours, 
+                                               Holiday.Hours, Call.Back.Hours,
+                                               na.rm = T),
+                     Bill.Type == "Adjustment" ~ Weekly.Hours))
+           
 # Day Spend needs to be in numerical decimal format to summarize it
 processed_data <- processed_data %>%
   mutate(
     Day.Spend.char = Day.Spend,
-    Day.Spend = as.numeric(str_trim(gsub("[$,]", "", Day.Spend)))
-  )
+    Day.Spend = 
+      case_when(Bill.Type == "Time" ~ 
+                  as.numeric(str_trim(gsub("[$,]", "", Day.Spend))),
+                Bill.Type == "Adjustment" ~ 
+                  as.numeric(str_trim(gsub("[$,]", "", Time.Card.Spend)))))
+
+# special handling for exempt employee Time and 0 hour Adjustment 
+processed_data <- processed_data %>%
+  mutate(Regular.Rate = 
+           as.numeric(str_trim(gsub("[$,]", "", Regular.Rate)))) %>%
+  mutate(daily_hours = 
+           case_when(Regular.Rate > exempt_payrate ~ round(40, digits = 2),
+                     daily_hours == 0 & Bill.Type == "Adjustment" ~ 
+                       round(Day.Spend/Regular.Rate, digits = 2),
+                     TRUE ~ daily_hours))
+
 
 # need to summarize data
 rolled_up <- processed_data %>%
@@ -446,6 +472,12 @@ high_hr_emp <- processed_data %>%
           as.Date(Date.Worked, "%m/%d/%Y")) # %>%
 
 View(high_hr_emp)
+
+# qc for employees with regular payrate > $1000
+high_payrate <- processed_data %>%
+  filter(Regular.Rate > exempt_payrate)
+
+View(high_payrate)
 
 
 # File Saving -------------------------------------------------------------
