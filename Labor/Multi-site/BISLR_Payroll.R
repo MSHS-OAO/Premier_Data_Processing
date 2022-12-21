@@ -1046,6 +1046,9 @@ View(accrual_raw_summary)
 # MM: In order to make file organization/sorting easier,
 # I'd like to update all file date naming to be in YYYY-MM-DD format
 # instead of DD-Mon-YYYY format
+# Dates also need to be corrected for the date range.  Start date should be
+# used instead of end date for the beginning date.  The range should also
+# be appropriate for the particular site (BIB doesn't go as far as SLR)
 
 ## Reference Files --------------------------------------------------------
 
