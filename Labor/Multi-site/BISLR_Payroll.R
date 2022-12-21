@@ -53,8 +53,8 @@ import_recent_file <- function(folder.path, place) {
   # Quality Check - Confirming Upload File
   answer <- showQuestion(title = "Question",
                          message = paste0("File selected is: \n",
-                                          File.Table$File.Name[place],
-                                          ". \nIs this the correct file?"),
+                                          File.Table$File.Name[place], "\n",
+                                          "Is this the correct file?"),
                          ok = "Yes", cancel = "No")
   if (answer == F) {
     user_selected_file <- select.list(choices = File.Table$File.Name,
@@ -74,45 +74,68 @@ import_recent_file <- function(folder.path, place) {
 raw_payroll <- import_recent_file(paste0(dir_BISLR, "/Source Data"), 1)
 
 # Import References -------------------------------------------------------
-pay_cycles_uploaded <- read.xlsx(paste0(
-  dir_BISLR, "/Reference", "/Pay cycles uploaded_Tracker.xlsx"), sheetIndex = 1)
-msus_removal_list <- read_xlsx(paste0(
-  dir_BISLR, "/Reference/MSUS_removal_list.xlsx"), sheet = 1)
+pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR, "/Reference",
+                                        "/Pay cycles uploaded_Tracker.xlsx"),
+                                 sheetIndex = 1)
+msus_removal_list <- read_xlsx(paste0(dir_BISLR,
+                                      "/Reference/MSUS_removal_list.xlsx"),
+                               sheet = 1)
 ## Universal Reference Files -----------------------------------------------
-map_uni_paycodes <- read_xlsx(paste0(
-  dir_universal, "/Mapping/MSHS_Paycode_Mapping.xlsx"), sheet = 1)
-map_uni_jobcodes <- read_xlsx(paste0(
-  dir_universal, "/Mapping/MSHS_Jobcode_Mapping.xlsx"), sheet = 1)
-map_uni_reports <- read_xlsx(paste0(
-  dir_universal, "/Mapping/MSHS_Reporting_Definition_Mapping.xlsx"), sheet = 1)
-map_uni_paycycles <- read_xlsx(paste0(
-  dir_universal, "/Mapping/MSHS_Pay_Cycle.xlsx"), sheet = 1)
+map_uni_paycodes <- read_xlsx(paste0(dir_universal,
+                                     "/Mapping/MSHS_Paycode_Mapping.xlsx"),
+                              sheet = 1)
+map_uni_jobcodes <- read_xlsx(paste0(dir_universal,
+                                     "/Mapping/MSHS_Jobcode_Mapping.xlsx"),
+                              sheet = 1)
+map_uni_reports <- read_xlsx(paste0(dir_universal,
+                                    "/Mapping",
+                                    "/MSHS_Reporting_Definition_Mapping.xlsx"),
+                             sheet = 1)
+map_uni_paycycles <- read_xlsx(paste0(dir_universal,
+                                      "/Mapping/MSHS_Pay_Cycle.xlsx"),
+                               sheet = 1)
 
 ## Premier Reference Files -------------------------------------------------
-dict_premier_dpt <- read.csv(paste0(
-  dir_universal, "/Premier/Dictionary Exports", "/DepartmentDictionary.csv"),
-col.names = c("Corporation.Code", "Site", "Cost.Center",
-              "Cost.Center.Description"), sep = ",")
-map_premier_dpt <- read.csv(paste0(
-  dir_universal, "/Premier/Mapping Exports", "/DepartmentMapping.csv"),
-col.names = c("Effective.Date", "Corporation.Code", "Site", "Cost.Center",
-  "Cost.Center.Map"), sep = ",")
-dict_premier_jobcode <- read.csv(paste0(
-  dir_universal, "/Premier/Dictionary Exports", "/DeptJobCodeDictionary.csv"),
-col.names = c("Corporation.Code", "Site", "Cost.Center", "Job.Code",
-  "Job.Code.Description"), sep = ",")
-dict_premier_report <- read.csv(paste0(
-  dir_universal, "/Premier/Dictionary Exports", "/DepartmentDef.csv"),
-  col.names = c("Corporation.Code", "Site", "Report.Name", "Report.ID",
-                "Cost.Center", "Report.Type", "Threshold.Type", "Target.Type",
-                "Exclude.Report.Rollup", "Effective.Date", "Paycycle.Type",
-                "Exclude.Admin.Rollup", "Exclude.Action.Plan",
-                "blank14", "blank15", "blank16", "blank17"),
-  sep = ",", fill = T)
+dict_premier_dpt <- read.csv(paste0(dir_universal,
+                                    "/Premier/Dictionary Exports",
+                                    "/DepartmentDictionary.csv"),
+                             col.names = c("Corporation.Code", "Site",
+                                           "Cost.Center",
+                                           "Cost.Center.Description"),
+                             sep = ",")
+map_premier_dpt <- read.csv(paste0(dir_universal, "/Premier/Mapping Exports",
+                                   "/DepartmentMapping.csv"),
+                            col.names = c("Effective.Date", "Corporation.Code",
+                                          "Site", "Cost.Center",
+                                          "Cost.Center.Map"),
+                            sep = ",")
+dict_premier_jobcode <- read.csv(paste0(dir_universal,
+                                        "/Premier/Dictionary Exports",
+                                        "/DeptJobCodeDictionary.csv"),
+                                 col.names = c("Corporation.Code", "Site",
+                                               "Cost.Center", "Job.Code",
+                                               "Job.Code.Description"),
+                                 sep = ",")
+dict_premier_report <- read.csv(paste0(dir_universal,
+                                       "/Premier/Dictionary Exports",
+                                       "/DepartmentDef.csv"),
+                                col.names = c("Corporation.Code", "Site",
+                                              "Report.Name", "Report.ID",
+                                              "Cost.Center", "Report.Type",
+                                              "Threshold.Type", "Target.Type",
+                                              "Exclude.Report.Rollup",
+                                              "Effective.Date", "Paycycle.Type",
+                                              "Exclude.Admin.Rollup",
+                                              "Exclude.Action.Plan",
+                                              "blank14", "blank15",
+                                              "blank16", "blank17"),
+                                sep = ",", fill = T)
 
-dict_premier_paycode <- read.csv(paste0(
-  dir_universal, "/Premier/Dictionary Exports", "/PayCodeDictionaryExport.csv"),
-header = TRUE, sep = ",")
+dict_premier_paycode <- read.csv(paste0(dir_universal,
+                                        "/Premier/Dictionary Exports",
+                                        "/PayCodeDictionaryExport.csv"),
+                                 header = TRUE,
+                                 sep = ",")
 
 # Preprocessing --------------------------------------------------------------
 
@@ -160,9 +183,8 @@ dist_dates <- map_uni_paycycles %>%
   distinct() %>%
   drop_na() %>%
   arrange(END.DATE) %>%
-  filter(
-    PREMIER.DISTRIBUTION %in% c(TRUE, 1),
-    END.DATE < max(as.POSIXct(raw_payroll$End.Date, format = "%m/%d/%Y")))
+  filter(PREMIER.DISTRIBUTION %in% c(TRUE, 1),
+         END.DATE < max(as.POSIXct(raw_payroll$End.Date, format = "%m/%d/%Y")))
 
 # Selecting the most recent distribution date
 distribution_date <- max(as.POSIXct(dist_dates$END.DATE))
@@ -181,16 +203,13 @@ piv_wide_check <- raw_payroll %>%
   ungroup() %>%
   arrange(as.Date(End.Date, "%m/%d/%Y"),
           Facility.Hospital.Id_Worked, Payroll.Name) %>%
-  bind_rows(
-    summarize(
-      group_by(., Facility.Hospital.Id_Worked, End.Date),
-      Hours = sum(Hours, na.rm = TRUE),
-      Payroll.Name = "-SITE TOTAL-")) %>%
-  bind_rows(
-    summarize(
-      group_by(filter(., Payroll.Name == "-SITE TOTAL-"), End.Date),
-      Hours = sum(Hours, na.rm = TRUE),
-      across(where(is.character), ~"TOTAL"))) %>%
+  bind_rows(summarize(group_by(., Facility.Hospital.Id_Worked, End.Date),
+                      Hours = sum(Hours, na.rm = TRUE),
+                      Payroll.Name = "-SITE TOTAL-")) %>%
+  bind_rows(summarize(group_by(filter(., Payroll.Name == "-SITE TOTAL-"),
+                               End.Date),
+                      Hours = sum(Hours, na.rm = TRUE),
+                      across(where(is.character), ~"TOTAL"))) %>%
   arrange(Facility.Hospital.Id_Worked, Payroll.Name,
           as.Date(End.Date, "%m/%d/%Y")) %>%
   mutate(Hours = prettyNum(Hours, big.mark = ",")) %>%
@@ -198,13 +217,23 @@ piv_wide_check <- raw_payroll %>%
 
 View(piv_wide_check)
 
+# MM: what is current_paycycles for?
+# is this really taken care of in another part of the script?
+# should it be deleted or is there something to develop?
+# is this meant to be used for a comparison with the previous raw payroll file?
 current_paycycles <- raw_payroll %>%
   filter(as.Date(End.Date, "%m/%d/%Y") >= dist_prev &
     as.Date(End.Date, "%m/%d/%Y") <= distribution_date +
                                      lubridate::days(7))
 
-# import previous payroll file
-# filter previous to include current paycycles based on Start and End Date
+# in order to perform a more thorough QC of the piv_wide_check table,
+# we can:
+# (1) import previous payroll file and minimally process it to compare
+# (2) write the piv_wide_check table to a file (RDS?) at the end of this script
+# and import the previous.  Either create a comparison table that calculates
+# the difference (challenging for the catch-up months with an extra pay period)
+# or merge the current and previous to create an even wider table to scroll
+# through history.
 
 ## Data  --------------------------------------------------------------------
 row_count <- nrow(raw_payroll)
@@ -339,6 +368,10 @@ while (NA %in% unique(bislr_payroll$JC_in_UniversalFile)) {
 
   View(new_jobcodes)
 
+  # MM: change the location of where this file is written
+  # I'd also like to add the date to the file
+  # and likely keep the files for future reference to trace
+  # back when job codes were new
   write.csv(new_jobcodes,
             paste0("New Job Codes for Universal File",
                    if (loop == 1) {
@@ -348,6 +381,10 @@ while (NA %in% unique(bislr_payroll$JC_in_UniversalFile)) {
                    },
                    ".csv"))
 
+  # MM: nothing can be navigated and viewed in an R session while
+  # the following window is open.  Perhaps this is an instance to
+  # add an additional step to get user input in the console
+  # or find another strategy
   showQuestion(title = "Warning",
                message =
                  paste0(
@@ -361,7 +398,15 @@ while (NA %in% unique(bislr_payroll$JC_in_UniversalFile)) {
                    "\n \n If you want to quit running the code select no \n",
                    " then click the stop code button in the console"),
                ok = "Yes", cancel = "No")
+  # this might be a good area to consider adding a Sys.sleep() delay
+  # so the user has time to hit the STOP button.
+  # Maybe the Sys.sleep() is nested in an if() statement that checks the value
+  # of the user input for the previous question
+  # Maybe a duration of 15 seconds is sufficient
 
+  # MM: I believe Anjelica and I discussed nesting many of these statements
+  # within an if() statement based on an "ok" user input from the previous
+  # prompt, but there's probably a simpler solution
   map_uni_jobcodes <- read_xlsx(paste0(dir_universal,
                                        "/Mapping/MSHS_Jobcode_Mapping.xlsx"),
                                 sheet = 1)
@@ -395,6 +440,8 @@ while (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
     select(Facility.Hospital.Id_Worked, Pay.Code) %>%
     unique()
   View(new_paycodes)
+
+  # MM: setup similarly to the new jobcodes section
   write.csv(new_paycodes,
             paste0("New Pay Codes for Universal File",
                    if (loop == 1) {
@@ -404,6 +451,7 @@ while (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
                    },
                    ".csv"))
 
+  # MM: setup similarly to the new jobcodes section
   showQuestion(
     title = "Warning",
     message = paste0(
@@ -442,6 +490,10 @@ while (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
 }
 
 # Paycycles to filter on
+
+# MM: update this code to prompt the user to understand if an older file
+# is being re-processed so this can be handled properly and the person
+# running the code doesn't have to comment/uncomment code
 filter_dates <- bislr_payroll %>%
   filter(is.na(Pay_Cycle_Uploaded)) %>% # comment out this line if
                                         # working with an older file
@@ -454,12 +506,15 @@ filter_dates <- bislr_payroll %>%
     !Start.Date > distribution_date) %>%
   mutate(upload_date = 1) %>%
   arrange(Start.Date, End.Date)
+
 # Updating pay cycles filter dates dictionary
-# Add in a column with time stamp when new filter dates are added to the tracker
-pay_cycles_uploaded_test <- rbind(pay_cycles_uploaded,
+# MM: Improvement: Add in a column with date+time stamp
+# when new filter dates are added to the tracker
+pay_cycles_uploaded <- rbind(pay_cycles_uploaded,
                                   rename(filter_dates,
                                          Pay_Cycle_Uploaded = upload_date)) %>%
   select(-Pay_Cycle_Uploaded)
+  # %>% mutate(capture_time = as.character(Sys.time()))
 
 ## JC ID check ----------------------------------------------------
 # this section is here because if any job codes become duplicates after
@@ -529,9 +584,15 @@ if (exists("new_jobcodes")) {
 
 row_count <- nrow(bislr_payroll)
 upload_payroll <- bislr_payroll %>%
-  # is there a method to filter on multiple columns instead of join?
-  # reference the DUS_RMV mutate()-case_when() as an example
-  # join seems simple/quick enough that we can keep it.
+  # best known alternative to a join when trying to match on multiple columns is
+  # a case_when and mutate on multiple columns
+  # This is kind of like creating a helper column in Excel
+  # DRAFT of alternative to join:
+  # mutate(upload_date = case_when(
+  #   paste0(Start.Date, "-", End.Date) %in%
+  #     paste0(filter_dates$Start.Date, "-", filter_dates$End.Date) ~ 1,
+  #   TRUE ~ )) %>%
+  # join seems simple/quick enough that we could keep it.
   left_join(filter_dates) %>%
   left_join(select(map_uni_paycodes, RAW.PAY.CODE, PAY.CODE),
             by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
@@ -539,6 +600,7 @@ upload_payroll <- bislr_payroll %>%
          PAY.CODE = NULL,
          Start.Date = format(Start.Date, "%m/%d/%Y"),
          End.Date = format(End.Date, "%m/%d/%Y"))
+
 if (nrow(upload_payroll) != row_count) {
   showDialog(title = "Join error",
              message = paste("Row count failed at", "upload_payroll"))
@@ -593,6 +655,7 @@ if (NA %in% bislr_payroll$HomeDpt_in_Dict |
   # there's some sort of error in the Cost.Center id column
   # these are values: --1--83-000 & --1--85-000
   # Anjelica will code to handle this issue further up in the script.
+  # WAS THIS COMPLETED?
 
   # update dpt map
 
@@ -684,13 +747,12 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
   View(upload_map_dpt_jc_na)
 }
 
-
 # # test data.frame for new paycodes
 # new_paycodes <- bislr_payroll %>%
 #   select(Facility.Hospital.Id_Worked, Pay.Code) %>%
 #   unique() %>%
 #   tail()
-# ##
+# #
 
 premier_missing_paycode <- anti_join(upload_payroll %>%
                                        select(Pay.Code) %>%
@@ -787,7 +849,6 @@ jc_desc_check <- bislr_payroll %>%
   summarize(freq = n()) %>%
   arrange(-freq, Job.Code) %>%
   filter(freq > 1) %>%
-  # mutate(freq = NULL) %>%
   inner_join(bislr_payroll %>%
     select(Job.Code, Position.Code.Description, PROVIDER) %>%
     distinct())
@@ -805,7 +866,8 @@ if (max(jc_desc_check$freq) > jc_desc_threshold) {
   View(jc_desc_check)
 }
 # pull in Premier jobcode category or other info to help?
-# seems like it will be infrequent, so may not be worth coding for it
+# seems like it will be infrequent, so it's not be worth coding for it at
+# this point in time
 
 
 ## cost center and upload FTE count -------------------------------------
@@ -920,7 +982,7 @@ if (nrow(fte_summary) != row_count) {
 #                         as.character(Sys.Date(), format = "%Y-%m-%d"),
 #                         ".xlsx"))
 # write.xlsx2(as.data.frame(fte_summary),
-#             file = paste0(fte_summary_path,"fte_summary.xlsx"),
+#             file = paste0(fte_summary_path,"fte_summary_2022-11.xlsx"),
 #             # file = "fte_summary.xlsx",
 #             row.names = F,
 #             sheetName = "fte_summary",
@@ -981,7 +1043,16 @@ View(accrual_raw_summary)
 
 # Exporting Data ----------------------------------------------------------
 
+# MM: In order to make file organization/sorting easier,
+# I'd like to update all file date naming to be in YYYY-MM-DD format
+# instead of DD-Mon-YYYY format
+
 ## Reference Files --------------------------------------------------------
+
+
+# is there an easy function that can be created to
+# cycle through all these files?
+# a constant can be created to store all the standard info for these
 write.table(upload_dict_dpt,
             file = paste0(dir_BISLR, "/BISLR_Department Dictionary_",
                           paste(format(as.Date(range(upload_payroll$End.Date),
@@ -1039,6 +1110,10 @@ write.xlsx(pay_cycles_uploaded,
                          "/Pay cycles uploaded_Tracker", ".xlsx"),
            row.names = F)
 ## Payroll Files --------------------------------------------------------------
+
+# MM: is there a better way to cycle than to use sapply?
+# or should this simply be muted so the NULL return is not printed in
+# the console?
 sapply(
   seq_len(length(unique(upload_payroll$Facility.Hospital.Id_Worked))),
   function(x) {
@@ -1059,4 +1134,4 @@ sapply(
 write_rds(accrual_raw_detail,
           file = paste0(dir_BISLR,
                         "/Quality Checks/Accrual Issue Raw Payroll",
-                        "/Raw Accrual Oringial Payroll.rds"))
+                        "/Raw Accrual Original Payroll.rds"))
