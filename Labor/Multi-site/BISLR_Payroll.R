@@ -706,6 +706,10 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
   # update dpt job code map
 
   row_count <- nrow(upload_dict_dpt_jc)
+  
+  # format is incorrect
+  # need to only list jobcode_up and needs percentage for each row
+  
   upload_map_dpt_jc <- upload_dict_dpt_jc %>%
     select(-Job.Code.Description) %>%
     # the map_premier_dpt Cost.Center column is character type
@@ -1061,28 +1065,32 @@ write.table(upload_dict_dpt,
                           paste(format(as.Date(range(upload_payroll$End.Date),
                                                format = "%m/%d/%Y"), "%d%b%y"),
                                 collapse = " to "), ".csv"),
-            row.names = F, sep = ",")
+            row.names = F, col.names = F, sep = ",")
+
 
 write.table(upload_map_dpt,
             file = paste0(dir_BISLR, "/BISLR_Department Map_",
                           paste(format(as.Date(range(upload_payroll$End.Date),
                                                format = "%m/%d/%Y"), "%d%b%y"),
                                 collapse = " to "), ".csv"),
-            row.names = F, sep = ",")
+            row.names = F, col.names = F, sep = ",")
+
 
 write.table(upload_dict_dpt_jc,
             file = paste0(dir_BISLR, "/BISLR_Department Job Code Dictionary_",
                           paste(format(as.Date(range(upload_payroll$End.Date),
                                                format = "%m/%d/%Y"), "%d%b%y"),
                                 collapse = " to "), ".csv"),
-            row.names = F, sep = ",")
+            row.names = F, col.names = F, sep = ",")
+
 
 write.table(upload_map_dpt_jc,
             file = paste0(dir_BISLR, "/BISLR_Department Job Code Map_",
                           paste(format(as.Date(range(upload_payroll$End.Date),
                                                format = "%m/%d/%Y"), "%d%b%y"),
                                 collapse = " to "), ".csv"),
-            row.names = F, sep = ",")
+            row.names = F, col.names = F, sep = ",")
+
 
 if (exists("new_paycodes")) {
   write.table(upload_dict_paycode,
@@ -1091,7 +1099,7 @@ if (exists("new_paycodes")) {
                               upload_payroll$End.Date),
                               format = "%m/%d/%Y"), "%d%b%y"),
                               collapse = " to "), ".csv"),
-              row.names = F, sep = ",")
+              row.names = F, col.names = F, sep = ",")
 
   write.table(upload_map_paycode,
               file = paste0(dir_BISLR, "/BISLR_Pay Code Map_",
@@ -1099,7 +1107,8 @@ if (exists("new_paycodes")) {
                               upload_payroll$End.Date),
                               format = "%m/%d/%Y"), "%d%b%y"),
                               collapse = " to "), ".csv"),
-              row.names = F, sep = ",")
+              row.names = F, col.names = F, sep = ",")
+
 }
 
 write.table(upload_report_dict,
@@ -1107,11 +1116,13 @@ write.table(upload_report_dict,
                           paste(format(as.Date(range(upload_payroll$End.Date),
                                                format = "%m/%d/%Y"), "%d%b%y"),
                                 collapse = " to "), ".csv"),
-            row.names = F, sep = ",")
+            row.names = F, col.names = F, sep = ",")
+
 write.xlsx(pay_cycles_uploaded,
            file = paste0(dir_BISLR, "/Reference",
                          "/Pay cycles uploaded_Tracker", ".xlsx"),
            row.names = F)
+
 ## Payroll Files --------------------------------------------------------------
 
 # MM: is there a better way to cycle than to use sapply?
@@ -1129,7 +1140,7 @@ sapply(
                     "_Payroll_", paste(format(as.Date(range(
                       upload_payroll$End.Date), format = "%m/%d/%Y"), "%d%b%y"),
                       collapse = " to "), ".csv"),
-      row.names = F, sep = ",")
+      row.names = F, col.names = F, sep = ",")
   }
 )
 
