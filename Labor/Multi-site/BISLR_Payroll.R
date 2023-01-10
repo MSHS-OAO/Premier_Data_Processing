@@ -809,14 +809,20 @@ if (nrow(premier_missing_paycode) > 0) {
 
 
 # dummy report upload
+
+# MM: Ensure we're not putting too many cost centers into 
+# this reporting definition - there was an error in publishing
+# 11/19/2022 data for MSBIB because there were more Dept IDs than
+# Premier could handle for a single report
+
 upload_report_dict <- bislr_payroll %>%
+  # MM: Why is Home facility selected instead of worked?
   select(Home.FacilityOR.Hospital.ID, DPT.HOME, DPT.WRKD) %>%
   left_join(report_list %>%
               filter(Report.ID %in% dummy_report_ids) %>%
               select(Site, Cost.Center) %>%
-              rename(
-                Facility.Hospital.Id_Worked = Site,
-                DPT.WRKD = Cost.Center) %>%
+              rename(Facility.Hospital.Id_Worked = Site,
+                     DPT.WRKD = Cost.Center) %>%
               mutate(WRKD.DPT.in.Report = 1)) %>%
   left_join(report_list %>%
               filter(Report.ID %in% dummy_report_ids) %>%
