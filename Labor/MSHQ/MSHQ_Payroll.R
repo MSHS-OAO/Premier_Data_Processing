@@ -27,9 +27,8 @@ labor <- function(start,end){
            !is.na(Job.Code))
   #format paycode, employee name, Department names, and home department ID
   df <- left_join(df,paycode,by=c("Pay.Code"="RAW.PAY.CODE"))
-  new_paycodes <- df %>% filter(is.na(PAY.CODE))
+  new_paycodes <<- df %>% filter(is.na(PAY.CODE))
   if(nrow(filter(df, is.na(PAY.CODE))) != 0) {
-    return(new_paycodes)
     stop("New Paycode(s). Check df for new paycode(s)")
   }
   df <- df %>%
