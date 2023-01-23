@@ -1117,6 +1117,7 @@ if (exists("new_paycodes")) {
 
 }
 
+# Need to add a check on how long the list is getting for each report
 write.table(upload_report_dict,
             file = paste0(dir_BISLR, "/BISLR_Dummy Report Dictionary_",
                           paste(format(as.Date(range(upload_payroll$End.Date),
