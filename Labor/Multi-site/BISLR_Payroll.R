@@ -629,6 +629,8 @@ upload_payroll <- upload_payroll %>%
 
 ## Premier Reference Files -------------------------------------------------
 
+### Dpt Dict and Map -------------------------------------------------------
+
 if (NA %in% bislr_payroll$HomeDpt_in_Dict |
     NA %in% bislr_payroll$WRKDpt_in_Dict) {
 
@@ -683,6 +685,8 @@ if (NA %in% bislr_payroll$HomeDpt_in_Dict |
     distinct()
 }
 
+### Dpt JC Dict and Map -----------------------------------------------------
+
 if (NA %in% bislr_payroll$WRKJC_in_Dict |
     NA %in% bislr_payroll$HOMEJC_in_Dict) {
 
@@ -711,10 +715,10 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
   # update dpt job code map
 
   row_count <- nrow(upload_dict_dpt_jc)
-  
+
   # format is incorrect
   # need to only list jobcode_up and needs percentage for each row
-  
+
   upload_map_dpt_jc <- upload_dict_dpt_jc %>%
     select(-Job.Code.Description) %>%
     # the map_premier_dpt Cost.Center column is character type
@@ -750,6 +754,8 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
     filter(is.na(PREMIER.J.C))
   View(upload_map_dpt_jc_na)
 }
+
+### Paycode Dict and Map ---------------------------------------------------
 
 # # test data.frame for new paycodes
 # new_paycodes <- bislr_payroll %>%
@@ -802,17 +808,23 @@ if (nrow(premier_missing_paycode) > 0) {
     mutate(eff_date = as.character(dist_prev - lubridate::days(6), "%m/%d/%Y"),
            alloc_pct = 100) %>%
     relocate(eff_date, .before = Corp)
-  
+
   if (nrow(upload_map_paycode) != row_count) {
     showDialog(title = "Join error",
                message = paste("Row count failed at", "upload_map_paycode"))
     stop(paste("Row count failed at", "upload_map_paycode"))
+  }
 }
 
 
-# dummy report upload
+### Dummy Report Dict ------------------------------------------------------
 
-# MM: Ensure we're not putting too many cost centers into 
+# These reports are those that have the Cost Center mapped when the 
+# Home Cost Center is not in an existing report.  If the home cost center
+# is not in an existing report, the Premier Employee Level Detail report
+# will not display the employee's hour detail.
+
+# MM: Ensure we're not putting too many cost centers into
 # this reporting definition - there was an error in publishing
 # 11/19/2022 data for MSBIB because there were more Dept IDs than
 # Premier could handle for a single report
@@ -1050,17 +1062,8 @@ accrual_raw_summary <- accrual_raw_detail %>%
 
 View(accrual_raw_summary)
 
-# Visualizations ----------------------------------------------------------
-
 
 # Exporting Data ----------------------------------------------------------
-
-# MM: In order to make file organization/sorting easier,
-# I'd like to update all file date naming to be in YYYY-MM-DD format
-# instead of DD-Mon-YYYY format
-# Dates also need to be corrected for the date range.  Start date should be
-# used instead of end date for the beginning date.  The range should also
-# be appropriate for the particular site (BIB doesn't go as far as SLR)
 
 date_range <- paste0(
   format(dist_prev + lubridate::days(1), "%Y-%m-%d"),
@@ -1070,10 +1073,6 @@ date_range <- paste0(
 
 ## Reference Files --------------------------------------------------------
 
-
-# is there an easy function that can be created to
-# cycle through all these files?
-# a constant can be created to store all the standard info for these
 write.table(upload_dict_dpt,
             file = paste0(dir_BISLR, "/BISLR_Department Dictionary_",
                           date_range, ".csv"),
@@ -1111,7 +1110,6 @@ if (exists("new_paycodes")) {
 
 }
 
-# Need to add a check on how long the list is getting for each report
 write.table(upload_report_dict,
             file = paste0(dir_BISLR, "/BISLR_Dummy Report Dictionary_",
                           date_range, ".csv"),
