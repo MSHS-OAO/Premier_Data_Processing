@@ -1060,6 +1060,12 @@ View(accrual_raw_summary)
 # used instead of end date for the beginning date.  The range should also
 # be appropriate for the particular site (BIB doesn't go as far as SLR)
 
+date_range <- paste0(
+  format(dist_prev + lubridate::days(1), "%Y-%m-%d"),
+  "_to_",
+  format(distribution_date, "%Y-%m-%d")
+)
+
 ## Reference Files --------------------------------------------------------
 
 
@@ -1068,51 +1074,37 @@ View(accrual_raw_summary)
 # a constant can be created to store all the standard info for these
 write.table(upload_dict_dpt,
             file = paste0(dir_BISLR, "/BISLR_Department Dictionary_",
-                          paste(format(as.Date(range(upload_payroll$End.Date),
-                                               format = "%m/%d/%Y"), "%d%b%y"),
-                                collapse = " to "), ".csv"),
+                          date_range, ".csv"),
             row.names = F, col.names = F, sep = ",")
 
 
 write.table(upload_map_dpt,
             file = paste0(dir_BISLR, "/BISLR_Department Map_",
-                          paste(format(as.Date(range(upload_payroll$End.Date),
-                                               format = "%m/%d/%Y"), "%d%b%y"),
-                                collapse = " to "), ".csv"),
+                          date_range, ".csv"),
             row.names = F, col.names = F, sep = ",")
 
 
 write.table(upload_dict_dpt_jc,
             file = paste0(dir_BISLR, "/BISLR_Department Job Code Dictionary_",
-                          paste(format(as.Date(range(upload_payroll$End.Date),
-                                               format = "%m/%d/%Y"), "%d%b%y"),
-                                collapse = " to "), ".csv"),
+                          date_range, ".csv"),
             row.names = F, col.names = F, sep = ",")
 
 
 write.table(upload_map_dpt_jc,
             file = paste0(dir_BISLR, "/BISLR_Department Job Code Map_",
-                          paste(format(as.Date(range(upload_payroll$End.Date),
-                                               format = "%m/%d/%Y"), "%d%b%y"),
-                                collapse = " to "), ".csv"),
+                          date_range, ".csv"),
             row.names = F, col.names = F, sep = ",")
 
 
 if (exists("new_paycodes")) {
   write.table(upload_dict_paycode,
               file = paste0(dir_BISLR, "/BISLR_Pay Code Dictionary_",
-                            paste(format(as.Date(range(
-                              upload_payroll$End.Date),
-                              format = "%m/%d/%Y"), "%d%b%y"),
-                              collapse = " to "), ".csv"),
+                            date_range, ".csv"),
               row.names = F, col.names = F, sep = ",")
 
   write.table(upload_map_paycode,
               file = paste0(dir_BISLR, "/BISLR_Pay Code Map_",
-                            paste(format(as.Date(range(
-                              upload_payroll$End.Date),
-                              format = "%m/%d/%Y"), "%d%b%y"),
-                              collapse = " to "), ".csv"),
+                            date_range, ".csv"),
               row.names = F, col.names = F, sep = ",")
 
 }
@@ -1120,9 +1112,7 @@ if (exists("new_paycodes")) {
 # Need to add a check on how long the list is getting for each report
 write.table(upload_report_dict,
             file = paste0(dir_BISLR, "/BISLR_Dummy Report Dictionary_",
-                          paste(format(as.Date(range(upload_payroll$End.Date),
-                                               format = "%m/%d/%Y"), "%d%b%y"),
-                                collapse = " to "), ".csv"),
+                          date_range, ".csv"),
             row.names = F, col.names = F, sep = ",")
 
 write.xlsx(pay_cycles_uploaded,
@@ -1144,9 +1134,7 @@ sapply(
                unique(upload_payroll$Facility.Hospital.Id_Worked)[x]),
       file = paste0(dir_BISLR, "/",
                     unique(upload_payroll$Facility.Hospital.Id_Worked)[x],
-                    "_Payroll_", paste(format(as.Date(range(
-                      upload_payroll$End.Date), format = "%m/%d/%Y"), "%d%b%y"),
-                      collapse = " to "), ".csv"),
+                    "_Payroll_", date_range, ".csv"),
       row.names = F, col.names = F, sep = ",")
   }
 )
@@ -1155,4 +1143,5 @@ sapply(
 write_rds(accrual_raw_detail,
           file = paste0(dir_BISLR,
                         "/Quality Checks/Accrual Issue Raw Payroll",
-                        "/Raw Accrual Original Payroll.rds"))
+                        "/Raw Accrual Original Payroll",
+                        date_range, ".rds"))
