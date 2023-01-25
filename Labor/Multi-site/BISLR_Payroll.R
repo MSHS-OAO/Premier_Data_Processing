@@ -148,6 +148,9 @@ map_uni_jobcodes <- map_uni_jobcodes %>%
 map_uni_paycodes <- map_uni_paycodes %>%
   mutate(Paycode_in_Universal = 1)
 pay_cycles_uploaded <- pay_cycles_uploaded %>%
+  # filter(capture_time > TBD_Date) %>%
+  # a filter could be used to limit the paycycles referenced if desired
+  select(-capture_time) %>%
   mutate(Pay_Cycle_Uploaded = 1)
 dict_premier_dpt <- dict_premier_dpt %>%
   mutate(Cost.Center = as.character(Cost.Center), Dpt_in_Dict = 1)
@@ -494,6 +497,8 @@ while (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
   Sys.sleep(2)
 }
 
+## Paycycles --------------------------------------------------------------
+
 # Paycycles to filter on
 
 # MM: update this code to prompt the user to understand if an older file
@@ -518,8 +523,8 @@ filter_dates <- bislr_payroll %>%
 pay_cycles_uploaded <- rbind(pay_cycles_uploaded,
                                   rename(filter_dates,
                                          Pay_Cycle_Uploaded = upload_date)) %>%
-  select(-Pay_Cycle_Uploaded)
-  # %>% mutate(capture_time = as.character(Sys.time()))
+  select(-Pay_Cycle_Uploaded) %>%
+  mutate(capture_time = as.character(Sys.time()))
 
 ## JC ID check ----------------------------------------------------
 # this section is here because if any job codes become duplicates after
