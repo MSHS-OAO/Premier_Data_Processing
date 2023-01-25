@@ -326,14 +326,18 @@ bislr_payroll <- bislr_payroll %>%
       DPT.WRKD.LEGACY %in%
         subset(report_list, Report.ID %in% accrual_report_ids)$Cost.Center &
         !Department.Name.Worked.Dept %in% true_accrual_cc_desc ~
-        DPT.WRKD.LEGACY,
+          DPT.WRKD.LEGACY,
       TRUE ~ DPT.WRKD),
     Department.Name.Worked.Dept = case_when(
       DPT.WRKD.LEGACY %in%
         subset(report_list, Report.ID %in% accrual_report_ids)$Cost.Center &
         !Department.Name.Worked.Dept %in% true_accrual_cc_desc ~
-        "ACCRUAL COST CENTER",
-      TRUE ~ Department.Name.Worked.Dept))
+          "ACCRUAL COST CENTER",
+      TRUE ~ Department.Name.Worked.Dept),
+    WRKDpt_in_Dict = case_when(
+      DPT.WRKD %in%
+        subset(report_list, Report.ID %in% accrual_report_ids)$Cost.Center ~ 1,
+      TRUE ~ WRKDpt_in_Dict))
 
 if (nrow(bislr_payroll) != row_count) {
   showDialog(title = "Join error",
