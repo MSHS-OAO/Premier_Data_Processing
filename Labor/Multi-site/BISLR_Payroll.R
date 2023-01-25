@@ -793,10 +793,8 @@ if (nrow(premier_missing_paycode) > 0) {
   # update paycode map
 
   row_count <- nrow(upload_dict_paycode)
-  # add join rowcount check!
   upload_map_paycode <- upload_dict_paycode %>%
     select(-PAY.CODE.NAME) %>%
-    # is a rowcount check needed for this join?
     left_join(map_uni_paycodes %>%
                 select(PAY.CODE, PAY.CODE.CATEGORY, INCLUDE.HOURS,
                        INCLUDE.EXPENSES),
@@ -804,7 +802,11 @@ if (nrow(premier_missing_paycode) > 0) {
     mutate(eff_date = as.character(dist_prev - lubridate::days(6), "%m/%d/%Y"),
            alloc_pct = 100) %>%
     relocate(eff_date, .before = Corp)
-  # add join rowcount check messaging
+  
+  if (nrow(upload_map_paycode) != row_count) {
+    showDialog(title = "Join error",
+               message = paste("Row count failed at", "upload_map_paycode"))
+    stop(paste("Row count failed at", "upload_map_paycode"))
 }
 
 
