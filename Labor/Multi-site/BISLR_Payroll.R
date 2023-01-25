@@ -16,6 +16,7 @@ dir_universal <- paste0(dir, "/Universal Data")
 new_dpt_map <- 10095
 map_effective_date_dpt <- as.Date("2010-01-01")
 corp_code <- 729805
+jc_alloc_pct <- 100
 
 accrual_report_ids <- c("DNU_8600", "DNU_MSM_8600", "DNU_MSW_8600")
 true_accrual_cc_desc <- c("ACCRUAL COST CENTER", "SPECIAL FUNDS ACCOUNTING",
@@ -720,22 +721,17 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
     mutate(Cost.Center.Map = case_when(
       is.na(Cost.Center.Map) ~ new_dpt_map,
       TRUE ~ Cost.Center.Map)) %>%
-    # the map_uni_jobcodes_bislr data.frame should be refreshed by the time
-    # this part of the code is run
     left_join(map_uni_jobcodes %>%
                 filter(PAYROLL == "BISLR") %>%
                 select(J.C, PREMIER.J.C) %>%
-                # this mutate assumes that all we've done to get a jobcode
-                # to fit into Premier is to shorten it to the acceptable
-                # length
-                mutate(J.C.prem = substr(J.C, 1, 10)),
+                mutate(J.C.prem = substr(J.C, 1, 10)) %>%
+                select(-J.C),
               by = c("Job.Code" = "J.C.prem")) %>%
-    mutate(effective_date = format(map_effective_date_dpt, "%m/%d/%Y")) %>%
+    mutate(effective_date = format(map_effective_date_dpt, "%m/%d/%Y"),
+           alloc_pct = jc_alloc_pct) %>%
     relocate(effective_date, .before = Corporation.Code) %>%
     distinct()
-  # when running the code live, new jobcodes that have not been updated in the
-  # universal mapping should show up as NA.
-  # but they should have been manually corrected by this point.
+
   if (nrow(upload_map_dpt_jc) != row_count) {
     showDialog(
       title = "Join error",
