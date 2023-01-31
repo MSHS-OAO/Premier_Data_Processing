@@ -94,7 +94,7 @@ new_col <- new_col %>%
   mutate(Status = "new")
 
 missing_col <-
-  colnames(raw_data)[!(colnames(raw_data_prev) %in% colnames(raw_data))]
+  colnames(raw_data_prev)[!(colnames(raw_data_prev) %in% colnames(raw_data))]
 missing_col <- missing_col %>%
   data.frame()
 colnames(missing_col) <- c("Column")
@@ -195,7 +195,7 @@ prev_0_max_date_msbib <- max(mdy(msbib_zero_old$date.end))
 week_reg_hr_indiv_emp_qc <- 40
 week_hr_indiv_emp_qc <- 55
 
-# constant for name of employee that needs to be removed fromd data
+# constant for name of employee that needs to be removed from data
 employee_removal <- "Vistharla, Moses"
 
 # regular rate threshold for exempt employees
@@ -469,7 +469,7 @@ high_hr_emp <- processed_data %>%
   filter(DEPARTMENT.BREAKDOWN == 1) %>%
   inner_join(hrs_indiv_emp) %>%
   arrange(-week_hours, Worker.Name, as.Date(Earnings.E.D, "%m/%d/%Y"),
-          as.Date(Date.Worked, "%m/%d/%Y")) # %>%
+          as.Date(Date.Worked, "%m/%d/%Y"))
 
 View(high_hr_emp)
 
