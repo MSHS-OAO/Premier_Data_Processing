@@ -465,8 +465,19 @@ while (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
     message = paste0(
       if (loop == 1) {
         "New pay codes detected! \n"
+        
+        if (max(nchar(new_paycodes$Pay.Code)) > char_len_paycode) {
+          paste0("\nBe aware a paycode will need to be shortened so it's not ",
+          "longer than the ", char_len_paycode, " limit.\n")
+        }
+        
       } else {
         "There are still new pay codes. \n"
+        
+        if (max(nchar(new_paycodes$Pay.Code)) > char_len_paycode) {
+          paste0("\nBe aware a paycode will need to be shortened so it's not ",
+                 "longer than the ", char_len_paycode, " character limit.\n")
+        }
       },
       "Update Universal Pay Code File before continuing. \n",
       "\n Have new pay codes been added?",
@@ -787,8 +798,7 @@ if (nrow(premier_missing_paycode) > 0) {
     mutate(Corp = corp_code) %>%
     relocate(c(Corp, Site), .before = Pay.Code)
 
-  # should this check be part of the Preprocessing > Update Universal Files
-  # section?
+  # user should be warned if character limit is broached
   if (max(nchar(upload_dict_paycode$Pay.Code)) > char_len_paycode |
     max(nchar(upload_dict_paycode$PAY.CODE.NAME)) > char_len_paycode_name) {
     showDialog(
@@ -796,9 +806,8 @@ if (nrow(premier_missing_paycode) > 0) {
       message = paste0(
         "Either a paycode or paycode name has more ",
         "characters than permitted.  ",
-        "Please fix them and rerun this segment of",
-        "the script."))
-    stop("Fix paycode errors and restart")
+        "Please fix them in the upload file to prevent upload errors ",
+        "and in the Universal Mapping file."))
   }
 
   # update paycode map
