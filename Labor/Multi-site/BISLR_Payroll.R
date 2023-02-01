@@ -838,13 +838,10 @@ if (nrow(premier_missing_paycode) > 0) {
 # is not in an existing report, the Premier Employee Level Detail report
 # will not display the employee's hour detail.
 
-# MM: Ensure we're not putting too many cost centers into
-# this reporting definition - there was an error in publishing
-# 11/19/2022 data for MSBIB because there were more Dept IDs than
-# Premier could handle for a single report
 
 upload_report_dict <- bislr_payroll %>%
-  # MM: Why is Home facility selected instead of worked?
+  # Home Facility is used because we're mainly interested in the
+  # Home Department for the dummy reports that are being updated
   select(Home.FacilityOR.Hospital.ID, DPT.HOME, DPT.WRKD) %>%
   left_join(report_list %>%
               filter(Report.ID %in% dummy_report_ids) %>%
@@ -865,7 +862,26 @@ upload_report_dict <- bislr_payroll %>%
   rbind(report_list %>%
           filter(Report.ID %in% dummy_report_ids) %>%
           select(Site, Cost.Center)) %>%
-  unique() %>%
+  unique()
+
+upload_report_dict_qc <- upload_report_dict %>%
+  group_by(Site) %>%
+  summarize(Cost.Center = paste(Cost.Center, collapse = "; ")) %>%
+  mutate(num_char = nchar(Cost.Center))
+
+if (max(upload_report_dict_qc$num_char >= 3000)) {
+  showDialog(
+    title = "Dummy Report Cost Centers Overflow",
+    message = paste0("There are too many characters in the Dummy Report ",
+                     "Cost Center list.  If you upload this file and try ",
+                     "to publish, the publishing job will stall and break ",
+                     "Premier.  PLEASE PLEASE PLEASE reduce the number of ",
+                     "Cost Centers included in the report before Publishing ",
+                     "Premier data.")
+    )
+}
+
+upload_report_dict <- upload_report_dict %>%
   group_by(Site) %>%
   summarize(Cost.Center = paste(Cost.Center, collapse = ":")) %>%
   left_join(dict_premier_report %>%
