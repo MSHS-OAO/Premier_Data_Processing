@@ -228,23 +228,6 @@ piv_wide_check <- raw_payroll %>%
 View(piv_wide_check)
 View(piv_wide_check_prev)
 
-# MM: what is current_paycycles for?
-# is this really taken care of in another part of the script?
-# should it be deleted or is there something to develop?
-# is this meant to be used for a comparison with the previous raw payroll file?
-current_paycycles <- raw_payroll %>%
-  filter(as.Date(End.Date, "%m/%d/%Y") >= dist_prev &
-    as.Date(End.Date, "%m/%d/%Y") <= distribution_date +
-                                     lubridate::days(7))
-
-# in order to perform a more thorough QC of the piv_wide_check table,
-# we can:
-# (1) import previous payroll file and minimally process it to compare
-# (2) write the piv_wide_check table to a file (RDS?) at the end of this script
-# and import the previous.  Either create a comparison table that calculates
-# the difference (challenging for the catch-up months with an extra pay period)
-# or merge the current and previous to create an even wider table to scroll
-# through history.
 
 ## Data  --------------------------------------------------------------------
 row_count <- nrow(raw_payroll)
@@ -531,30 +514,42 @@ while (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
 
 # Paycycles to filter on
 
-# MM: update this code to prompt the user to understand if an older file
-# is being re-processed so this can be handled properly and the person
-# running the code doesn't have to comment/uncomment code
+# based on the data
+paycycles_data <- bislr_payroll %>%
+  select(Start.Date, End.Date) %>%
+  distinct() %>%
+  filter(as.Date(Start.Date, "%m/%d/%Y") > dist_prev &
+           as.Date(Start.Date, "%m/%d/%Y") < distribution_date)
+
+# based on Pay_Cycle_uploaded
 filter_dates <- bislr_payroll %>%
-  filter(is.na(Pay_Cycle_Uploaded)) %>% # comment out this line if
-                                        # working with an older file
+  filter(is.na(Pay_Cycle_Uploaded)) %>%
   select(Start.Date, End.Date) %>%
   unique() %>%
   arrange(Start.Date) %>%
   filter(
-    End.Date > dist_prev, # change End.Date to Start.Date if
-                          # working with an older file
+    End.Date > dist_prev,
     !Start.Date > distribution_date) %>%
   mutate(upload_date = 1) %>%
   arrange(Start.Date, End.Date)
 
 # Updating pay cycles filter dates dictionary
-# MM: Improvement: Add in a column with date+time stamp
-# when new filter dates are added to the tracker
-pay_cycles_uploaded <- rbind(pay_cycles_uploaded,
-                                  rename(filter_dates,
-                                         Pay_Cycle_Uploaded = upload_date)) %>%
-  select(-Pay_Cycle_Uploaded) %>%
-  mutate(capture_time = as.character(Sys.time()))
+if (nrow(filter_dates) > 0) {
+  pay_cycles_uploaded <- rbind(pay_cycles_uploaded,
+                               rename(filter_dates,
+                                      Pay_Cycle_Uploaded = upload_date)) %>%
+    select(-Pay_Cycle_Uploaded) %>%
+    mutate(capture_time = as.character(Sys.time()))
+  date_filtering <- filter_dates
+}else{
+  showDialog(
+    title = "Dates in Data",
+    message = paste("It appears that you're working with data",
+                    "that has already been prepared for Premier upload",
+                    "at some point in the past.  Be careful not to",
+                    "overwrite data files by mistake."))
+  date_filtering <- paycycles_data
+}
 
 ## JC ID check ----------------------------------------------------
 # this section is here because if any job codes become duplicates after
@@ -633,7 +628,7 @@ upload_payroll <- bislr_payroll %>%
   #     paste0(filter_dates$Start.Date, "-", filter_dates$End.Date) ~ 1,
   #   TRUE ~ )) %>%
   # join seems simple/quick enough that we could keep it.
-  left_join(filter_dates) %>%
+  left_join(date_filtering) %>%
   left_join(select(map_uni_paycodes, RAW.PAY.CODE, PAY.CODE),
             by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
   mutate(Pay.Code = PAY.CODE,
@@ -1143,10 +1138,12 @@ write.table(upload_report_dict,
                           date_range, ".csv"),
             row.names = F, col.names = F, sep = ",")
 
-write.xlsx(pay_cycles_uploaded,
-           file = paste0(dir_BISLR, "/Reference",
-                         "/Pay cycles uploaded_Tracker", ".xlsx"),
-           row.names = F)
+if (nrow(filter_dates) > 0) {
+  write.xlsx(pay_cycles_uploaded,
+             file = paste0(dir_BISLR, "/Reference",
+                           "/Pay cycles uploaded_Tracker", ".xlsx"),
+             row.names = F)
+}
 
 ## Payroll Files --------------------------------------------------------------
 
