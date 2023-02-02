@@ -138,6 +138,12 @@ dict_premier_paycode <- read.csv(paste0(dir_universal,
                                  header = TRUE,
                                  sep = ",")
 
+
+## Quality - piv_wide_check ------------------------------------------------
+
+piv_wide_check_prev <- read.csv(paste0(dir_BISLR, "/Quality Checks",
+                                       "/piv_wide_check", ".csv"))
+
 # Preprocessing --------------------------------------------------------------
 
 
@@ -220,6 +226,7 @@ piv_wide_check <- raw_payroll %>%
   pivot_wider(names_from = End.Date, values_from = Hours)
 
 View(piv_wide_check)
+View(piv_wide_check_prev)
 
 # MM: what is current_paycycles for?
 # is this really taken care of in another part of the script?
@@ -1169,5 +1176,18 @@ write.xlsx2(as.data.frame(fte_summary),
             row.names = F,
             sheetName = "fte_summary",
             append = FALSE)
+
+# rename previous piv_wide_check
+file.rename(from = paste0(dir_BISLR, "/Quality Checks",
+                          "/piv_wide_check", ".csv"),
+            to = paste0(dir_BISLR, "/Quality Checks",
+                        "/piv_wide_check_BU_",
+                        as.character(Sys.time(), format = "%Y-%m-%d_%H-%M-%S"),
+                        ".csv"))
+# write piv_wide_check
+write.csv(piv_wide_check, 
+          file = paste0(dir_BISLR, "/Quality Checks",
+                        "/piv_wide_check", ".csv"),
+          row.names = FALSE)
 
 # End of Script -----------------------------------------------------------
