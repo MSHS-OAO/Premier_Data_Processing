@@ -1015,33 +1015,12 @@ fte_summary <- fte_summary %>%
          DEFINITION.CODE, DEFINITION.NAME, SERVICE.LINE,
          CORPORATE.SERVICE.LINE, VP, dist_date,
          Avg_FTEs_worked, Avg_FTEs_paid, capture_time)
-# Any preference on the arrangement order of columns?
-# arrange()
 
 if (nrow(fte_summary) != row_count) {
   showDialog(title = "Join error",
              message = paste("Row count failed at", "fte_summary"))
   stop(paste("Row count failed at", "fte_summary"))
 }
-
-# we can limit the number of distributions included in the fte_summary
-# or the visuals can limit the data displayed based on the excel
-# file
-
-# re-writing the file will need to be refined and likely located to a
-# different section
-# file.rename(from = paste0(fte_summary_path, "fte_summary.xlsx"),
-#             to = paste0(fte_summary_path,
-#                         "fte_summary_",
-#                         as.character(Sys.Date(), format = "%Y-%m-%d"),
-#                         ".xlsx"))
-# write.xlsx2(as.data.frame(fte_summary),
-#             file = paste0(fte_summary_path,"fte_summary_2022-11.xlsx"),
-#             # file = "fte_summary.xlsx",
-#             row.names = F,
-#             sheetName = "fte_summary",
-#             append = FALSE)
-
 
 ## 8600 Accrual Site Summary --------------------------------------------
 
@@ -1170,8 +1149,25 @@ sapply(
 )
 
 ## Quality Files --------------------------------------------------------------
+
+# accrual detail
 write_rds(accrual_raw_detail,
           file = paste0(dir_BISLR,
                         "/Quality Checks/Accrual Issue Raw Payroll",
                         "/Raw Accrual Original Payroll",
                         date_range, ".rds"))
+
+# backup the previous fte_summary
+file.rename(from = paste0(fte_summary_path, "fte_summary.xlsx"),
+            to = paste0(fte_summary_path,
+                        "fte_summary_BU_",
+                        as.character(Sys.time(), format = "%Y-%m-%d_%H-%M-%S"),
+                        ".xlsx"))
+# fte_summary
+write.xlsx2(as.data.frame(fte_summary),
+            file = "fte_summary.xlsx",
+            row.names = F,
+            sheetName = "fte_summary",
+            append = FALSE)
+
+# End of Script -----------------------------------------------------------
