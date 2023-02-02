@@ -357,7 +357,8 @@ if (nrow(bislr_payroll) != row_count) {
 
 ## Update Universal Files --------------------------------------------------
 loop <- 0
-while (NA %in% unique(bislr_payroll$JC_in_UniversalFile)) {
+while (NA %in% unique(bislr_payroll$JC_in_UniversalFile) |
+       NA %in% unique(bislr_payroll$PROVIDER)) {
   loop <- loop + 1
   new_jobcodes <- bislr_payroll %>%
     filter(is.na(JC_in_UniversalFile)) %>%
@@ -404,12 +405,14 @@ while (NA %in% unique(bislr_payroll$JC_in_UniversalFile)) {
                message =
                  paste0(
                    if (loop == 1) {
-                     "New job codes detected! \n"
+                     paste0("Job Code attention needed!\n",
+                            "New jobcodes and/or PROVIDER value is NA.\n")
                    } else {
-                     "There are still new job codes. \n"
+                     paste0("There are still new job codes and/or \n",
+                            "PROVIDER values of NA.\n")
                    },
                    "Update Universal Job Code File before continuing. \n",
-                   "\n Have new jobs been added?",
+                   "\n Has the mapping file been completely updated?",
                    "\n \n If you want to quit running the code select no \n",
                    " then click the stop code button in the console"),
                ok = "Yes", cancel = "No")
@@ -430,7 +433,6 @@ while (NA %in% unique(bislr_payroll$JC_in_UniversalFile)) {
     mutate(JC_in_UniversalFile = 1)
 
   row_count <- nrow(bislr_payroll)
-
   bislr_payroll <- left_join(
     bislr_payroll %>%
       select(-JC_in_UniversalFile, -PROVIDER),
