@@ -341,7 +341,7 @@ processed_data <- processed_data %>%
   rowwise() %>%
   mutate(daily_hours =
            case_when(Bill.Type == "Time" ~ sum(Regular.Hours, OT.Hours, 
-                                               Holiday.Hours, Call.Back.Hours,
+                                               Holiday.Hours,
                                                na.rm = T),
                      Bill.Type == "Adjustment" ~ Weekly.Hours))
            
