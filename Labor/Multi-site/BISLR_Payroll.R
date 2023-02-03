@@ -7,6 +7,9 @@ library(rstudioapi)
 library(stringr)
 library(stringi)
 
+# clear memory of all objects including those hidden
+rm(list = ls(all.names = TRUE))
+
 # Directories -------------------------------------------------------------
 dir <- "J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity"
 dir_BISLR <- paste0(dir, "/Labor - Data/Multi-site/BISLR")
@@ -330,7 +333,13 @@ bislr_payroll <- bislr_payroll %>%
     WRKDpt_in_Dict = case_when(
       DPT.WRKD %in%
         subset(report_list, Report.ID %in% accrual_report_ids)$Cost.Center ~ 1,
-      TRUE ~ WRKDpt_in_Dict))
+      TRUE ~ WRKDpt_in_Dict),
+    WRKJC_in_Dict = case_when(
+      DPT.WRKD %in%
+        subset(report_list, Report.ID %in%
+                 accrual_report_ids)$Cost.Center ~ NA_real_,
+      TRUE ~ WRKJC_in_Dict)
+    )
 
 if (nrow(bislr_payroll) != row_count) {
   showDialog(title = "Join error",
@@ -734,6 +743,8 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
              DPT.HOME, Job.Code_up, Position.Code.Description) %>%
       setNames(colnames(dict_premier_jobcode %>%
                           select(-JC_in_Dict)))) %>%
+    # for the future, we might look out for handling descriptoins
+    # that have special characters, such as & (ampersand)
     # mutate(Job.Code.Description = case_when(
     #   str_detect(Job.Code.Description, "&") ~
     #     str_replace(Job.Code.Description, "&", "AND"),
@@ -745,10 +756,6 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
   # update dpt job code map
 
   row_count <- nrow(upload_dict_dpt_jc)
-
-  # format is incorrect
-  # need to only list jobcode_up and needs percentage for each row
-
   upload_map_dpt_jc <- upload_dict_dpt_jc %>%
     select(-Job.Code.Description) %>%
     # the map_premier_dpt Cost.Center column is character type
@@ -769,7 +776,6 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
            alloc_pct = jc_alloc_pct) %>%
     relocate(effective_date, .before = Corporation.Code) %>%
     distinct()
-
   if (nrow(upload_map_dpt_jc) != row_count) {
     showDialog(
       title = "Join error",
@@ -998,10 +1004,10 @@ if (fte_summary %>% select(dist_date) %>% distinct() %>% nrow() !=
     fte_summary %>% select(dist_date, capture_time) %>% distinct() %>% nrow()) {
   showDialog(title = "Warning",
              message = paste(
-               "You are liking appending rows to",
+               "You will likely be appending rows to",
                "the fte_summary file for a distribution",
                "period that already exists in the file."))
-  stop(paste("You are liking appending rows to",
+  stop(paste("You will likely be appending rows to",
              "the fte_summary file for a distribution",
              "period that already exists in the file."))
 }
@@ -1039,8 +1045,7 @@ if (nrow(fte_summary) != row_count) {
 ## 8600 Accrual Site Summary --------------------------------------------
 
 accrual_summary <- bislr_payroll %>%
-  left_join(filter_dates) %>%
-  filter(!is.na(upload_date)) %>%
+  left_join(date_filtering) %>%
   filter(PROVIDER == 0) %>%
   filter(DPT.WRKD %in%
            subset(report_list,
@@ -1050,10 +1055,9 @@ accrual_summary <- bislr_payroll %>%
             Expense = sum(Expense, na.rm = TRUE)) %>%
   ungroup()
 
-# row count check not required for joining filter_dates
+# row count check not required for joining date_filtering
 accrual_raw_detail <- accrual_raw_detail %>%
-  left_join(filter_dates) %>%
-  filter(!is.na(upload_date))
+  left_join(date_filtering)
 
 row_count <- nrow(accrual_raw_detail)
 accrual_raw_detail <- accrual_raw_detail %>%
@@ -1070,6 +1074,7 @@ if (nrow(accrual_raw_detail) != row_count) {
   stop(paste("Row count failed at", "accrual_raw_detail"))
 }
 
+row_count <- nrow(accrual_raw_detail)
 accrual_raw_summary <- accrual_raw_detail %>%
   mutate(Hours_Worked = Hours * INCLUDE.HOURS * WORKED.PAY.CODE,
          Expense_Worked = Expense * INCLUDE.EXPENSES * WORKED.PAY.CODE,
@@ -1081,7 +1086,15 @@ accrual_raw_summary <- accrual_raw_detail %>%
             Expense_Worked = sum(Expense_Worked, na.rm = TRUE),
             Hours_Paid = sum(Hours_Paid, na.rm = TRUE),
             Expense_Paid = sum(Expense_Paid, na.rm = TRUE)) %>%
-  ungroup()
+  ungroup() %>%
+  left_join(map_uni_reports %>%
+              select(ORACLE.COST.CENTER, DEFINITION.CODE, DEFINITION.NAME),
+            by = c("DPT.WRKD" = "ORACLE.COST.CENTER"))
+if (nrow(accrual_raw_detail) != row_count) {
+  showDialog(title = "Join error",
+             message = paste("Row count failed at", "accrual_raw_summary"))
+  stop(paste("Row count failed at", "accrual_raw_summary"))
+}
 
 View(accrual_raw_summary)
 
