@@ -157,8 +157,6 @@ map_uni_jobcodes <- map_uni_jobcodes %>%
 map_uni_paycodes <- map_uni_paycodes %>%
   mutate(Paycode_in_Universal = 1)
 pay_cycles_uploaded <- pay_cycles_uploaded %>%
-  # filter(capture_time > TBD_Date) %>%
-  # a filter could be used to limit the paycycles referenced if desired
   select(-capture_time) %>%
   mutate(Pay_Cycle_Uploaded = 1)
 dict_premier_dpt <- dict_premier_dpt %>%
@@ -375,54 +373,47 @@ while (NA %in% unique(bislr_payroll$JC_in_UniversalFile) |
 
   View(new_jobcodes)
 
-  # MM: change the location of where this file is written
-  # I'd also like to add the date to the file
-  # and likely keep the files for future reference to trace
-  # back when job codes were new
-  
+
   if (nrow(new_jobcodes) > 0) {
-    
     new_jc_path <- paste0(dir_universal, "/Mapping/BISLR payroll script")
-    
     write.csv(new_jobcodes,
               paste0(new_jc_path,
                      "/new_jc_for_Universal_File_",
                      as.character(Sys.time(), format = "%Y-%m-%d"),
                      if (loop == 1) {
                        ""
-                     } else {
+                     }else{
                        paste0("_V", loop)
                      },
                      ".csv"))
-    
   }
-    
+
   # MM: nothing can be navigated and viewed in an R session while
   # the following window is open.  Perhaps this is an instance to
   # add an additional step to get user input in the console
   # or find another strategy
-  showQuestion(title = "Warning",
-               message =
-                 paste0(
-                   if (loop == 1) {
-                     paste0("Job Code attention needed!\n",
-                            "New jobcodes and/or PROVIDER value is NA.\n")
-                   } else {
-                     paste0("There are still new job codes and/or \n",
-                            "PROVIDER values of NA.\n")
-                   },
-                   "Update Universal Job Code File before continuing. \n",
-                   "\nIf there are new Job Codes they were written to a file ",
-                   "in this directory:\n'", new_jc_path, "'\n\n",
-                   "\n Has the mapping file been completely updated?",
-                   "\n \n If you want to quit running the code select no \n",
-                   " then click the stop code button in the console"),
-               ok = "Yes", cancel = "No")
-  # this might be a good area to consider adding a Sys.sleep() delay
-  # so the user has time to hit the STOP button.
-  # Maybe the Sys.sleep() is nested in an if() statement that checks the value
-  # of the user input for the previous question
-  # Maybe a duration of 15 seconds is sufficient
+  warn_new_jc <-
+    showQuestion(title = "Warning",
+                 message =
+                   paste0(
+                     if (loop == 1) {
+                       paste0("Job Code attention needed!\n",
+                              "New jobcodes and/or PROVIDER value is NA.\n")
+                     } else {
+                       paste0("There are still new job codes and/or \n",
+                              "PROVIDER values of NA.\n")
+                     },
+                     "Update Universal Job Code File before continuing. \n",
+                     "\nIf there are new Job Codes they were written to a ",
+                     "file in this directory:\n'", new_jc_path, "'\n\n",
+                     "\n Has the mapping file been completely updated?",
+                     "\n \n If you want to quit running the code select NO \n",
+                     " then click the stop code button in the console"),
+                 ok = "YES", cancel = "NO")
+
+  if (warn_new_jc == FALSE) {
+    Sys.sleep(15)
+  }
 
   # MM: I believe Anjelica and I discussed nesting many of these statements
   # within an if() statement based on an "ok" user input from the previous
@@ -460,41 +451,47 @@ while (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
     unique()
   View(new_paycodes)
 
-  # MM: setup similarly to the new jobcodes section
   write.csv(new_paycodes,
-            paste0("New Pay Codes for Universal File",
+            paste0(new_jc_path,
+                   "/new_paycodes_for_Universal_File_",
+                   as.character(Sys.time(), format = "%Y-%m-%d"),
                    if (loop == 1) {
                      ""
                    } else {
                      paste0("_V", loop)
                    },
                    ".csv"))
+  
+  warn_new_pc <-
+    showQuestion(
+      title = "Warning",
+      message = paste0(
+        if (loop == 1) {
+          "New pay codes detected! \n"
 
-  # MM: setup similarly to the new jobcodes section
-  showQuestion(
-    title = "Warning",
-    message = paste0(
-      if (loop == 1) {
-        "New pay codes detected! \n"
-        
-        if (max(nchar(new_paycodes$Pay.Code)) > char_len_paycode) {
-          paste0("\nBe aware a paycode will need to be shortened so it's not ",
-          "longer than the ", char_len_paycode, " limit.\n")
-        }
-        
-      } else {
-        "There are still new pay codes. \n"
-        
-        if (max(nchar(new_paycodes$Pay.Code)) > char_len_paycode) {
-          paste0("\nBe aware a paycode will need to be shortened so it's not ",
-                 "longer than the ", char_len_paycode, " character limit.\n")
-        }
-      },
-      "Update Universal Pay Code File before continuing. \n",
-      "\n Have new pay codes been added?",
-      "\n \n If you want to quit running the code select no \n",
-      " then click the stop code button in the console"),
-    ok = "Yes", cancel = "No")
+          if (max(nchar(new_paycodes$Pay.Code)) > char_len_paycode) {
+            paste0("\nBe aware a paycode will need to be shortened so it's ",
+                   "not longer than the ", char_len_paycode, " limit.\n")
+          }
+
+        } else {
+          "There are still new pay codes. \n"
+
+          if (max(nchar(new_paycodes$Pay.Code)) > char_len_paycode) {
+            paste0("\nBe aware a paycode will need to be shortened so it's ",
+                   "not longer than the ", char_len_paycode, " character ",
+                   "limit.\n")
+          }
+        },
+        "Update Universal Pay Code File before continuing. \n",
+        "\n Have new pay codes been added?",
+        "\n \n If you want to quit running the code select No \n",
+        " then click the stop code button in the console"),
+      ok = "Yes", cancel = "No")
+
+  if (warn_new_pc == FALSE) {
+    Sys.sleep(15)
+  }
 
   map_uni_paycodes <- read_xlsx(paste0(dir_universal,
                                        "/Mapping/MSHS_Paycode_Mapping.xlsx"),
@@ -568,30 +565,6 @@ if (nrow(filter_dates) > 0) {
 # There's an assumption that the universal jc mapping file has been updated
 # with new jobcodes by this point.
 
-# test data.frame for when new jobcodes were already created
-# new_jobcodes <- bislr_payroll %>%
-#   filter(Job.Code == "SM16") %>%
-#   select(Job.Code, Position.Code.Description) %>%
-#   unique() %>%
-#   mutate(JobDescCap = toupper(Position.Code.Description)) %>%
-#   left_join(map_uni_jobcodes %>%
-#               filter(PAYROLL == 'MSHQ') %>%
-#               select(J.C.DESCRIPTION, PROVIDER, PREMIER.J.C,
-#                      PREMIER.J.C.DESCRIPTION) %>%
-#               rename(JobDescCap = J.C.DESCRIPTION)) %>%
-#   select(-JobDescCap) %>%
-#   # the below can be uncommented to see an instance when
-#   # a jobcode has been shortened and already exists
-#   # mutate(Job.Code = case_when(
-#   #   Job.Code == "SM16" ~ "SU54_BIMG_W",
-#   #   TRUE ~ Job.Code)) %>%
-#   unique()
-
-# test <- bislr_payroll %>%
-#   filter(Job.Code != Job.Code_up) %>%
-#   select(Job.Code, Job.Code_up) %>%
-#   distinct()
-
 # incorporate this into the if-statement above looking at JC_in_UniversalFile?
 if (exists("new_jobcodes")) {
   jc_check_new_long <- new_jobcodes %>%
@@ -602,7 +575,7 @@ if (exists("new_jobcodes")) {
                  distinct(),
                by = c("Job.Code_up" = "Job.Code"))
 
-  # This will get incorporated into Preprocessing-Updating Universal Files
+  # This can get incorporated into Preprocessing > Update Universal Files
   # section
 
   if (nrow(jc_check_new_long) > 0) {
@@ -652,8 +625,6 @@ if (nrow(upload_payroll) != row_count) {
 }
 
 upload_payroll <- upload_payroll %>%
-  # if any PROVIDER value is NA, then it needs to be mapped
-  # it will be checked for in QC section
   filter(PROVIDER == 0) %>%
   filter(!is.na(upload_date)) %>%
   group_by(PartnerOR.Health.System.ID, Home.FacilityOR.Hospital.ID, DPT.HOME,
@@ -698,10 +669,6 @@ if (NA %in% bislr_payroll$HomeDpt_in_Dict |
     distinct()
   # if there are no new depts, then this will be empty
 
-  # there's some sort of error in the Cost.Center id column
-  # these are values: --1--83-000 & --1--85-000
-  # Anjelica will code to handle this issue further up in the script.
-  # WAS THIS COMPLETED?
 
   # update dpt map
 
@@ -743,7 +710,7 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
              DPT.HOME, Job.Code_up, Position.Code.Description) %>%
       setNames(colnames(dict_premier_jobcode %>%
                           select(-JC_in_Dict)))) %>%
-    # for the future, we might look out for handling descriptoins
+    # for the future, we might look out for handling descriptions
     # that have special characters, such as & (ampersand)
     # mutate(Job.Code.Description = case_when(
     #   str_detect(Job.Code.Description, "&") ~
@@ -793,12 +760,6 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
 
 ### Paycode Dict and Map ---------------------------------------------------
 
-# # test data.frame for new paycodes
-# new_paycodes <- bislr_payroll %>%
-#   select(Facility.Hospital.Id_Worked, Pay.Code) %>%
-#   unique() %>%
-#   tail()
-# #
 
 premier_missing_paycode <- anti_join(upload_payroll %>%
                                        select(Pay.Code) %>%
@@ -818,7 +779,7 @@ if (nrow(premier_missing_paycode) > 0) {
     mutate(Corp = corp_code) %>%
     relocate(c(Corp, Site), .before = Pay.Code)
 
-  # user should be warned if character limit is broached
+  # user should be warned if character limit is reached
   if (max(nchar(upload_dict_paycode$Pay.Code)) > char_len_paycode |
     max(nchar(upload_dict_paycode$PAY.CODE.NAME)) > char_len_paycode_name) {
     showDialog(
@@ -853,7 +814,7 @@ if (nrow(premier_missing_paycode) > 0) {
 
 ### Dummy Report Dict ------------------------------------------------------
 
-# These reports are those that have the Cost Center mapped when the 
+# These reports are those that have the Cost Center mapped when the
 # Home Cost Center is not in an existing report.  If the home cost center
 # is not in an existing report, the Premier Employee Level Detail report
 # will not display the employee's hour detail.
@@ -1207,7 +1168,7 @@ file.rename(from = paste0(dir_BISLR, "/Quality Checks",
                         as.character(Sys.time(), format = "%Y-%m-%d_%H-%M-%S"),
                         ".csv"))
 # write piv_wide_check
-write.csv(piv_wide_check, 
+write.csv(piv_wide_check,
           file = paste0(dir_BISLR, "/Quality Checks",
                         "/piv_wide_check", ".csv"),
           row.names = FALSE)
