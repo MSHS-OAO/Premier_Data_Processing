@@ -10,9 +10,9 @@ library(openxlsx)
 
 # User Input --------------------------------------------------------------
 # start date of first pay period needed
-pp.start <- as.Date("2022-09-25")
+pp.start <- as.Date("2023-01-01")
 # end date of the last pay period needed
-pp.end <- as.Date("2022-10-22")
+pp.end <- as.Date("2023-01-28")
 # initial QC check on date range
 if (pp.end < pp.start) {
   stop("End date before Start date")
@@ -146,7 +146,7 @@ map_CC_Vol <- map_CC_Vol %>%
 # if any of the files have old site names update them to new site names
 if (any(!unique(map_CC_Vol$Site) %in% site_names) |
     any(!unique(data_census$Site) %in% site_names)) {
-  for (i in seq_len(site_names)) {
+  for (i in seq_len(length(site_names))) {
     data_census$Site <- gsub(paste(unlist(site_old_names[i]), collapse = "|"),
                              site_names[i], data_census$Site)
     map_CC_Vol$Site <- gsub(paste(unlist(site_old_names[i]), collapse = "|"),
@@ -239,30 +239,30 @@ data_upload_MSBIB <- new_start_end(
 write.table(data_upload_MSMW,
             file = paste0(dir, "/Upload Files", "/MSMW_Census Days_",
                           if (exists("pp.start.new")) {
-                            format(pp.start.new, "%d%b%y")
+                            format(pp.start.new, "%Y-%m-%d")
                           }else{
-                            format(pp.start, "%d%b%y")
+                            format(pp.start, "%Y-%m-%d")
                           },
                           " to ",
                           if (exists("pp.end.new")) {
-                            format(pp.end.new, "%d%b%y")
+                            format(pp.end.new, "%Y-%m-%d")
                           }else{
-                            format(pp.end, "%d%b%y")
+                            format(pp.end, "%Y-%m-%d")
                           },
                           ".csv"),
             sep = ",", row.names = F, col.names = F)
 write.table(data_upload_MSBIB,
             file = paste0(dir, "/Upload Files", "/MSBIB_Census Days_",
                           if (exists("pp.start.new")) {
-                            format(pp.start.new, "%d%b%y")
+                            format(pp.start.new, "%Y-%m-%d")
                           }else{
-                            format(pp.start, "%d%b%y")
+                            format(pp.start, "%Y-%m-%d")
                           },
                           " to ",
                           if (exists("pp.end.new")) {
-                            format(pp.end.new, "%d%b%y")
+                            format(pp.end.new, "%Y-%m-%d")
                           }else{
-                            format(pp.end, "%d%b%y")
+                            format(pp.end, "%Y-%m-%d")
                           },
                           ".csv"),
             sep = ",", row.names = F, col.names = F)
@@ -278,8 +278,8 @@ quality_chart <- function(data, site.census) {
            Nursing.Station.Code,
            End.Date,
            Census.Day) %>%
-    arrange(End.Date) %>%
-    mutate(End.Date = format(End.Date, "%m.%d.%y")) %>%
+    arrange(Nursing.Station.Code, End.Date) %>%
+    mutate(End.Date = format(End.Date, "%Y-%m-%d")) %>%
     pivot_wider(names_from = End.Date, values_from = Census.Day,
                 values_fn = list(Census.Day = sum)) #%>%
     #mutate(Report = paste(ReportCode, ReportName, sep = "-")) %>%
@@ -292,7 +292,7 @@ chart_master <- lapply(as.list(unique(data_upload$Site)),
 write.xlsx2(chart_master[1],
             file = paste0(dir,
                           "/Quality Chart_",
-                          format(Sys.time(), "%d%b%y"),
+                          format(Sys.time(), "%Y-%m-%d"),
                           ".xlsx"),
             row.names = F,
             sheetName = unique(data_upload$Site)[1])
@@ -300,7 +300,7 @@ sapply(2:length(chart_master),
        function(x) write.xlsx2(chart_master[x],
                                file = paste0(dir,
                                              "/Quality Chart_",
-                                             format(Sys.time(), "%d%b%y"),
+                                             format(Sys.time(), "%Y-%m-%d"),
                                              ".xlsx"),
                                row.names = F,
                                sheetName = unique(data_upload$Site)[x],
