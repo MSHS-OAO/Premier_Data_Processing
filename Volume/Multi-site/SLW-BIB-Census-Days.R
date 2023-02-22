@@ -48,7 +48,7 @@ pp.end <- max(dist_dates$END.DATE)
 pp.start <- dist_dates %>%
   arrange(END.DATE) %>%
   select(END.DATE)
-pp.start <- pp.start$END.DATE[nrow(pp.start)-1] + lubridate::days(1)
+pp.start <- pp.start$END.DATE[nrow(pp.start) - 1] + lubridate::days(1)
 
 #Confirming date range
 answer <- winDialog(
