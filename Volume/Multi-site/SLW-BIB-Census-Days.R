@@ -8,25 +8,6 @@ library(tidyverse)
 library(xlsx)
 library(openxlsx)
 
-# User Input --------------------------------------------------------------
-# start date of first pay period needed
-pp.start <- as.Date("2023-01-01")
-# end date of the last pay period needed
-pp.end <- as.Date("2023-01-28")
-# initial QC check on date range
-if (pp.end < pp.start) {
-  stop("End date before Start date")
-  }
-#reminder to update dates
-warning("Update Pay Periods Start and End Dates Needed:")
-cat(paste("Pay period starting on",
-          format(pp.start, "%m/%d/%Y"),
-          "and ending on",
-          format(pp.end, "%m/%d/%Y")),
-    fill = T)
-
-Sys.sleep(2)
-
 # Constants ---------------------------------------------------------------
 #Current names of sites - one for each site (order matters)
 site_names <- c("MSB", "MSBI", "MSM", "MSW")
@@ -40,22 +21,61 @@ site_old_names <- list(c("BIB", "MSB"),
 # Import Dictionaries -------------------------------------------------------
 map_CC_Vol <- read.xlsx(paste0(dir,
                                "/BIBSLW_Volume ID_Cost Center_ Mapping.xlsx"))
-dict_PC <- read.xlsx(paste0(dir_universal, "/Mapping/MSHS_Pay_Cycle.xlsx"),
+dict_PC_raw <- read.xlsx(paste0(dir_universal, "/Mapping/MSHS_Pay_Cycle.xlsx"),
                      detectDates = T)
-dict_PC <- dict_PC %>% select(DATE, START.DATE, END.DATE) %>% drop_na()
+dict_PC <- dict_PC_raw %>% select(DATE, START.DATE, END.DATE) %>% drop_na()
 colnames(dict_PC) <- c("Census.Date", "Start.Date", "End.Date")
-#Checking dates requested are valid payperiods
-if (!pp.start %in% dict_PC$Start.Date) {
-  stop(paste0("Start date entered is not the start of a payperiod, ",
-              "please enter another start date"))
-}else if (!pp.end %in% dict_PC$End.Date) {
-  stop(paste0("End date entered is not the end of a pay period, ",
-              "please enter another end date"))
-       }
+
 map_reports <- read.xlsx(
   paste0(dir_universal, "/Mapping/MSHS_Reporting_Definition_Mapping.xlsx"),
   detectDates = T)
-  
+
+
+# Constants - Dates--------------------------------------------------------
+
+#Table of distribution dates earlier than the current date
+dist_dates <- dict_PC_raw %>%
+  select(END.DATE, PREMIER.DISTRIBUTION) %>%
+  distinct() %>%
+  drop_na() %>%
+  arrange(END.DATE) %>%
+  filter(PREMIER.DISTRIBUTION %in% c(TRUE, 1),
+         END.DATE < as.POSIXct(Sys.Date()))
+
+
+#Selecting the most recent distribution date
+pp.end <- max(dist_dates$END.DATE)
+pp.start <- dist_dates %>%
+  arrange(END.DATE) %>%
+  select(END.DATE)
+pp.start <- pp.start$END.DATE[nrow(pp.start)-1] + lubridate::days(1)
+
+#Confirming date range
+answer <- winDialog(
+  message = paste0(
+    "Starting Date will be: ", pp.start, "\r\r",
+    "Ending Date will be: ", pp.end, "\r\r",
+    "If this is correct, press OK\r\r",
+    "If this is not correct, press Cancel and\r",
+    "you will be prompted to provide the correct\r",
+    "date range."
+  ),
+  type = "okcancel"
+)
+
+if (answer == "CANCEL") {
+  pp.start <- as.Date(
+    rstudioapi::showPrompt(
+      title = "pp.start input",
+      message = paste0("What is the date you'd like the data to start from?\r",
+                       "\rPlease enter the date in YYYY-MM-DD format")))
+  pp.end <- as.Date(
+    rstudioapi::showPrompt(
+      title = "pp.start input",
+      message = paste0("What is the date you'd like the data to go up to?\r",
+                       "\rPlease enter the date in YYYY-MM-DD format")))
+}
+
 # Import Data -------------------------------------------------------------
 import_recent_file <- function(folder.path, place) {
   #Importing File information from Folder
