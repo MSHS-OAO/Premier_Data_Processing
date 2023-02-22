@@ -352,7 +352,7 @@ processed_data <- processed_data %>%
     Day.Spend = 
       case_when(Bill.Type == "Time" ~ 
                   as.numeric(str_trim(gsub("[$,]", "", Day.Spend))),
-                Bill.Type == "Adjustment" ~ 
+                Bill.Type == "Adjustment" | Regular.Rate > exempt_payrate ~
                   as.numeric(str_trim(gsub("[$,]", "", Time.Card.Spend)))))
 
 # special handling for exempt employee Time and 0 hour Adjustment 
@@ -360,7 +360,8 @@ processed_data <- processed_data %>%
   mutate(Regular.Rate = 
            as.numeric(str_trim(gsub("[$,]", "", Regular.Rate)))) %>%
   mutate(daily_hours = 
-           case_when(Regular.Rate > exempt_payrate ~ round(40, digits = 2),
+           case_when(Regular.Rate > exempt_payrate ~ 
+                       round(40 * Day.Spend/Regular.Rate, digits = 2),
                      daily_hours == 0 & Bill.Type == "Adjustment" ~ 
                        round(Day.Spend/Regular.Rate, digits = 2),
                      TRUE ~ daily_hours))
