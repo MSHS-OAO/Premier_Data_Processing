@@ -94,7 +94,7 @@ new_col <- new_col %>%
   mutate(Status = "new")
 
 missing_col <-
-  colnames(raw_data)[!(colnames(raw_data_prev) %in% colnames(raw_data))]
+  colnames(raw_data_prev)[!(colnames(raw_data_prev) %in% colnames(raw_data))]
 missing_col <- missing_col %>%
   data.frame()
 colnames(missing_col) <- c("Column")
@@ -195,7 +195,7 @@ prev_0_max_date_msbib <- max(mdy(msbib_zero_old$date.end))
 week_reg_hr_indiv_emp_qc <- 40
 week_hr_indiv_emp_qc <- 55
 
-# constant for name of employee that needs to be removed fromd data
+# constant for name of employee that needs to be removed from data
 employee_removal <- "Vistharla, Moses"
 
 # regular rate threshold for exempt employees
@@ -341,26 +341,27 @@ processed_data <- processed_data %>%
   rowwise() %>%
   mutate(daily_hours =
            case_when(Bill.Type == "Time" ~ sum(Regular.Hours, OT.Hours, 
-                                               Holiday.Hours, Call.Back.Hours,
+                                               Holiday.Hours,
                                                na.rm = T),
                      Bill.Type == "Adjustment" ~ Weekly.Hours))
            
 # Day Spend needs to be in numerical decimal format to summarize it
 processed_data <- processed_data %>%
+  mutate(Regular.Rate = 
+           as.numeric(str_trim(gsub("[$,]", "", Regular.Rate)))) %>%
   mutate(
     Day.Spend.char = Day.Spend,
     Day.Spend = 
-      case_when(Bill.Type == "Time" ~ 
-                  as.numeric(str_trim(gsub("[$,]", "", Day.Spend))),
-                Bill.Type == "Adjustment" ~ 
-                  as.numeric(str_trim(gsub("[$,]", "", Time.Card.Spend)))))
+      case_when(Bill.Type == "Adjustment" | Regular.Rate > exempt_payrate ~
+                  as.numeric(str_trim(gsub("[$,]", "", Time.Card.Spend))),
+                Bill.Type == "Time" ~ 
+                  as.numeric(str_trim(gsub("[$,]", "", Day.Spend)))))
 
 # special handling for exempt employee Time and 0 hour Adjustment 
 processed_data <- processed_data %>%
-  mutate(Regular.Rate = 
-           as.numeric(str_trim(gsub("[$,]", "", Regular.Rate)))) %>%
   mutate(daily_hours = 
-           case_when(Regular.Rate > exempt_payrate ~ round(40, digits = 2),
+           case_when(Regular.Rate > exempt_payrate ~ 
+                       round(40 * Day.Spend/Regular.Rate, digits = 2),
                      daily_hours == 0 & Bill.Type == "Adjustment" ~ 
                        round(Day.Spend/Regular.Rate, digits = 2),
                      TRUE ~ daily_hours))
@@ -469,7 +470,7 @@ high_hr_emp <- processed_data %>%
   filter(DEPARTMENT.BREAKDOWN == 1) %>%
   inner_join(hrs_indiv_emp) %>%
   arrange(-week_hours, Worker.Name, as.Date(Earnings.E.D, "%m/%d/%Y"),
-          as.Date(Date.Worked, "%m/%d/%Y")) # %>%
+          as.Date(Date.Worked, "%m/%d/%Y"))
 
 View(high_hr_emp)
 

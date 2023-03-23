@@ -27,8 +27,10 @@ labor <- function(start,end){
            !is.na(Job.Code))
   #format paycode, employee name, Department names, and home department ID
   df <- left_join(df,paycode,by=c("Pay.Code"="RAW.PAY.CODE"))
-  new_paycodes <- df %>% filter(is.na(PAY.CODE))
-  if(nrow(filter(df, is.na(PAY.CODE))) != 0) stop("New Paycode(s). Check df for new paycode(s)")
+  new_paycodes <<- df %>% filter(is.na(PAY.CODE))
+  if(nrow(filter(df, is.na(PAY.CODE))) != 0) {
+    stop("New Paycode(s). Check df for new paycode(s)")
+  }
   df <- df %>%
     mutate(Pay.Code = PAY.CODE,
            PAY.CODE = NULL,
@@ -278,8 +280,8 @@ save_payroll <- function(start,end){
 
 ## Function Execution --------------------------------------------------------
 #Enter start and end date needed for payroll upload
-start <- "05/22/2022" 
-end <- "07/02/2022"
+start <- "11/20/2022" 
+end <- "12/31/2022"
 df <- labor(start,end)
 #If you need to update jobcode list for new jobcodes leave R and do that in excel
 #"J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Useful Tools & Templates/Job Code Mappings/MSH MSQ Position Mappings.xlsx"

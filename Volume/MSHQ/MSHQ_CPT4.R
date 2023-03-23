@@ -25,11 +25,12 @@ charges <- function(MSH,MSQ){
   MSQ <- MSQ %>% 
     filter(!is.na(SINAI.CODE))
   #combine MSH and MSQ charge details
-  MSHQ <- rbind(MSH,MSQ)
+  MSHQ <- rbind(MSH,MSQ) %>%
+    mutate(REV.DEP = as.character(REV.DEP))
   #remove blank CPT lines
   MSHQ <- filter(MSHQ,!is.na(CPT))
   #establish what quarter of the year it is
-  if(max(MSHQ$MONTH) < 4){
+  if(max(as.numeric(MSHQ$MONTH)) < 4){
     Q <<- 1
   } else if(max(MSHQ$MONTH) < 7){
     Q <<- 2
@@ -112,14 +113,14 @@ upload_master <- function(){
 #Bring in all sheets in charges file
 path <- file.choose()
 sheetnames <- excel_sheets(path)
-mylist <- lapply(excel_sheets(path), read_excel, path = path, col_names = F)
+mylist <- lapply(excel_sheets(path), read_excel, path = path, col_names = T)
 names(mylist) <- sheetnames
 names(mylist)
 
 #Enter Year of data
-Year <- "2022"
+Year <- "2023"
 #Execute functions
-MSHQ <- charges(MSH = mylist[[4]],MSQ = mylist[[3]])
+MSHQ <- charges(MSH = mylist[[2]],MSQ = mylist[[1]])
 #Create master and master trend
 master()
 #Review master trend
