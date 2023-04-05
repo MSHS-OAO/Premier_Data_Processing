@@ -43,9 +43,9 @@ pc_start_dates <- distinct(clean_data, pc_start_date)
 pc_end_dates <- distinct(clean_data, pc_end_date)
 
 #convert lists to vectors
-sites_vec <- sites$site
-pc_start_dates_vec <- pc_start_dates$pc_start_date
-pc_end_dates_vec <- pc_end_dates$pc_end_date
+sites_vec <- sort(sites$site)
+pc_start_dates_vec <- sort(pc_start_dates$pc_start_date)
+pc_end_dates_vec <- sort(pc_end_dates$pc_end_date)
 
 #create "all" vectors, which contain data necessary to produce all rows for upload
 if (length(pc_start_dates_vec) == 2) {
@@ -105,7 +105,11 @@ upload_df <- left_join(summary_df, ref_df,
                        by = c("Site Name")
                        )
 #re-ordering columns to match upload format
-upload_df <- upload_df[, c(5, 6, 7, 2, 3, 8, 4, 9)]
+upload_df <- upload_df[, c(5, 6, 7, 2, 3, 8, 4, 9)] %>%
+  mutate(`Cost Ctr` = as.character(`Cost Ctr`),
+         `Vol ID` = as.character(`Vol ID`),
+         `Start Date` = as.character(`Start Date`),
+         `End Date` = as.character(`End Date`))
 
 #export upload_df as a .csv file
 earliest_date <- min(pc_start_dates_vec) %>%  
