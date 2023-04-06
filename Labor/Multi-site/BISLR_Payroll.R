@@ -15,6 +15,27 @@ dir <- "J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity"
 dir_BISLR <- paste0(dir, "/Labor - Data/Multi-site/BISLR")
 dir_universal <- paste0(dir, "/Universal Data")
 
+# User Warnings -----------------------------------------------------------
+
+showDialog(
+  title = "Updated Premier Dictionary Mapping Files",
+  message = paste0(
+    "USER WARNING: ",
+    "Before proceeding, ",
+    "be sure that all the latest Premier Dictionary and Mapping Exports ",
+    "have been saved in the folder listed below.  ",
+    "    Issues can arise if the files are not the latest version.     ",
+    dir, "/Universal Data/Premier")
+  )
+
+showDialog(
+  title = "Script Improvement",
+  message = paste0(
+    "Please update the script to ensure Cost.Center.Description values ",
+    "are not blank in the fte_summary quality check output."
+    )
+)
+
 # Constants ---------------------------------------------------------------
 new_dpt_map <- 10095
 map_effective_date_dpt <- as.Date("2010-01-01")
