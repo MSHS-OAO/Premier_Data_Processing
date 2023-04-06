@@ -554,7 +554,9 @@ if (nrow(filter_dates) > 0) {
                     "that has already been prepared for Premier upload",
                     "at some point in the past.  Be careful not to",
                     "overwrite data files by mistake."))
-  date_filtering <- paycycles_data
+  date_filtering <- paycycles_data %>%
+    mutate(upload_date = 1) %>%
+    arrange(Start.Date, End.Date)
 }
 
 ## JC ID check ----------------------------------------------------
