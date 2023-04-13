@@ -28,14 +28,6 @@ showDialog(
     dir, "/Universal Data/Premier")
   )
 
-showDialog(
-  title = "Script Improvement",
-  message = paste0(
-    "Please update the script to ensure Cost.Center.Description values ",
-    "are not blank in the fte_summary quality check output."
-    )
-)
-
 # Constants ---------------------------------------------------------------
 new_dpt_map <- 10095
 map_effective_date_dpt <- as.Date("2010-01-01")
@@ -932,6 +924,8 @@ if (max(jc_desc_check$freq) > jc_desc_threshold) {
 
 # average FTEs since previous distribution
 
+## FYI: this is based on the upload file, so it only includes providers
+
 # need Pay Code info to get appropriate hours
 row_count <- nrow(upload_payroll)
 fte_summary <- upload_payroll %>%
@@ -958,6 +952,8 @@ fte_summary <- fte_summary %>%
       round(sum(Hours, na.rm = TRUE) /
               (37.5 * (as.numeric(distribution_date - dist_prev) / 7)), 1)) %>%
   ungroup() %>%
+  # removing the formatting of this date could eliminate some need
+  # for all the date processing within this coding section
   mutate(dist_date = format(distribution_date, "%m/%d/%Y")) %>%
   relocate(dist_date, .before = Avg_FTEs_worked) %>%
   mutate(capture_time = as.character(Sys.time())) %>%
@@ -1012,7 +1008,12 @@ fte_summary <- fte_summary %>%
         Site == "NY2162" ~ "MSW",
         Site == "NY2163" ~ "MSM",
         TRUE ~ "Other")),
-    upload_dict_dpt) %>%
+    upload_dict_dpt %>%
+      mutate(Site = case_when(
+        Site == "630571" ~ "MSBIB",
+        Site == "NY2162" ~ "MSW",
+        Site == "NY2163" ~ "MSM",
+        TRUE ~ "Other"))) %>%
       select(-Corporation.Code),
     by = c("Site" = "Site", "Department" = "Cost.Center")) %>%
   select(Site, Department, Cost.Center.Description,
@@ -1020,11 +1021,103 @@ fte_summary <- fte_summary %>%
          CORPORATE.SERVICE.LINE, VP, dist_date,
          Avg_FTEs_worked, Avg_FTEs_paid, capture_time)
 
+# some Cost.Center.Description values are showing as NA
+# - this is minimal and doesn't look worth pursuing at this time
+  
 if (nrow(fte_summary) != row_count) {
   showDialog(title = "Join error",
              message = paste("Row count failed at", "fte_summary"))
   stop(paste("Row count failed at", "fte_summary"))
 }
+
+# filtering so only the trailing year is included
+fte_summary <- fte_summary %>%
+  filter(as.numeric(as.Date(distribution_date) -
+                      as.Date(dist_date, "%m/%d/%Y")) < 390)
+
+
+### wide summary ------------------------------------------------------------
+
+# get the minimum date for each cost center
+fte_summary_cc_age <- fte_summary %>%
+  select(Site, Department, dist_date) %>%
+  mutate(dist_date = as.Date(dist_date, "%m/%d/%Y")) %>%
+  arrange(dist_date, Site, Department) %>%
+  distinct(across(-dist_date), .keep_all = TRUE) %>%
+  rename(oldest_date = dist_date)
+
+# PAID
+
+fte_summary_wide_paid <- fte_summary %>%
+  mutate(dist_date = as.Date(dist_date, "%m/%d/%Y")) %>%
+  arrange(dist_date, Site, Department) %>%
+  select(-Avg_FTEs_worked, -capture_time) %>%
+  pivot_wider(names_from = dist_date, values_from = Avg_FTEs_paid,
+              values_fill = 0)
+
+fte_summary_wide_paid$current_change_raw <-
+  pull(select(fte_summary_wide_paid,
+              contains(format(distribution_date, "%Y-%m-%d")))) - 
+  pull(select(fte_summary_wide_paid,
+              contains(format(dist_prev, "%Y-%m-%d"))))
+
+fte_summary_wide_paid$current_change_pct <-
+  100 * round(
+    fte_summary_wide_paid$current_change_raw /
+      pull(select(fte_summary_wide_paid,
+                  contains(format(dist_prev, "%Y-%m-%d")))), 3)
+
+fte_summary_wide_paid <- fte_summary_wide_paid %>%
+  left_join(fte_summary_cc_age) %>%
+  arrange(oldest_date)
+
+fte_summary_extreme_change_pd <- fte_summary_wide_paid %>%
+  filter(current_change_raw >= 3 | current_change_raw <= -3) %>%
+  arrange(-current_change_raw)
+
+View(fte_summary_extreme_change_pd)
+
+fte_summary_new_dept_pd <- fte_summary_wide_paid %>%
+  filter(oldest_date == distribution_date)
+
+View(fte_summary_new_dept_pd)
+
+# WORKED
+
+fte_summary_wide_worked <- fte_summary %>%
+  mutate(dist_date = as.Date(dist_date, "%m/%d/%Y")) %>%
+  arrange(dist_date, Site, Department) %>%
+  select(-Avg_FTEs_paid, -capture_time) %>%
+  pivot_wider(names_from = dist_date, values_from = Avg_FTEs_worked,
+              values_fill = 0)
+
+fte_summary_wide_worked$current_change_raw <-
+  pull(select(fte_summary_wide_worked,
+              contains(format(distribution_date, "%Y-%m-%d")))) - 
+  pull(select(fte_summary_wide_worked,
+              contains(format(dist_prev, "%Y-%m-%d"))))
+
+fte_summary_wide_worked$current_change_pct <-
+  100 * round(
+    fte_summary_wide_worked$current_change_raw /
+      pull(select(fte_summary_wide_worked,
+                  contains(format(dist_prev, "%Y-%m-%d")))), 3)
+
+fte_summary_wide_worked <- fte_summary_wide_worked %>%
+  left_join(fte_summary_cc_age) %>%
+  arrange(oldest_date)
+
+fte_summary_extreme_change_wrk <- fte_summary_wide_worked %>%
+  filter(current_change_raw >= 3 | current_change_raw <= -3) %>%
+  arrange(-current_change_raw)
+
+View(fte_summary_extreme_change_wrk)
+
+fte_summary_new_dept_wrk <- fte_summary_wide_worked %>%
+  filter(oldest_date == distribution_date)
+
+View(fte_summary_new_dept_wrk)
+
 
 ## 8600 Accrual Site Summary --------------------------------------------
 
@@ -1182,6 +1275,26 @@ write.xlsx2(as.data.frame(fte_summary),
             row.names = F,
             sheetName = "fte_summary",
             append = FALSE)
+
+# backup the previous fte_summary_wide
+file.rename(from = paste0(fte_summary_path, "fte_summary_wide.xlsx"),
+            to = paste0(fte_summary_path,
+                        "fte_summary_wide_BU_",
+                        as.character(Sys.time(), format = "%Y-%m-%d_%H-%M-%S"),
+                        ".xlsx"))
+
+fte_summary_wide_list <- list(
+  "new_dept_PD_FTEs" = fte_summary_new_dept_pd,
+  "new_dept_WRK_FTEs" = fte_summary_new_dept_wrk,
+  "extremes_PD_FTEs" = fte_summary_extreme_change_pd,
+  "extremes_WRK_FTEs" = fte_summary_extreme_change_wrk,
+  "PAID_FTEs" = fte_summary_wide_paid,
+  "WORKED_FTEs" = fte_summary_wide_worked
+)
+
+openxlsx::write.xlsx(fte_summary_wide_list,
+                     file = paste0(fte_summary_path, "fte_summary_wide_2.xlsx"))
+
 
 # rename previous piv_wide_check
 file.rename(from = paste0(dir_BISLR, "/Quality Checks",
