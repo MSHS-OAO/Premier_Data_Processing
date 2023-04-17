@@ -1062,10 +1062,10 @@ fte_summary_wide_paid$current_change_raw <-
               contains(format(dist_prev, "%Y-%m-%d"))))
 
 fte_summary_wide_paid$current_change_pct <-
-  100 * round(
+  formattable::percent(
     fte_summary_wide_paid$current_change_raw /
       pull(select(fte_summary_wide_paid,
-                  contains(format(dist_prev, "%Y-%m-%d")))), 3)
+                  contains(format(dist_prev, "%Y-%m-%d")))), digits = 1)
 
 fte_summary_wide_paid <- fte_summary_wide_paid %>%
   left_join(fte_summary_cc_age) %>%
@@ -1098,10 +1098,10 @@ fte_summary_wide_worked$current_change_raw <-
               contains(format(dist_prev, "%Y-%m-%d"))))
 
 fte_summary_wide_worked$current_change_pct <-
-  100 * round(
+  formattable::percent(
     fte_summary_wide_worked$current_change_raw /
       pull(select(fte_summary_wide_worked,
-                  contains(format(dist_prev, "%Y-%m-%d")))), 3)
+                  contains(format(dist_prev, "%Y-%m-%d")))), digits = 1)
 
 fte_summary_wide_worked <- fte_summary_wide_worked %>%
   left_join(fte_summary_cc_age) %>%
@@ -1289,12 +1289,18 @@ fte_summary_wide_list <- list(
   "extremes_PD_FTEs" = fte_summary_extreme_change_pd,
   "extremes_WRK_FTEs" = fte_summary_extreme_change_wrk,
   "PAID_FTEs" = fte_summary_wide_paid,
-  "WORKED_FTEs" = fte_summary_wide_worked
-)
+  "WORKED_FTEs" = fte_summary_wide_worked)
 
 openxlsx::write.xlsx(fte_summary_wide_list,
-                     file = paste0(fte_summary_path, "fte_summary_wide_2.xlsx"))
-
+                     file = paste0(fte_summary_path, "fte_summary_wide.xlsx"),
+                     firstActiveRow = 2,
+                     firstActiveCol = 6,
+                     headerStyle = 
+                       openxlsx::createStyle(halign = "center",
+                                             fgFill = "#ADD8E6",
+                                             border = "TopBottomLeftRight"),
+                     colWidths = "auto",
+                     zoom = 70)
 
 # rename previous piv_wide_check
 file.rename(from = paste0(dir_BISLR, "/Quality Checks",
