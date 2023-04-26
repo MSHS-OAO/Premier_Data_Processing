@@ -474,7 +474,7 @@ while (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
                      paste0("_V", loop)
                    },
                    ".csv"))
-  
+
   warn_new_pc <-
     showQuestion(
       title = "Warning",
@@ -1057,7 +1057,7 @@ fte_summary_wide_paid <- fte_summary %>%
 
 fte_summary_wide_paid$current_change_raw <-
   pull(select(fte_summary_wide_paid,
-              contains(format(distribution_date, "%Y-%m-%d")))) - 
+              contains(format(distribution_date, "%Y-%m-%d")))) -
   pull(select(fte_summary_wide_paid,
               contains(format(dist_prev, "%Y-%m-%d"))))
 
@@ -1093,7 +1093,7 @@ fte_summary_wide_worked <- fte_summary %>%
 
 fte_summary_wide_worked$current_change_raw <-
   pull(select(fte_summary_wide_worked,
-              contains(format(distribution_date, "%Y-%m-%d")))) - 
+              contains(format(distribution_date, "%Y-%m-%d")))) -
   pull(select(fte_summary_wide_worked,
               contains(format(dist_prev, "%Y-%m-%d"))))
 
@@ -1175,6 +1175,111 @@ if (nrow(accrual_raw_detail) != row_count) {
 
 View(accrual_raw_summary)
 
+
+## Employee Excessive Hours -----------------------------------------------
+
+### Regular Hours ---------------------------------------------------------
+
+employee_reg_hours_qc <- bislr_payroll %>%
+  left_join(map_uni_paycodes %>%
+              select(RAW.PAY.CODE, INCLUDE.HOURS, WORKED.PAY.CODE,
+                     PAY.CODE.CATEGORY) %>%
+              distinct(),
+            by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
+  left_join(date_filtering) %>%
+  filter(PROVIDER == 0,
+         PAY.CODE.CATEGORY == "REGULAR") %>%
+  filter(!is.na(upload_date)) %>%
+  group_by(Employee.ID, Employee.Name, Start.Date, End.Date) %>%
+  summarize(hours_reg_pp = sum(Hours, na.rm = T)) %>%
+  ungroup() %>%
+  mutate(pp_days = as.numeric(End.Date - Start.Date) + 1) %>%
+  mutate(pp_thresh = case_when(
+    pp_days == 7 ~ 40,
+    pp_days == 14 ~ 80)) %>%
+  mutate(pp_overage_coeff = hours_reg_pp / pp_thresh) %>%
+  filter(hours_reg_pp > pp_thresh) %>%
+  arrange(-pp_overage_coeff, Employee.Name, End.Date, Start.Date)
+
+View(employee_reg_hours_qc)
+
+# create detailed view of all entries for employees with high regular hours
+employee_reg_hours_qc_detail <- bislr_payroll %>%
+  left_join(map_uni_paycodes %>%
+              select(RAW.PAY.CODE, INCLUDE.HOURS, WORKED.PAY.CODE,
+                     PAY.CODE.CATEGORY) %>%
+              distinct(),
+            by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
+  left_join(filter(select(map_uni_reports, DEFINITION.CODE, DEFINITION.NAME,
+                          ORACLE.COST.CENTER, DEPARTMENT.BREAKDOWN, CLOSED),
+                   is.na(CLOSED)),
+            c("DPT.WRKD" = "ORACLE.COST.CENTER")) %>%
+  inner_join(employee_reg_hours_qc) %>%
+  arrange(-pp_overage_coeff, Employee.Name, End.Date, Start.Date,
+          DPT.WRKD, Pay.Code)
+
+View(employee_reg_hours_qc_detail)
+
+### Total Hours ----------------------------------------------------------
+
+employee_tot_hours_qc <- bislr_payroll %>%
+  left_join(date_filtering) %>%
+  left_join(map_uni_paycodes %>%
+              select(RAW.PAY.CODE, INCLUDE.HOURS, WORKED.PAY.CODE,
+                     PAY.CODE.CATEGORY) %>%
+              distinct(),
+            by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
+  filter(PROVIDER == 0,
+         WORKED.PAY.CODE == 1,
+         INCLUDE.HOURS == 1) %>%
+  filter(!is.na(upload_date)) %>%
+  group_by(Employee.ID, Employee.Name, Start.Date, End.Date) %>%
+  summarize(hours_tot_pp = sum(Hours, na.rm = T)) %>%
+  ungroup() %>%
+  mutate(pp_days = as.numeric(End.Date - Start.Date) + 1) %>%
+  mutate(pp_thresh = case_when(
+    pp_days == 7 ~ 55,
+    pp_days == 14 ~ 110)) %>%
+  mutate(pp_overage_coeff = hours_tot_pp / pp_thresh) %>%
+  filter(hours_tot_pp > pp_thresh) %>%
+  arrange(-pp_overage_coeff, Employee.Name, End.Date, Start.Date)
+
+View(employee_tot_hours_qc)
+
+# create detailed view of all entries for employees with high total hours
+employee_tot_hours_qc_detail <- bislr_payroll %>%
+  left_join(map_uni_paycodes %>%
+              select(RAW.PAY.CODE, INCLUDE.HOURS, WORKED.PAY.CODE,
+                     PAY.CODE.CATEGORY) %>%
+              distinct(),
+            by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
+  left_join(filter(select(map_uni_reports, DEFINITION.CODE, DEFINITION.NAME,
+                          ORACLE.COST.CENTER, DEPARTMENT.BREAKDOWN, CLOSED),
+                   is.na(CLOSED)),
+            c("DPT.WRKD" = "ORACLE.COST.CENTER")) %>%
+  inner_join(employee_tot_hours_qc) %>%
+  arrange(-pp_overage_coeff, Employee.Name, End.Date, Start.Date,
+          DPT.WRKD, Pay.Code)
+
+View(employee_tot_hours_qc_detail)
+
+### Premier reports with excess --------------------------------------------
+
+employee_hr_qc_rpt_potential <- employee_tot_hours_qc_detail %>%
+  filter(DEPARTMENT.BREAKDOWN == 1) %>%
+  filter(INCLUDE.HOURS == 1,
+         WORKED.PAY.CODE == 1) %>%
+  group_by(DEFINITION.CODE, DEFINITION.NAME, Start.Date, End.Date) %>%
+  summarize(Hours = sum(Hours, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(pp_days = as.numeric(End.Date - Start.Date) + 1) %>%
+  mutate(FTEs_under_review = case_when(pp_days == 7 ~ round(Hours / 37.5, 2),
+                                       pp_days == 14 ~ round(Hours / 75, 2))
+  ) %>%
+  select(-Hours) %>%
+  arrange(-FTEs_under_review)
+
+View(employee_hr_qc_rpt_potential)
 
 # Exporting Data ----------------------------------------------------------
 
@@ -1295,7 +1400,7 @@ openxlsx::write.xlsx(fte_summary_wide_list,
                      file = paste0(fte_summary_path, "fte_summary_wide.xlsx"),
                      firstActiveRow = 2,
                      firstActiveCol = 6,
-                     headerStyle = 
+                     headerStyle =
                        openxlsx::createStyle(halign = "center",
                                              fgFill = "#ADD8E6",
                                              border = "TopBottomLeftRight"),
@@ -1314,5 +1419,26 @@ write.csv(piv_wide_check,
           file = paste0(dir_BISLR, "/Quality Checks",
                         "/piv_wide_check", ".csv"),
           row.names = FALSE)
+
+emp_excess_hr_qc_list <- list(
+  "rpt_impact_excess_hr" = employee_hr_qc_rpt_potential,
+  "emp_reg_hr" = employee_reg_hours_qc,
+  "emp_reg_hr_det" = employee_reg_hours_qc_detail,
+  "emp_tot_hr" = employee_tot_hours_qc,
+  "emp_tot_hr_det" = employee_tot_hours_qc_detail)
+
+openxlsx::write.xlsx(emp_excess_hr_qc_list,
+                     file = paste0(dir_BISLR, "/Quality Checks",
+                                   "/employee_excess_hours_",
+                                   as.character(Sys.time(),
+                                                format = "%Y-%m-%d"),
+                                   ".xlsx"),
+                     firstActiveRow = 2,
+                     headerStyle =
+                       openxlsx::createStyle(halign = "center",
+                                             fgFill = "#ADD8E6",
+                                             border = "TopBottomLeftRight"),
+                     colWidths = "auto",
+                     zoom = 70)
 
 # End of Script -----------------------------------------------------------
