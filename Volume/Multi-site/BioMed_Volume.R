@@ -108,8 +108,8 @@ upload_df <- left_join(summary_df, ref_df,
 upload_df <- upload_df[, c(5, 6, 7, 2, 3, 8, 4, 9)] %>%
   mutate(`Cost Ctr` = as.character(`Cost Ctr`),
          `Vol ID` = as.character(`Vol ID`),
-         `Start Date` = as.character(`Start Date`),
-         `End Date` = as.character(`End Date`))
+         `Start Date` = as.character(`Start Date`, format = "%m/%d/%Y"),
+         `End Date` = as.character(`End Date`, format = "%m/%d/%Y"))
 
 #export upload_df as a .csv file
 earliest_date <- min(pc_start_dates_vec) %>%  
