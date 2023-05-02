@@ -17,7 +17,7 @@ labor <- function(start,end){
   #read in most recent oracle text file and filter on start and end dates
   df <- file.info(list.files(paste0("J:/deans/Presidents/SixSigma/",
                                     "MSHS Productivity/Productivity/",
-                                    "Universal Data/Labor/Raw Data/MSHQ Oracle")
+                                    "Universal Data/Labor/Raw Data/MSHQ Oracle/")
                              , full.names = T))
   df <- read.csv(rownames(df)[which.max(df$mtime)], header = T, sep = "~",
                  stringsAsFactors = F, colClasses = rep("character", 32)) %>%
