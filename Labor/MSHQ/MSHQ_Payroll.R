@@ -15,9 +15,10 @@ labor <- function(start,end){
                               "MSHS_Paycode_Mapping.xlsx")) %>% 
     select(RAW.PAY.CODE,PAY.CODE)
   #read in most recent oracle text file and filter on start and end dates
-  df <- file.info(list.files(paste0("C:/Users/lenang01/Documents/",
-                                    "FTE-Projections-Dashboard/",
-                                    "Raw Data/MSHQ Oracle"), full.names = T))
+  df <- file.info(list.files(paste0("J:/deans/Presidents/SixSigma/",
+                                    "MSHS Productivity/Productivity/",
+                                    "Universal Data/Labor/Raw Data/MSHQ Oracle")
+                             , full.names = T))
   df <- read.csv(rownames(df)[which.max(df$mtime)], header = T, sep = "~",
                  stringsAsFactors = F, colClasses = rep("character", 32)) %>%
     filter(as.Date(End.Date, format = "%m/%d/%Y") <= 
@@ -280,8 +281,8 @@ save_payroll <- function(start,end){
 
 ## Function Execution --------------------------------------------------------
 #Enter start and end date needed for payroll upload
-start <- "11/20/2022" 
-end <- "12/31/2022"
+start <- "02/26/2023" 
+end <- "03/25/2023"
 df <- labor(start,end)
 #If you need to update jobcode list for new jobcodes leave R and do that in excel
 #"J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Useful Tools & Templates/Job Code Mappings/MSH MSQ Position Mappings.xlsx"
