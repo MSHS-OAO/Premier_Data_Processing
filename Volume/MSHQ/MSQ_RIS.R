@@ -10,7 +10,7 @@ RIS_dir <- paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
                   "Productivity/Volume - Data/MSQ Data/RIS/")
 
 #month and year of charge detail
-month_year <- "MAR2022"
+month_year <- "JUL2022"
 
 #read in charge detail
 RIS <- read.csv(paste0(RIS_dir,"Charge Detail/",
@@ -23,12 +23,12 @@ RIS_OR <- read.csv(paste0(RIS_dir,"Charge Detail/OR Diagnostic/",
   select(MRN, Name, ACC, Date, Exam, Exam.Modifier, Org, Resource)
 
 #read in CDM
-CDM <- read_xlsx(file.choose(), col_types = rep("text",55))
+CDM <- read_xlsx(file.choose(), col_types = rep("text",21))
 #read in PAT Mapping
 PAT <- read_xlsx(paste0(RIS_dir,"Mapping/PAT_Mapping.xlsx"))
 #read in Dep ID mapping
-Dep_ID <- read_xlsx(paste0(RIS_dir,"Mapping/Dep_ID.xlsx"),
-                    col_types = c("text","text"))
+Resource <- read_xlsx(paste0(RIS_dir,"Mapping/Resource_Mapping.xlsx"),
+                      col_types = c("text","text","text"))
 #Premier Dep ID for CPT upload
 Premier_Dep <- read_xlsx(paste0(RIS_dir,"Mapping/Premier_Dep.xlsx"))
 
@@ -74,16 +74,16 @@ RIS_charge_mod <- RIS_charge %>%
 
 #select columns from CDM for join
 CDM_join <- CDM %>%
-  select(`CHARGE CODE`,`CHARGE DESC`,`DEPARTMENT CODE`,`GENERAL CPT4 CODE`) %>%
-  rename(charge_code = `CHARGE CODE`) %>%
+  select(Code, description, AlternateCode) %>%
+  rename(charge_code = Code) %>%
   distinct()
 #join charge detail with CDM, PAT, and DEP IT
 RIS_cpt4 <- left_join(RIS_charge_mod, CDM_join) %>%
-  filter(!is.na(`GENERAL CPT4 CODE`)) %>%
+  filter(!is.na(AlternateCode)) %>%
   left_join(PAT, by = c("Pat.Type" = "Code")) %>%
-  left_join(Dep_ID, by = c("DEPARTMENT CODE" = "Dept")) %>%
-  mutate(Identifier = paste0(Org,"-",`DEPARTMENT CODE`,"-",`IP or OP`)) %>%
-  mutate(CPT = paste0(`GENERAL CPT4 CODE`,Modifier)) %>%
+  left_join(Resource, by = c("Resource" = "Resource")) %>%
+  mutate(Identifier = paste0(Org,"-",Dept,"-",`IP or OP`)) %>%
+  mutate(CPT = paste0(AlternateCode ,Modifier)) %>%
   left_join(Premier_Dep) %>%
   mutate(Start = paste0(
     substr(Date,6,7),"/",
