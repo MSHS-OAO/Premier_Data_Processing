@@ -10,7 +10,7 @@ RIS_dir <- paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
                   "Productivity/Volume - Data/MSQ Data/RIS/")
 
 #month and year of charge detail
-month_year <- "JUL2022"
+month_year <- "MAR2023"
 
 #read in charge detail
 RIS <- read.csv(paste0(RIS_dir,"Charge Detail/",
@@ -85,6 +85,7 @@ RIS_cpt4 <- left_join(RIS_charge_mod, CDM_join) %>%
   mutate(Identifier = paste0(Org,"-",Dept,"-",`IP or OP`)) %>%
   mutate(CPT = paste0(AlternateCode ,Modifier)) %>%
   left_join(Premier_Dep) %>%
+  filter(!is.na(DepID)) %>%
   mutate(Start = paste0(
     substr(Date,6,7),"/",
     substr(Date,9,10),"/",
