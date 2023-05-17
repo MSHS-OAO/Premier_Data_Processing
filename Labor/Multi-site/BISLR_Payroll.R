@@ -1188,7 +1188,8 @@ employee_reg_hours_qc <- bislr_payroll %>%
             by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
   left_join(date_filtering) %>%
   filter(PROVIDER == 0,
-         PAY.CODE.CATEGORY == "REGULAR") %>%
+         PAY.CODE.CATEGORY == "REGULAR",
+         INCLUDE.HOURS == "1") %>%
   filter(!is.na(upload_date)) %>%
   group_by(Employee.ID, Employee.Name, Start.Date, End.Date) %>%
   summarize(hours_reg_pp = sum(Hours, na.rm = T)) %>%
@@ -1231,7 +1232,7 @@ employee_tot_hours_qc <- bislr_payroll %>%
             by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
   filter(PROVIDER == 0,
          WORKED.PAY.CODE == 1,
-         INCLUDE.HOURS == 1) %>%
+         INCLUDE.HOURS == "1") %>%
   filter(!is.na(upload_date)) %>%
   group_by(Employee.ID, Employee.Name, Start.Date, End.Date) %>%
   summarize(hours_tot_pp = sum(Hours, na.rm = T)) %>%
@@ -1262,6 +1263,12 @@ employee_tot_hours_qc_detail <- bislr_payroll %>%
           DPT.WRKD, Pay.Code)
 
 View(employee_tot_hours_qc_detail)
+
+### Table with Percent of Employees in Excess ------------------------------
+
+# Get total employees by home facility
+# Identify percent of employees that are on the
+# reg hours qc and total hours qc lists
 
 ### Premier reports with excess --------------------------------------------
 
