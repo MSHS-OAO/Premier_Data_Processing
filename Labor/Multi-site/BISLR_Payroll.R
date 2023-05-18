@@ -646,8 +646,8 @@ upload_payroll <- upload_payroll %>%
     Facility.Hospital.Id_Worked, DPT.WRKD, Start.Date, End.Date,
     Employee.ID, Employee.Name, Approved.Hours.per.Pay.Period,
     Job.Code_up, Pay.Code) %>%
-  summarize(Hours = sum(Hours, na.rm = TRUE),
-            Expense = sum(Expense, na.rm = TRUE)) %>%
+  summarize(Hours = round(sum(Hours, na.rm = TRUE), 4),
+            Expense = round(sum(Expense, na.rm = TRUE), 2)) %>%
   ungroup()
 
 # upload_payroll will be split into BIB and SLW in the Exporting section
@@ -1322,7 +1322,7 @@ write.table(upload_map_dpt_jc,
             row.names = F, col.names = F, sep = ",")
 
 
-if (exists("new_paycodes")) {
+if (exists("upload_dict_paycode")) {
   write.table(upload_dict_paycode,
               file = paste0(dir_BISLR, "/BISLR_Pay Code Dictionary_",
                             date_range, ".csv"),
