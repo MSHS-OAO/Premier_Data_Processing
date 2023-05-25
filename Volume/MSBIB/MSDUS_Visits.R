@@ -272,13 +272,10 @@ if (length(new_dept$Department) > 0) {
   message("No new departments identified.")
 }
 
-
 # Visualization -----------------------------------------------------------
 #Questions:
 #most recent end dates appear at the top of each series of bars. Is that ok?
-#would you prefer me to show the data in smaller batches based on visits?
 #would you like the labels on the y axis to have names associated with the IDs?
-#are there any other visualization formatting concerns you have?
 
 #add note column to the upload file so it can bind to trend data file
 new_trend_data <- upload_file %>%
@@ -310,17 +307,31 @@ write_xlsx(updated_trend_data, paste0(j_drive, "/SixSigma/MSHS Productivity",
                                       "/Union Square/Calculation Worksheets",
                                       "/MSDUS_trend_data.xlsx"))
 
-#select trend data from within 100 days of today's date
+#read in MSDUS trend groups table for a left join
+trend_groups <- read_xlsx(paste0(j_drive, "/SixSigma/MSHS Productivity",
+                                 "/Productivity/Volume - Data/MSBI Data",
+                                 "/Union Square/Calculation Worksheets",
+                                 "/MSDUS_trend_groups.xlsx")) %>%
+  mutate(`Volume ID` = as.character(`Volume ID`))
+
+#prepare the updated trend data for visualization
 plot_trend_data <- updated_trend_data %>%
+  left_join(trend_groups,
+            by = c("Volume ID" = "Volume ID")) %>%
   filter(START.DATE >= today() - 180)
 
-#creating multiple-bar plot (x = volume ID, y = volume, and
+#creating multiple-bar plots (x = volume ID, y = volume, and
 #each bar indicates the volume on a specific end date)
-ggplot(data = plot_trend_data,
-       mapping = aes(x = `Volume ID`, y = `visits`, fill = `END.DATE`)) +
-  geom_bar(position = "dodge2", stat = "identity") +
-  coord_flip()
-
+#each plot is depicts sets of volume ids with similar visit counts
+for (i in c("low", "med", "high")){
+  plot <- ggplot(data = filter(plot_trend_data, `Plot Group` == i),
+         mapping = aes(x = `Volume ID`, y = `visits`, fill = `END.DATE`)) +
+    geom_bar(position = "dodge2", stat = "identity") +
+    coord_flip() + 
+    labs(y = "Visits per Pay Period", x = "Cost Center & Volume ID") + 
+    ggtitle(paste0("MSDUS Visit Trends: ", i, " volume group"))
+  print(plot)
+}
 # File Saving -------------------------------------------------------------
 
 date_min_char <- format(as.Date(data_date_min, "%m/%d/%Y"), "%Y-%m-%d")
