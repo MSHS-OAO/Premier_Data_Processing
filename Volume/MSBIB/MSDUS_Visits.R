@@ -273,9 +273,6 @@ if (length(new_dept$Department) > 0) {
 }
 
 # Visualization -----------------------------------------------------------
-#Questions:
-#most recent end dates appear at the top of each series of bars. Is that ok?
-#would you like the labels on the y axis to have names associated with the IDs?
 
 #add note column to the upload file so it can bind to trend data file
 new_trend_data <- upload_file %>%
@@ -318,6 +315,10 @@ trend_groups <- read_xlsx(paste0(j_drive, "/SixSigma/MSHS Productivity",
 plot_trend_data <- updated_trend_data %>%
   left_join(trend_groups,
             by = c("Volume ID" = "Volume ID")) %>%
+  arrange(desc(START.DATE)) %>%
+  mutate(NEW.NAME = paste0(`Cost Center Description`,
+                           " - ",
+                           as.character(`Volume ID`))) %>%
   filter(START.DATE >= today() - 180)
 
 #creating multiple-bar plots (x = volume ID, y = volume, and
@@ -325,7 +326,7 @@ plot_trend_data <- updated_trend_data %>%
 #each plot is depicts sets of volume ids with similar visit counts
 for (i in c("low", "med", "high")){
   plot <- ggplot(data = filter(plot_trend_data, `Plot Group` == i),
-         mapping = aes(x = `Volume ID`, y = `visits`, fill = `END.DATE`)) +
+         mapping = aes(x = `NEW.NAME`, y = `visits`, fill = `END.DATE`)) +
     geom_bar(position = "dodge2", stat = "identity") +
     coord_flip() + 
     labs(y = "Visits per Pay Period", x = "Cost Center & Volume ID") + 
