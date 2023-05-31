@@ -38,14 +38,14 @@ recent_file <- function(path, file_header = F, encoding = "",
   # need names on columns of previous month's files
   if (premier == TRUE) {
     prem_upload_col_names <- c("partner",
-                             "hosp.home", "dept.home",
-                             "hosp.worked", "dept.worked",
-                             "date.start", "date.end",
-                             "emp.ID", "emp.name",
-                             "budget", "jobcode", "paycode",
-                             "hours", "spend")
+                               "hosp.home", "dept.home",
+                               "hosp.worked", "dept.worked",
+                               "date.start", "date.end",
+                               "emp.ID", "emp.name",
+                               "budget", "jobcode", "paycode",
+                               "hours", "spend")
 
-  colnames(df) <- prem_upload_col_names
+    colnames(df) <- prem_upload_col_names
   }
 
   return(df)
@@ -75,11 +75,11 @@ raw_data <- recent_file(path = paste0(project_path, "Source Data"),
 
 # user needs previous raw data file to compare column headers
 raw_data_prev <- recent_file(path = paste0(project_path, "Source Data"),
-                        file_header = T,
-                        encoding = "UTF-16LE",
-                        delimeter = "\t",
-                        desc_order = 2,
-                        premier = FALSE)
+                             file_header = T,
+                             encoding = "UTF-16LE",
+                             delimeter = "\t",
+                             desc_order = 2,
+                             premier = FALSE)
 
 
 
@@ -221,12 +221,14 @@ mshq_zero_new <- mshq_upload_old %>%
 
 # apply employee removal filter
 processed_data <- raw_data %>%
-  filter(!Worker.Name %in% employee_removal)
+  filter(!Worker.Name %in% employee_removal) %>%
+  mutate(Earnings.E.D = word(Earnings.E.D)) # added because time of day was included for April 2023 data
+
 
 # filter raw data on date range needed for upload
 processed_data <- processed_data %>%
   filter(mdy(Earnings.E.D) > min(c(prev_0_max_date_mshq,
-                                  prev_0_max_date_msbib)),
+                                   prev_0_max_date_msbib)),
          mdy(Earnings.E.D) <= distribution_date)
 
 # process department.billed to get oracle home and legacy worked department
@@ -247,19 +249,28 @@ processed_data <- processed_data %>%
   mutate(home_dept_oracle = case_when(
     substr(wrkd_dept_leg, 1, 4) == "0130" ~ "101010101010102",
     substr(wrkd_dept_leg, 1, 4) == "4709" ~ "900000040790000",
+    substr(wrkd_dept_leg, 1, 2) == "11" ~ "900000030090000", # added for quick MSMW fix
     nchar(cost_center_info) == 12 ~ "101010101010101",
     nchar(cost_center_info) == 30 ~ "900000040490000",
     TRUE ~ cost_center_info
   )) %>%
   mutate(hospital = case_when(
+    home_dept_oracle == "900000030090000" ~ "MSMW", # added for quick MSMW fix
     nchar(cost_center_info) == 12 ~ "NY0014",
     nchar(cost_center_info) == 30 ~ "630571",
     TRUE ~ cost_center_info
   ))
 
+# added to filter out MSMW
+processed_data <- processed_data %>%
+  filter(hospital != "MSMW")
+
 # join to get oracle departments
 row_count <- nrow(processed_data)
 processed_data <- processed_data %>%
+  # this join will need to look at multiple columns when MSMW is incorporated.
+  # it will need to include the Hospital and Payroll info, which may also need
+  # to be adjusted to ensure things map properly
   left_join(select(code_conversion, COST.CENTER.LEGACY, COST.CENTER.ORACLE),
             by = c("wrkd_dept_leg" = "COST.CENTER.LEGACY")) %>%
   mutate(wrkd_dept_oracle = case_when(
@@ -344,7 +355,7 @@ processed_data <- processed_data %>%
                                                Holiday.Hours,
                                                na.rm = T),
                      Bill.Type == "Adjustment" ~ Weekly.Hours))
-           
+
 # Day Spend needs to be in numerical decimal format to summarize it
 processed_data <- processed_data %>%
   mutate(Regular.Rate = 
@@ -408,7 +419,7 @@ qc_hours_by_cc <- upload_new %>%
   left_join(distinct(select(code_conversion,
                             COST.CENTER.ORACLE,
                             COST.CENTER.DESCRIPTION.ORACLE)),
-                     by = c("wrkd_dept_oracle" = "COST.CENTER.ORACLE")) %>%
+            by = c("wrkd_dept_oracle" = "COST.CENTER.ORACLE")) %>%
   pivot_wider(id_cols = c(wrkd_dept_oracle, COST.CENTER.DESCRIPTION.ORACLE),
               names_from = Earnings.E.D,
               values_from = Hours)
@@ -511,9 +522,9 @@ if (sites == "MSHS" | sites == "MSBIB") {
 
   # save MSBIB zero file
   write.table(msbib_zero_new, paste0(project_path,
-                                    "MSBIB/Zero/MSBIB_Rightsourcing Zero_",
-                                    min(mdy(msbib_zero_new$date.start)), "_",
-                                    max(mdy(msbib_zero_new$date.end)), ".csv"),
+                                     "MSBIB/Zero/MSBIB_Rightsourcing Zero_",
+                                     min(mdy(msbib_zero_new$date.start)), "_",
+                                     max(mdy(msbib_zero_new$date.end)), ".csv"),
               row.names = F, col.names = F, sep = ",")
 }
 
