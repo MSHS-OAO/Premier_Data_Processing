@@ -273,7 +273,7 @@ if (length(new_dept$Department) > 0) {
 }
 
 # Visualization -----------------------------------------------------------
-
+#consolidate plot groups into the MSUS Epic Dict
 #add note column to the upload file so it can bind to trend data file
 new_trend_data <- upload_file %>%
   mutate(Note = NA) %>%
@@ -304,19 +304,19 @@ write_xlsx(updated_trend_data, paste0(j_drive, "/SixSigma/MSHS Productivity",
                                       "/Union Square/Calculation Worksheets",
                                       "/MSDUS_trend_data.xlsx"))
 
-#read in MSDUS trend groups table for a left join
-trend_groups <- read_xlsx(paste0(j_drive, "/SixSigma/MSHS Productivity",
-                                 "/Productivity/Volume - Data/MSBI Data",
-                                 "/Union Square/Calculation Worksheets",
-                                 "/MSDUS_trend_groups.xlsx")) %>%
-  mutate(`Volume ID` = as.character(`Volume ID`))
+#format dict_epic for a left join
+trend_groups <- dict_epic %>%
+  select("Volume ID", "Plot Group", "Cost Center Name") %>%
+  mutate(`Volume ID` = as.character(`Volume ID`)) %>%
+  na.omit() %>%
+  unique()
 
 #prepare the updated trend data for visualization
 plot_trend_data <- updated_trend_data %>%
   left_join(trend_groups,
             by = c("Volume ID" = "Volume ID")) %>%
   arrange(desc(START.DATE)) %>%
-  mutate(NEW.NAME = paste0(`Cost Center Description`,
+  mutate(NEW.NAME = paste0(`Cost Center Name`,
                            " - ",
                            as.character(`Volume ID`))) %>%
   filter(START.DATE >= today() - 180)
