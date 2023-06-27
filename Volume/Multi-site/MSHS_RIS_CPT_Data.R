@@ -97,26 +97,34 @@ cat("MSBIB CDM File Used:", cdm_file_import$name)
 # Import Data -------------------------------------------------------------
 
 ## OR Data -------------------------------------------------------------
-import_recent_OR_file <- function(folder.path, place) {
-  #Importing File information from Folder
-  File.Name <- list.files(path = folder.path, pattern = "csv$", full.names = F)
-  File.Path <- list.files(path = folder.path, pattern = "csv$", full.names = T)
-  File.Date <- as.Date(sapply(File.Name, function(x)
-    paste0("01", substr(x, nchar(x) - 10, nchar(x) - 4))), format = "%d%b%Y")
-  File.Table <- data.table::data.table(File.Name, File.Date, File.Path) %>%
-    arrange(desc(File.Date))
-  all_dates <- File.Table %>% select(File.Date) %>% unique()
-  File.Table <- File.Table %>% filter(File.Date %in% all_dates[place])
-  cat("OR file selected for ",
-      format(unique(File.Table$File.Date), format = "%B %Y"))
-  #Importing Data
-  data_recent <- read.csv(File.Table$File.Path,
-                          colClasses = c(rep("character", 9))) %>%
-    select(MRN, Name, ACC, Date, Exam, Exam.Modifier, Org, Resource)
-  return(data_recent)
-}
-mshs_or_rad_data <- import_recent_OR_file(paste0(dir_data, "/OR Source Data"),
-                                          1)
+
+# this section is not yet ready.
+# the import recent function will need to be adjusted since the file:
+# - is typically a .xls file
+# - the first row needs to be skipped
+# - there are rows that should be removed because they are header sections
+#   (a row indicated that the section is for BI, MSH, etc.)
+
+# import_recent_OR_file <- function(folder.path, place) {
+#   #Importing File information from Folder
+#   File.Name <- list.files(path = folder.path, pattern = "csv$", full.names = F)
+#   File.Path <- list.files(path = folder.path, pattern = "csv$", full.names = T)
+#   File.Date <- as.Date(sapply(File.Name, function(x)
+#     paste0("01", substr(x, nchar(x) - 10, nchar(x) - 4))), format = "%d%b%Y")
+#   File.Table <- data.table::data.table(File.Name, File.Date, File.Path) %>%
+#     arrange(desc(File.Date))
+#   all_dates <- File.Table %>% select(File.Date) %>% unique()
+#   File.Table <- File.Table %>% filter(File.Date %in% all_dates[place])
+#   cat("OR file selected for ",
+#       format(unique(File.Table$File.Date), format = "%B %Y"))
+#   #Importing Data
+#   data_recent <- read.csv(File.Table$File.Path,
+#                           colClasses = c(rep("character", 9))) %>%
+#     select(MRN, Name, ACC, Date, Exam, Exam.Modifier, Org, Resource)
+#   return(data_recent)
+# }
+# mshs_or_rad_data <- import_recent_OR_file(paste0(dir_data, "/OR Source Data"),
+#                                           1)
 
 ## RIS Data ----------------------------------------------------------------
 import_recent_RIS_files <- function(folder.path,
