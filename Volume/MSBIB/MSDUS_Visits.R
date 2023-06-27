@@ -3,8 +3,9 @@
 library(readxl)
 library(xlsx)
 library(dplyr)
-
-
+library(lubridate)
+library(ggplot2)
+library(writexl)
 # Assigning Directory(ies) ------------------------------------------------
 
 ## Shared Drive Path (Generic) --------------------------------------------
@@ -39,10 +40,10 @@ path_dict_prem <- paste0(j_drive,
                          "R Code/MSUS Epic Dictionary.xlsx")
 
 dict_epic <- read_xlsx(
-    path_dict_prem,
-    sheet = 1,
-    skip = 0
-  )
+  path_dict_prem,
+  sheet = 1,
+  skip = 0
+)
 
 dict_epic_short <- dict_epic %>%
   select(`Epic Department Name`, `Volume ID`, `Cost Center`, `volume ratio`)
@@ -80,7 +81,7 @@ skip_ct_max <- 5
 
 while (d_check != 0 & skip_ct < skip_ct_max) {
   col_check <- read_xlsx(path_data_epic, sheet = 1, skip = skip_ct, n_max = 10)
-
+  
   if ("Department" %in% colnames(col_check) |
       "DEPARTMENT_NAME" %in% colnames(col_check)) {
     data_raw <- read_xlsx(path_data_epic, sheet = 1, skip = skip_ct)
@@ -97,7 +98,7 @@ while (d_check != 0 & skip_ct < skip_ct_max) {
 if (skip_ct == skip_ct_max) {
   stop(paste0("The raw data is not in the appropriate format.\n",
               "Identify the appropriate file and restart")
-       )
+  )
 }
 
 # if the atypical file format has been provided, the column names
@@ -107,7 +108,7 @@ if ("DEPARTMENT_NAME" %in% colnames(data_raw)) {
     rename(Department = DEPARTMENT_NAME,
            Provider = PROV_NAME,
            `Appt Time` = APPT_TIME)
-
+  
   # if there are NA dates then Date of Service can be used instead
   data_raw <- data_raw %>%
     mutate(`Appt Time` = case_when(
@@ -259,19 +260,79 @@ if (length(new_dept$Department) > 0) {
                      "Press \"OK\" to continue\r",
                      "Press \"Cancel\" to stop running this script"),
     type = "okcancel")
-
+  
   if (new_dept_stop == "CANCEL") {
     stop(paste0("Incorporate the new depts into the dictionary as desired.\n",
                 "Restart the script after the dictionary is as desired.")
     )
   }
-
+  
 } else {
   new_dept_stop <- "OK"
   message("No new departments identified.")
 }
 
+# Visualization -----------------------------------------------------------
+#consolidate plot groups into the MSUS Epic Dict
+#add note column to the upload file so it can bind to trend data file
+new_trend_data <- upload_file %>%
+  mutate(Note = NA) %>%
+  mutate(START.DATE = mdy(START.DATE)) %>%
+  mutate(START.DATE = as.Date(START.DATE, format = "%Y-%m-%d")) %>%
+  mutate(END.DATE = mdy(END.DATE)) %>%
+  mutate(END.DATE = as.Date(END.DATE, format = "%Y-%m-%d"))
 
+#read in trend data file
+old_trend_data <- read_xlsx(paste0(j_drive, "/SixSigma/MSHS Productivity",
+                                   "/Productivity/Volume - Data/MSBI Data",
+                                   "/Union Square/Calculation Worksheets",
+                                   "/MSDUS_trend_data.xlsx"),
+                            sheet = 1) %>%
+  mutate(START.DATE = as.Date(START.DATE)) %>%
+  mutate(END.DATE = as.Date(END.DATE)) %>%
+  mutate(`Volume ID` = as.character(`Volume ID`))
+
+#combine new upload data with the existing trend data
+updated_trend_data <- rbind(old_trend_data, new_trend_data) %>%
+  mutate(START.DATE = as.Date(START.DATE)) %>%
+  mutate(END.DATE = as.Date(END.DATE)) %>%
+  unique()
+
+#overwrite trend data file with updated trend data
+write_xlsx(updated_trend_data, paste0(j_drive, "/SixSigma/MSHS Productivity",
+                                      "/Productivity/Volume - Data/MSBI Data",
+                                      "/Union Square/Calculation Worksheets",
+                                      "/MSDUS_trend_data.xlsx"))
+
+#format dict_epic for a left join
+trend_groups <- dict_epic %>%
+  select("Volume ID", "Plot Group", "Cost Center Name") %>%
+  mutate(`Volume ID` = as.character(`Volume ID`)) %>%
+  na.omit() %>%
+  unique()
+
+#prepare the updated trend data for visualization
+plot_trend_data <- updated_trend_data %>%
+  left_join(trend_groups,
+            by = c("Volume ID" = "Volume ID")) %>%
+  arrange(desc(START.DATE)) %>%
+  mutate(NEW.NAME = paste0(`Cost Center Name`,
+                           " - ",
+                           as.character(`Volume ID`))) %>%
+  filter(START.DATE >= today() - 180)
+
+#creating multiple-bar plots (x = volume ID, y = volume, and
+#each bar indicates the volume on a specific end date)
+#each plot is depicts sets of volume ids with similar visit counts
+for (i in c("low", "med", "high")){
+  plot <- ggplot(data = filter(plot_trend_data, `Plot Group` == i),
+         mapping = aes(x = `NEW.NAME`, y = `visits`, fill = `END.DATE`)) +
+    geom_bar(position = "dodge2", stat = "identity") +
+    coord_flip() + 
+    labs(y = "Visits per Pay Period", x = "Cost Center & Volume ID") + 
+    ggtitle(paste0("MSDUS Visit Trends: ", i, " volume group"))
+  print(plot)
+}
 # File Saving -------------------------------------------------------------
 
 date_min_char <- format(as.Date(data_date_min, "%m/%d/%Y"), "%Y-%m-%d")
@@ -281,9 +342,9 @@ file_name_premier <-
   paste0("MSDUS_Department Volumes_", date_min_char, "_to_", date_max_char,
          ".csv")
 path_folder_premier_export <- paste0(j_drive,
-                     "/SixSigma/MSHS Productivity/Productivity",
-                     "/Volume - Data/MSBI Data/Union Square",
-                     "/Calculation Worksheets")
+                                     "/SixSigma/MSHS Productivity/Productivity",
+                                     "/Volume - Data/MSBI Data/Union Square",
+                                     "/Calculation Worksheets")
 write.table(
   upload_file,
   file = paste0(path_folder_premier_export, "\\", file_name_premier),
