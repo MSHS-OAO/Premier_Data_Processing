@@ -61,7 +61,8 @@ pay_period_mapping <- read_xlsx(paste0(mapping_path,
                                        "MSHS_Pay_Cycle.xlsx"))
 # code conversion mapping file to convert legacy to oracle cc
 code_conversion <- read_xlsx(paste0(mapping_path,
-                                    "MSHS_Code_Conversion_Mapping.xlsx"))
+                                    "MSHS_Code_Conversion_Mapping.xlsx")) %>%
+  filter(PAYROLL != "MSMW")
 # report mapping file for QC check to identify published departments
 report_info <- read_xlsx(paste0(mapping_path,
                                 "MSHS_Reporting_Definition_Mapping.xlsx"))
