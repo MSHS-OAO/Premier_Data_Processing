@@ -15,6 +15,19 @@ dir <- "J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity"
 dir_BISLR <- paste0(dir, "/Labor - Data/Multi-site/BISLR")
 dir_universal <- paste0(dir, "/Universal Data")
 
+# User Warnings -----------------------------------------------------------
+
+showDialog(
+  title = "Updated Premier Dictionary Mapping Files",
+  message = paste0(
+    "USER WARNING: ",
+    "Before proceeding, ",
+    "be sure that all the latest Premier Dictionary and Mapping Exports ",
+    "have been saved in the folder listed below.  ",
+    "    Issues can arise if the files are not the latest version.     ",
+    dir, "/Universal Data/Premier")
+  )
+
 # Constants ---------------------------------------------------------------
 new_dpt_map <- 10095
 map_effective_date_dpt <- as.Date("2010-01-01")
@@ -461,7 +474,7 @@ while (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
                      paste0("_V", loop)
                    },
                    ".csv"))
-  
+
   warn_new_pc <-
     showQuestion(
       title = "Warning",
@@ -554,7 +567,9 @@ if (nrow(filter_dates) > 0) {
                     "that has already been prepared for Premier upload",
                     "at some point in the past.  Be careful not to",
                     "overwrite data files by mistake."))
-  date_filtering <- paycycles_data
+  date_filtering <- paycycles_data %>%
+    mutate(upload_date = 1) %>%
+    arrange(Start.Date, End.Date)
 }
 
 ## JC ID check ----------------------------------------------------
@@ -631,8 +646,8 @@ upload_payroll <- upload_payroll %>%
     Facility.Hospital.Id_Worked, DPT.WRKD, Start.Date, End.Date,
     Employee.ID, Employee.Name, Approved.Hours.per.Pay.Period,
     Job.Code_up, Pay.Code) %>%
-  summarize(Hours = sum(Hours, na.rm = TRUE),
-            Expense = sum(Expense, na.rm = TRUE)) %>%
+  summarize(Hours = round(sum(Hours, na.rm = TRUE), 4),
+            Expense = round(sum(Expense, na.rm = TRUE), 2)) %>%
   ungroup()
 
 # upload_payroll will be split into BIB and SLW in the Exporting section
@@ -909,6 +924,8 @@ if (max(jc_desc_check$freq) > jc_desc_threshold) {
 
 # average FTEs since previous distribution
 
+## FYI: this is based on the upload file, so it only includes providers
+
 # need Pay Code info to get appropriate hours
 row_count <- nrow(upload_payroll)
 fte_summary <- upload_payroll %>%
@@ -935,6 +952,8 @@ fte_summary <- fte_summary %>%
       round(sum(Hours, na.rm = TRUE) /
               (37.5 * (as.numeric(distribution_date - dist_prev) / 7)), 1)) %>%
   ungroup() %>%
+  # removing the formatting of this date could eliminate some need
+  # for all the date processing within this coding section
   mutate(dist_date = format(distribution_date, "%m/%d/%Y")) %>%
   relocate(dist_date, .before = Avg_FTEs_worked) %>%
   mutate(capture_time = as.character(Sys.time())) %>%
@@ -989,7 +1008,12 @@ fte_summary <- fte_summary %>%
         Site == "NY2162" ~ "MSW",
         Site == "NY2163" ~ "MSM",
         TRUE ~ "Other")),
-    upload_dict_dpt) %>%
+    upload_dict_dpt %>%
+      mutate(Site = case_when(
+        Site == "630571" ~ "MSBIB",
+        Site == "NY2162" ~ "MSW",
+        Site == "NY2163" ~ "MSM",
+        TRUE ~ "Other"))) %>%
       select(-Corporation.Code),
     by = c("Site" = "Site", "Department" = "Cost.Center")) %>%
   select(Site, Department, Cost.Center.Description,
@@ -997,11 +1021,103 @@ fte_summary <- fte_summary %>%
          CORPORATE.SERVICE.LINE, VP, dist_date,
          Avg_FTEs_worked, Avg_FTEs_paid, capture_time)
 
+# some Cost.Center.Description values are showing as NA
+# - this is minimal and doesn't look worth pursuing at this time
+  
 if (nrow(fte_summary) != row_count) {
   showDialog(title = "Join error",
              message = paste("Row count failed at", "fte_summary"))
   stop(paste("Row count failed at", "fte_summary"))
 }
+
+# filtering so only the trailing year is included
+fte_summary <- fte_summary %>%
+  filter(as.numeric(as.Date(distribution_date) -
+                      as.Date(dist_date, "%m/%d/%Y")) < 390)
+
+
+### wide summary ------------------------------------------------------------
+
+# get the minimum date for each cost center
+fte_summary_cc_age <- fte_summary %>%
+  select(Site, Department, dist_date) %>%
+  mutate(dist_date = as.Date(dist_date, "%m/%d/%Y")) %>%
+  arrange(dist_date, Site, Department) %>%
+  distinct(across(-dist_date), .keep_all = TRUE) %>%
+  rename(oldest_date = dist_date)
+
+# PAID
+
+fte_summary_wide_paid <- fte_summary %>%
+  mutate(dist_date = as.Date(dist_date, "%m/%d/%Y")) %>%
+  arrange(dist_date, Site, Department) %>%
+  select(-Avg_FTEs_worked, -capture_time) %>%
+  pivot_wider(names_from = dist_date, values_from = Avg_FTEs_paid,
+              values_fill = 0)
+
+fte_summary_wide_paid$current_change_raw <-
+  pull(select(fte_summary_wide_paid,
+              contains(format(distribution_date, "%Y-%m-%d")))) -
+  pull(select(fte_summary_wide_paid,
+              contains(format(dist_prev, "%Y-%m-%d"))))
+
+fte_summary_wide_paid$current_change_pct <-
+  formattable::percent(
+    fte_summary_wide_paid$current_change_raw /
+      pull(select(fte_summary_wide_paid,
+                  contains(format(dist_prev, "%Y-%m-%d")))), digits = 1)
+
+fte_summary_wide_paid <- fte_summary_wide_paid %>%
+  left_join(fte_summary_cc_age) %>%
+  arrange(oldest_date)
+
+fte_summary_extreme_change_pd <- fte_summary_wide_paid %>%
+  filter(current_change_raw >= 3 | current_change_raw <= -3) %>%
+  arrange(-current_change_raw)
+
+View(fte_summary_extreme_change_pd)
+
+fte_summary_new_dept_pd <- fte_summary_wide_paid %>%
+  filter(oldest_date == distribution_date)
+
+View(fte_summary_new_dept_pd)
+
+# WORKED
+
+fte_summary_wide_worked <- fte_summary %>%
+  mutate(dist_date = as.Date(dist_date, "%m/%d/%Y")) %>%
+  arrange(dist_date, Site, Department) %>%
+  select(-Avg_FTEs_paid, -capture_time) %>%
+  pivot_wider(names_from = dist_date, values_from = Avg_FTEs_worked,
+              values_fill = 0)
+
+fte_summary_wide_worked$current_change_raw <-
+  pull(select(fte_summary_wide_worked,
+              contains(format(distribution_date, "%Y-%m-%d")))) -
+  pull(select(fte_summary_wide_worked,
+              contains(format(dist_prev, "%Y-%m-%d"))))
+
+fte_summary_wide_worked$current_change_pct <-
+  formattable::percent(
+    fte_summary_wide_worked$current_change_raw /
+      pull(select(fte_summary_wide_worked,
+                  contains(format(dist_prev, "%Y-%m-%d")))), digits = 1)
+
+fte_summary_wide_worked <- fte_summary_wide_worked %>%
+  left_join(fte_summary_cc_age) %>%
+  arrange(oldest_date)
+
+fte_summary_extreme_change_wrk <- fte_summary_wide_worked %>%
+  filter(current_change_raw >= 3 | current_change_raw <= -3) %>%
+  arrange(-current_change_raw)
+
+View(fte_summary_extreme_change_wrk)
+
+fte_summary_new_dept_wrk <- fte_summary_wide_worked %>%
+  filter(oldest_date == distribution_date)
+
+View(fte_summary_new_dept_wrk)
+
 
 ## 8600 Accrual Site Summary --------------------------------------------
 
@@ -1060,6 +1176,118 @@ if (nrow(accrual_raw_detail) != row_count) {
 View(accrual_raw_summary)
 
 
+## Employee Excessive Hours -----------------------------------------------
+
+### Regular Hours ---------------------------------------------------------
+
+employee_reg_hours_qc <- bislr_payroll %>%
+  left_join(map_uni_paycodes %>%
+              select(RAW.PAY.CODE, INCLUDE.HOURS, WORKED.PAY.CODE,
+                     PAY.CODE.CATEGORY) %>%
+              distinct(),
+            by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
+  left_join(date_filtering) %>%
+  filter(PROVIDER == 0,
+         PAY.CODE.CATEGORY == "REGULAR",
+         INCLUDE.HOURS == "1") %>%
+  filter(!is.na(upload_date)) %>%
+  group_by(Employee.ID, Employee.Name, Start.Date, End.Date) %>%
+  summarize(hours_reg_pp = sum(Hours, na.rm = T)) %>%
+  ungroup() %>%
+  mutate(pp_days = as.numeric(End.Date - Start.Date) + 1) %>%
+  mutate(pp_thresh = case_when(
+    pp_days == 7 ~ 40,
+    pp_days == 14 ~ 80)) %>%
+  mutate(pp_overage_coeff = hours_reg_pp / pp_thresh) %>%
+  filter(hours_reg_pp > pp_thresh) %>%
+  arrange(-pp_overage_coeff, Employee.Name, End.Date, Start.Date)
+
+View(employee_reg_hours_qc)
+
+# create detailed view of all entries for employees with high regular hours
+employee_reg_hours_qc_detail <- bislr_payroll %>%
+  left_join(map_uni_paycodes %>%
+              select(RAW.PAY.CODE, INCLUDE.HOURS, WORKED.PAY.CODE,
+                     PAY.CODE.CATEGORY) %>%
+              distinct(),
+            by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
+  left_join(filter(select(map_uni_reports, DEFINITION.CODE, DEFINITION.NAME,
+                          ORACLE.COST.CENTER, DEPARTMENT.BREAKDOWN, CLOSED),
+                   is.na(CLOSED)),
+            c("DPT.WRKD" = "ORACLE.COST.CENTER")) %>%
+  inner_join(employee_reg_hours_qc) %>%
+  arrange(-pp_overage_coeff, Employee.Name, End.Date, Start.Date,
+          DPT.WRKD, Pay.Code)
+
+View(employee_reg_hours_qc_detail)
+
+### Total Hours ----------------------------------------------------------
+
+employee_tot_hours_qc <- bislr_payroll %>%
+  left_join(date_filtering) %>%
+  left_join(map_uni_paycodes %>%
+              select(RAW.PAY.CODE, INCLUDE.HOURS, WORKED.PAY.CODE,
+                     PAY.CODE.CATEGORY) %>%
+              distinct(),
+            by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
+  filter(PROVIDER == 0,
+         WORKED.PAY.CODE == 1,
+         INCLUDE.HOURS == "1") %>%
+  filter(!is.na(upload_date)) %>%
+  group_by(Employee.ID, Employee.Name, Start.Date, End.Date) %>%
+  summarize(hours_tot_pp = sum(Hours, na.rm = T)) %>%
+  ungroup() %>%
+  mutate(pp_days = as.numeric(End.Date - Start.Date) + 1) %>%
+  mutate(pp_thresh = case_when(
+    pp_days == 7 ~ 55,
+    pp_days == 14 ~ 110)) %>%
+  mutate(pp_overage_coeff = hours_tot_pp / pp_thresh) %>%
+  filter(hours_tot_pp > pp_thresh) %>%
+  arrange(-pp_overage_coeff, Employee.Name, End.Date, Start.Date)
+
+View(employee_tot_hours_qc)
+
+# create detailed view of all entries for employees with high total hours
+employee_tot_hours_qc_detail <- bislr_payroll %>%
+  left_join(map_uni_paycodes %>%
+              select(RAW.PAY.CODE, INCLUDE.HOURS, WORKED.PAY.CODE,
+                     PAY.CODE.CATEGORY) %>%
+              distinct(),
+            by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
+  left_join(filter(select(map_uni_reports, DEFINITION.CODE, DEFINITION.NAME,
+                          ORACLE.COST.CENTER, DEPARTMENT.BREAKDOWN, CLOSED),
+                   is.na(CLOSED)),
+            c("DPT.WRKD" = "ORACLE.COST.CENTER")) %>%
+  inner_join(employee_tot_hours_qc) %>%
+  arrange(-pp_overage_coeff, Employee.Name, End.Date, Start.Date,
+          DPT.WRKD, Pay.Code)
+
+View(employee_tot_hours_qc_detail)
+
+### Table with Percent of Employees in Excess ------------------------------
+
+# Get total employees by home facility
+# Identify percent of employees that are on the
+# reg hours qc and total hours qc lists
+
+### Premier reports with excess --------------------------------------------
+
+employee_hr_qc_rpt_potential <- employee_tot_hours_qc_detail %>%
+  filter(DEPARTMENT.BREAKDOWN == 1) %>%
+  filter(INCLUDE.HOURS == 1,
+         WORKED.PAY.CODE == 1) %>%
+  group_by(DEFINITION.CODE, DEFINITION.NAME, Start.Date, End.Date) %>%
+  summarize(Hours = sum(Hours, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(pp_days = as.numeric(End.Date - Start.Date) + 1) %>%
+  mutate(FTEs_under_review = case_when(pp_days == 7 ~ round(Hours / 37.5, 2),
+                                       pp_days == 14 ~ round(Hours / 75, 2))
+  ) %>%
+  select(-Hours) %>%
+  arrange(-FTEs_under_review)
+
+View(employee_hr_qc_rpt_potential)
+
 # Exporting Data ----------------------------------------------------------
 
 date_range <- paste0(
@@ -1094,7 +1322,7 @@ write.table(upload_map_dpt_jc,
             row.names = F, col.names = F, sep = ",")
 
 
-if (exists("new_paycodes")) {
+if (exists("upload_dict_paycode")) {
   write.table(upload_dict_paycode,
               file = paste0(dir_BISLR, "/BISLR_Pay Code Dictionary_",
                             date_range, ".csv"),
@@ -1160,6 +1388,32 @@ write.xlsx2(as.data.frame(fte_summary),
             sheetName = "fte_summary",
             append = FALSE)
 
+# backup the previous fte_summary_wide
+file.rename(from = paste0(fte_summary_path, "fte_summary_wide.xlsx"),
+            to = paste0(fte_summary_path,
+                        "fte_summary_wide_BU_",
+                        as.character(Sys.time(), format = "%Y-%m-%d_%H-%M-%S"),
+                        ".xlsx"))
+
+fte_summary_wide_list <- list(
+  "new_dept_PD_FTEs" = fte_summary_new_dept_pd,
+  "new_dept_WRK_FTEs" = fte_summary_new_dept_wrk,
+  "extremes_PD_FTEs" = fte_summary_extreme_change_pd,
+  "extremes_WRK_FTEs" = fte_summary_extreme_change_wrk,
+  "PAID_FTEs" = fte_summary_wide_paid,
+  "WORKED_FTEs" = fte_summary_wide_worked)
+
+openxlsx::write.xlsx(fte_summary_wide_list,
+                     file = paste0(fte_summary_path, "fte_summary_wide.xlsx"),
+                     firstActiveRow = 2,
+                     firstActiveCol = 6,
+                     headerStyle =
+                       openxlsx::createStyle(halign = "center",
+                                             fgFill = "#ADD8E6",
+                                             border = "TopBottomLeftRight"),
+                     colWidths = "auto",
+                     zoom = 70)
+
 # rename previous piv_wide_check
 file.rename(from = paste0(dir_BISLR, "/Quality Checks",
                           "/piv_wide_check", ".csv"),
@@ -1172,5 +1426,26 @@ write.csv(piv_wide_check,
           file = paste0(dir_BISLR, "/Quality Checks",
                         "/piv_wide_check", ".csv"),
           row.names = FALSE)
+
+emp_excess_hr_qc_list <- list(
+  "rpt_impact_excess_hr" = employee_hr_qc_rpt_potential,
+  "emp_reg_hr" = employee_reg_hours_qc,
+  "emp_reg_hr_det" = employee_reg_hours_qc_detail,
+  "emp_tot_hr" = employee_tot_hours_qc,
+  "emp_tot_hr_det" = employee_tot_hours_qc_detail)
+
+openxlsx::write.xlsx(emp_excess_hr_qc_list,
+                     file = paste0(dir_BISLR, "/Quality Checks",
+                                   "/employee_excess_hours_",
+                                   as.character(Sys.time(),
+                                                format = "%Y-%m-%d"),
+                                   ".xlsx"),
+                     firstActiveRow = 2,
+                     headerStyle =
+                       openxlsx::createStyle(halign = "center",
+                                             fgFill = "#ADD8E6",
+                                             border = "TopBottomLeftRight"),
+                     colWidths = "auto",
+                     zoom = 70)
 
 # End of Script -----------------------------------------------------------

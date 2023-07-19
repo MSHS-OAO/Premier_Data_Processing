@@ -11,6 +11,7 @@ rev_map <- read_excel("J:\\deans\\Presidents\\SixSigma\\MSHS Productivity\\Produ
   distinct()
 #Bring in CPT reference table
 #For months: January,April,July,October there is a new cpt_ref to download
+# https://communities.premierinc.com/display/OUG/Data+Management%3A+Productivity+%28Legacy%29+Topics
 cpt_ref <- read_excel("J:\\deans\\Presidents\\SixSigma\\MSHS Productivity\\Productivity\\Volume - Data\\MSH Data\\RIS\\Mapping\\CPT_Ref.xlsx") %>%
   select(1,2,3,6,11,12)
 
@@ -110,17 +111,18 @@ upload_master <- function(){
   write.table(upload,upload_path,sep = ",",row.names = F,col.names = F)
 }
 
-#Bring in all sheets in charges file
+# choose path for this months data
 path <- file.choose()
 sheetnames <- excel_sheets(path)
 mylist <- lapply(excel_sheets(path), read_excel, path = path, col_names = T)
 names(mylist) <- sheetnames
+# print sheets in selected file
 names(mylist)
 
 #Enter Year of data
 Year <- "2023"
-#Execute functions
-MSHQ <- charges(MSH = mylist[[2]],MSQ = mylist[[1]])
+# tell charges function which sheet is MSH and which is MSQ
+MSHQ <- charges(MSH = mylist[[1]],MSQ = mylist[[2]])
 #Create master and master trend
 master()
 #Review master trend
