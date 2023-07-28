@@ -12,7 +12,7 @@ MSQ_RIS_dir <- paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
                   "Productivity/Volume - Data/MSQ Data/RIS/")
 
 #month and year of charge detail
-month_year <- "MAY2022"
+month_year <- "JUN2023"
 #Diagnostic OR scaling factor
 diagnostic_scaling <- 2.69
 
@@ -43,8 +43,11 @@ RIS_MSQ <- read.csv(paste0(MSQ_RIS_dir,"Charge Detail/",
                        "MSQ_RIS_",month_year,".csv"), 
                 colClasses = c(rep("character",21)))
 #read in MSQ CDM
-MSQ_CDM <- read_xlsx(paste0(MSQ_RIS_dir, "CDM/MSQ CDM.xlsx"), 
-                     col_types = rep("text",55))
+MSQ_CDM <- read_xlsx(paste0(MSQ_RIS_dir, "CDM/MSQ_CDM_combined.xlsx"), 
+                     col_types = rep("text",21))
+#read in MSQ resource mapping
+msq_resource <- read_xlsx(paste0(MSQ_RIS_dir, "Mapping/Resource_Mapping.xlsx"),
+                          col_types = rep("text",3))
 #Read in modality mapping file
 modality <- read_xlsx(paste0(RIS_dir,"Mapping/Modality_Mapping.xlsx"))
 #Read in PAT mapping
@@ -66,9 +69,6 @@ cpt_mapping <- read_xlsx(paste0(RIS_dir,"/Mapping/",
                                 "CPT_Ref.xlsx")) %>%
   select(1, 2, 3, 6, 12)
 
-#read in Dep ID mapping for MSQ
-Dep_ID <- read_xlsx(paste0(MSQ_RIS_dir,"Mapping/Dep_ID.xlsx"),
-                    col_types = c("text","text"))
 #remove whitespaces
 RIS[,1:21] <- sapply(RIS[,1:21], trimws)
 RIS_neuro[,1:21] <- sapply(RIS_neuro[,1:21], trimws)
@@ -279,16 +279,16 @@ RIS_MSQ_charge_mod <- RIS_MSQ_charge %>%
 
 #select columns from CDM for join
 MSQ_CDM_join <- MSQ_CDM %>%
-  select(`CHARGE CODE`,`CHARGE DESC`,`DEPARTMENT CODE`,`GENERAL CPT4 CODE`) %>%
-  rename(charge_code = `CHARGE CODE`) %>%
+  select(Code, description, AlternateCode) %>%
+  rename(charge_code = Code) %>%
   distinct()
 #join charge detail with CDM, PAT, and DEP IT
 RIS_MSQ_cpt4 <- left_join(RIS_MSQ_charge_mod, MSQ_CDM_join) %>%
-  filter(!is.na(`GENERAL CPT4 CODE`)) %>%
+  filter(!is.na(charge_code)) %>%
+  left_join(msq_resource) %>%
   left_join(PAT, by = c("Pat.Type" = "Code")) %>%
-  left_join(Dep_ID, by = c("DEPARTMENT CODE" = "Dept")) %>%
-  mutate(Identifier = paste0(Org,"-",`DEPARTMENT CODE`,"-",`IP or OP`)) %>%
-  mutate(CPT = paste0(`GENERAL CPT4 CODE`,Modifier)) %>%
+  mutate(Identifier = paste0(Org, "-", Dept, "-", `IP or OP`)) %>%
+  mutate(CPT = paste0(AlternateCode ,Modifier)) %>%
   left_join(Premier_Dep) %>%
   mutate(Start = paste0(
     substr(Date,6,7),"/",
@@ -370,81 +370,81 @@ View(MSH_trend)
 #Save master trend
 saveRDS(MSH_trend, paste0(RIS_dir,"Master/Master_Trend.rds"))
 
-#--------------------------Nuc Med Master and Trend----------------------------
-#read old master
-old_nm_master <- readRDS(paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
-                             "Productivity/Volume - Data/MSH Data/RIS/Master/",
-                             "Nuc Med/Master.rds"))
+# #--------------------------Nuc Med Master and Trend----------------------------
+# #read old master
+# old_nm_master <- readRDS(paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
+#                              "Productivity/Volume - Data/MSH Data/RIS/Master/",
+#                              "Nuc Med/Master.rds"))
+# 
+# #append current upload to master
+# new_nm_master <- rbind(old_nm_master, nuc_med)
+# #save new master
+# saveRDS(new_nm_master, paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
+#                            "Productivity/Volume - Data/MSH Data/RIS/Master/",
+#                            "Nuc Med/Master.rds"))
+# 
+# #Quality Check
+# pp_mapping <- read_xlsx(paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
+#                                "Productivity/Universal Data/Mapping/",
+#                                "MSHS_Pay_Cycle.xlsx"))
+# 
+# pp_mapping$DATE <- format(as.Date(pp_mapping$DATE), "%m/%d/%Y")
+# pp_mapping$END.DATE <- format(as.Date(pp_mapping$END.DATE), "%m/%d/%Y")
+# 
+# pp_mapping[, 1] <- sapply(pp_mapping[, 1], as.character)
+# 
+# nm_trend <- new_nm_master %>%
+#   left_join(pp_mapping, by = c('Date2' = 'DATE')) %>% 
+#   ungroup() %>%
+#   group_by(DeptID,END.DATE) %>%
+#   summarise(Vol = sum(volume, na.rm = T)) %>%
+#   pivot_wider(id_cols = c(DeptID),names_from = END.DATE, values_from = Vol)
+# 
+# View(nm_trend)
 
-#append current upload to master
-new_nm_master <- rbind(old_nm_master, nuc_med)
-#save new master
-saveRDS(new_nm_master, paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
-                           "Productivity/Volume - Data/MSH Data/RIS/Master/",
-                           "Nuc Med/Master.rds"))
-
-#Quality Check
-pp_mapping <- read_xlsx(paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
-                               "Productivity/Universal Data/Mapping/",
-                               "MSHS_Pay_Cycle.xlsx"))
-
-pp_mapping$DATE <- format(as.Date(pp_mapping$DATE), "%m/%d/%Y")
-pp_mapping$END.DATE <- format(as.Date(pp_mapping$END.DATE), "%m/%d/%Y")
-
-pp_mapping[, 1] <- sapply(pp_mapping[, 1], as.character)
-
-nm_trend <- new_nm_master %>%
-  left_join(pp_mapping, by = c('Date2' = 'DATE')) %>% 
-  ungroup() %>%
-  group_by(DeptID,END.DATE) %>%
-  summarise(Vol = sum(volume, na.rm = T)) %>%
-  pivot_wider(id_cols = c(DeptID),names_from = END.DATE, values_from = Vol)
-
-View(nm_trend)
-
-#---------------------------Mobile Van Master and Trend------------------------
-old_mv_master <- readRDS(paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
-                             "Productivity/Volume - Data/MSH Data/RIS/Master/",
-                             "Mobile Van/Master.rds"))
-
-#Check that the new upload does not overlap with master
-if(max(as.Date(old_mv_master$Date2,format = "%m/%d/%Y")) < min(as.Date(mobile_van$Date,format = "%m/%d/%Y"))){
-  new_mv_master <- rbind(old_mv_master, mobile_van)
-} else {
-  stop("Raw data overlaps with master")
-}
-#Read in old trend
-old_mv_trend <- readRDS(paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
-                                   "Productivity/Volume - Data/MSH Data/RIS/Master/",
-                                   "Mobile Van/Trend_Master.rds"))
-
-#Format date columns in same format as new_master
-pp_mapping$DATE <- format(as.Date(pp_mapping$DATE), "%m/%d/%Y")
-pp_mapping$END.DATE <- format(as.Date(pp_mapping$END.DATE), "%m/%d/%Y")
-
-
-pp_mapping[, 1] <- sapply(pp_mapping[, 1], as.character) #Convert to character
-
-#Creates volume trend
-mv_trend <- new_mv_master %>%
-  left_join(pp_mapping, by = c('Date2' = 'DATE')) %>% #Adds PP end date column
-  ungroup() %>%
-  group_by(DeptID,END.DATE) %>% 
-  summarise(Vol = sum(volume, na.rm = T)) %>% 
-  pivot_wider(id_cols = c(DeptID),names_from = END.DATE, values_from = Vol)
-
-View(mv_trend)
-
-#append current trend to master trend and saves
-new_mv_trend <- rbind(old_mv_trend, mv_trend)
-saveRDS(new_mv_trend, paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
-                                 "Productivity/Volume - Data/MSH Data/RIS/Master/",
-                                 "Mobile Van/Trend_Master.rds"))
-
-#Save new master 
-saveRDS(new_mv_master, paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
-                           "Productivity/Volume - Data/MSH Data/RIS/Master/",
-                           "Mobile Van/Master.rds"))
+# #---------------------------Mobile Van Master and Trend------------------------
+# old_mv_master <- readRDS(paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
+#                              "Productivity/Volume - Data/MSH Data/RIS/Master/",
+#                              "Mobile Van/Master.rds"))
+# 
+# #Check that the new upload does not overlap with master
+# if(max(as.Date(old_mv_master$Date2,format = "%m/%d/%Y")) < min(as.Date(mobile_van$Date,format = "%m/%d/%Y"))){
+#   new_mv_master <- rbind(old_mv_master, mobile_van)
+# } else {
+#   stop("Raw data overlaps with master")
+# }
+# #Read in old trend
+# old_mv_trend <- readRDS(paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
+#                                    "Productivity/Volume - Data/MSH Data/RIS/Master/",
+#                                    "Mobile Van/Trend_Master.rds"))
+# 
+# #Format date columns in same format as new_master
+# pp_mapping$DATE <- format(as.Date(pp_mapping$DATE), "%m/%d/%Y")
+# pp_mapping$END.DATE <- format(as.Date(pp_mapping$END.DATE), "%m/%d/%Y")
+# 
+# 
+# pp_mapping[, 1] <- sapply(pp_mapping[, 1], as.character) #Convert to character
+# 
+# #Creates volume trend
+# mv_trend <- new_mv_master %>%
+#   left_join(pp_mapping, by = c('Date2' = 'DATE')) %>% #Adds PP end date column
+#   ungroup() %>%
+#   group_by(DeptID,END.DATE) %>% 
+#   summarise(Vol = sum(volume, na.rm = T)) %>% 
+#   pivot_wider(id_cols = c(DeptID),names_from = END.DATE, values_from = Vol)
+# 
+# View(mv_trend)
+# 
+# #append current trend to master trend and saves
+# new_mv_trend <- rbind(old_mv_trend, mv_trend)
+# saveRDS(new_mv_trend, paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
+#                                  "Productivity/Volume - Data/MSH Data/RIS/Master/",
+#                                  "Mobile Van/Trend_Master.rds"))
+# 
+# #Save new master 
+# saveRDS(new_mv_master, paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
+#                            "Productivity/Volume - Data/MSH Data/RIS/Master/",
+#                            "Mobile Van/Master.rds"))
 
 #------------------------------MSQ RIS Master and Trend-----------------------
 
@@ -492,39 +492,39 @@ saveRDS(MSQ_trend, paste0(MSQ_RIS_dir,"Master/New/Master_Trend.rds"))
 write.table(MSH_upload,paste0(RIS_dir,"Uploads/MSH_RIS_",month_year,".csv"),
             sep = ",", row.names = F, col.names = F)
 
-#save Nuc Med upload
-min_nm_date <- min(as.Date(nuc_med$Date, format = "%m/%d/%Y"))
-min_nm_mon <- toupper(month.abb[month(min_nm_date)])
-min_nm_date_save <- paste0(substr(min_nm_date,9,10),
-                        min_nm_mon,
-                        substr(min_nm_date,1,4))
-max_nm_date <- max(as.Date(nuc_med$Date, format = "%m/%d/%Y"))
-max_nm_mon <- toupper(month.abb[month(min_nm_date)])
-max_nm_date_save <- paste0(substr(max_nm_date,9,10),
-                        min_nm_mon,
-                        substr(max_nm_date,1,4))
-write.csv(nuc_med, paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
-                          "Productivity/Volume - Data/MSH Data/RIS/Uploads/",
-                          "Nuc Med/MSH_Nuc Med RIS_",
-                          min_nm_date_save, " to ",max_nm_date_save, ".csv"))
-
-#save mobile van upload
-min_mv_date <- min(as.Date(mobile_van$Date, format = "%m/%d/%Y"))
-min_mv_mon <- toupper(month.abb[month(min_mv_date)])
-min_mv_date_save <- paste0(substr(min_mv_date,9,10),
-                        min_mv_mon,
-                        substr(min_mv_date,1,4))
-
-max_mv_date <- max(as.Date(mobile_van$Date, format = "%m/%d/%Y"))
-max_mv_mon <- toupper(month.abb[month(min_mv_date)])
-max_mv_date_save <- paste0(substr(max_mv_date,9,10),
-                        min_mv_mon,
-                        substr(max_mv_date,1,4))
-write.csv(mobile_van, paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
-                             "Productivity/Volume - Data/MSH Data/RIS/Uploads/",
-                             "Mobile Van/MSH_Mobile Van RIS_",
-                             min_mv_date_save, " to ",max_mv_date_save, ".csv"),
-          sep=",",row.names = F, col.names = F)
+# #save Nuc Med upload
+# min_nm_date <- min(as.Date(nuc_med$Date, format = "%m/%d/%Y"))
+# min_nm_mon <- toupper(month.abb[month(min_nm_date)])
+# min_nm_date_save <- paste0(substr(min_nm_date,9,10),
+#                         min_nm_mon,
+#                         substr(min_nm_date,1,4))
+# max_nm_date <- max(as.Date(nuc_med$Date, format = "%m/%d/%Y"))
+# max_nm_mon <- toupper(month.abb[month(min_nm_date)])
+# max_nm_date_save <- paste0(substr(max_nm_date,9,10),
+#                         min_nm_mon,
+#                         substr(max_nm_date,1,4))
+# write.csv(nuc_med, paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
+#                           "Productivity/Volume - Data/MSH Data/RIS/Uploads/",
+#                           "Nuc Med/MSH_Nuc Med RIS_",
+#                           min_nm_date_save, " to ",max_nm_date_save, ".csv"))
+# 
+# #save mobile van upload
+# min_mv_date <- min(as.Date(mobile_van$Date, format = "%m/%d/%Y"))
+# min_mv_mon <- toupper(month.abb[month(min_mv_date)])
+# min_mv_date_save <- paste0(substr(min_mv_date,9,10),
+#                         min_mv_mon,
+#                         substr(min_mv_date,1,4))
+# 
+# max_mv_date <- max(as.Date(mobile_van$Date, format = "%m/%d/%Y"))
+# max_mv_mon <- toupper(month.abb[month(min_mv_date)])
+# max_mv_date_save <- paste0(substr(max_mv_date,9,10),
+#                         min_mv_mon,
+#                         substr(max_mv_date,1,4))
+# write.csv(mobile_van, paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
+#                              "Productivity/Volume - Data/MSH Data/RIS/Uploads/",
+#                              "Mobile Van/MSH_Mobile Van RIS_",
+#                              min_mv_date_save, " to ",max_mv_date_save, ".csv"),
+#           sep=",",row.names = F, col.names = F)
 
 #Save MSQ Upload
 write.table(MSQ_upload,paste0(MSQ_RIS_dir,"Uploads/new_2022/MSQ_RIS_",month_year,".csv"),
