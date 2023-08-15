@@ -288,7 +288,10 @@ upload <- charge_summary %>%
   mutate(StartDate = format(StartDate, "%m/%d/%Y"),
          EndDate = format(EndDate, "%m/%d/%Y")) %>%
   select(EntityID, FacilID, `Labor Department`, StartDate, EndDate,
-         OPTB_cpt4, Vol, budget)
+         OPTB_cpt4, Vol, budget) %>%
+  `colnames<-`(c("Corporation Code", "Entity Code", "Cost Center Code", 
+                 "Start Date", "End Date", "CPT Code", "Actual Volume",
+                 "Budget Volume"))
 
 
 non_upload_depts <- charge_summary %>%
@@ -369,7 +372,7 @@ date_dist_char <- format(as.Date(dist_date), "%Y-%m-%d")
 write.table(upload,
             file = paste0(write_path, "/MSBIB CPT Vol ", date_start_char,
                           " to ", date_dist_char, ".csv"),
-            row.names = F, col.names = F, sep = ",")
+            row.names = F, col.names = T, sep = ",")
 write.table(non_upload_depts,
             file = paste0(write_path, "/MSBIB CPT Vol - depts not pub ",
                           date_start_char, " to ", date_dist_char, ".csv"),
