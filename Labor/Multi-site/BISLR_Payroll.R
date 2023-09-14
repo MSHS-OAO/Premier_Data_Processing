@@ -114,44 +114,44 @@ map_uni_paycycles <- read_xlsx(paste0(dir_universal,
 
 ## Premier Reference Files -------------------------------------------------
 dict_premier_dpt <- read.csv(paste0(dir_universal,
-                                    "/Premier/Dictionary Exports",
-                                    "/DepartmentDictionary.csv"),
+                                    "/Premier/2.0 Dictionary Exports",
+                                    "/CostCenterDictionary.csv"),
                              col.names = c("Corporation.Code", "Site",
                                            "Cost.Center",
                                            "Cost.Center.Description"),
                              sep = ",")
-map_premier_dpt <- read.csv(paste0(dir_universal, "/Premier/Mapping Exports",
-                                   "/DepartmentMapping.csv"),
-                            col.names = c("Effective.Date", "Corporation.Code",
+map_premier_dpt <- read.csv(paste0(dir_universal, "/Premier/2.0 Mapping Exports",
+                                   "/CostCenterMapping.csv"),
+                            col.names = c("Effective.Start.Date", 
+                                          "Effective.End.Date",
+                                          "Corporation.Code",
                                           "Site", "Cost.Center",
                                           "Cost.Center.Map"),
                             sep = ",")
 dict_premier_jobcode <- read.csv(paste0(dir_universal,
-                                        "/Premier/Dictionary Exports",
-                                        "/DeptJobCodeDictionary.csv"),
+                                        "/Premier/2.0 Dictionary Exports",
+                                        "/JobCodeDictionary.csv"),
                                  col.names = c("Corporation.Code", "Site",
-                                               "Cost.Center", "Job.Code",
-                                               "Job.Code.Description"),
+                                               "Job.Code",
+                                               "Job.Code.Description",
+                                               "Default.Agency.Hourly.Rate",
+                                               "Effective Start Date",
+                                               "Expiration Date"),
                                  sep = ",")
 dict_premier_report <- read.csv(paste0(dir_universal,
-                                       "/Premier/Dictionary Exports",
+                                       "/Premier/2.0 Dictionary Exports",
                                        "/DepartmentDef.csv"),
                                 col.names = c("Corporation.Code", "Site",
-                                              "Report.Name", "Report.ID",
-                                              "Cost.Center", "Report.Type",
-                                              "Threshold.Type", "Target.Type",
-                                              "Exclude.Report.Rollup",
-                                              "Effective.Date", "Paycycle.Type",
-                                              "Exclude.Admin.Rollup",
-                                              "Exclude.Action.Plan",
-                                              "blank14", "blank15",
-                                              "blank16", "blank17"),
-                                sep = ",", fill = T)
+                                              "Report.ID", "Cost.Center", 
+                                              "Effective.Date"),
+                                sep = ",")
 
 dict_premier_paycode <- read.csv(paste0(dir_universal,
-                                        "/Premier/Dictionary Exports",
+                                        "/Premier/2.0 Dictionary Exports",
                                         "/PayCodeDictionaryExport.csv"),
-                                 header = TRUE,
+                                 col.names = c("Partner.or.Health.System.ID",
+                                               "Facility.or.Hospital.ID",
+                                               "Pay.Code", "Pay.Code.Name"),
                                  sep = ",")
 
 
@@ -175,6 +175,7 @@ pay_cycles_uploaded <- pay_cycles_uploaded %>%
 dict_premier_dpt <- dict_premier_dpt %>%
   mutate(Cost.Center = as.character(Cost.Center), Dpt_in_Dict = 1)
 dict_premier_jobcode <- dict_premier_jobcode %>%
+  select(1:4) %>%
   mutate(JC_in_Dict = 1)
 
 reports_dept <- str_split(dict_premier_report$Cost.Center,
@@ -309,14 +310,12 @@ bislr_payroll <- raw_payroll %>%
                      DPT.WRKD = Cost.Center,
                      WRKDpt_in_Dict = Dpt_in_Dict)) %>%
   left_join(dict_premier_jobcode %>%
-              select(Site, Cost.Center, Job.Code, JC_in_Dict) %>%
+              select(Site, Job.Code, JC_in_Dict) %>%
               rename(Home.FacilityOR.Hospital.ID = Site,
-                     DPT.HOME = Cost.Center,
                      HOMEJC_in_Dict = JC_in_Dict)) %>%
   left_join(dict_premier_jobcode %>%
-              select(Site, Cost.Center, Job.Code, JC_in_Dict) %>%
+              select(Site, Job.Code, JC_in_Dict) %>%
               rename(Facility.Hospital.Id_Worked = Site,
-                     DPT.WRKD = Cost.Center,
                      WRKJC_in_Dict = JC_in_Dict)) %>%
   mutate(Job.Code_up = substr(Job.Code, 1, 10),
          Approved.Hours.per.Pay.Period = case_when(
@@ -716,7 +715,7 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
     bislr_payroll %>%
       filter(is.na(WRKJC_in_Dict), PROVIDER == 0) %>%
       select(PartnerOR.Health.System.ID, Facility.Hospital.Id_Worked,
-             DPT.WRKD, Job.Code_up, Position.Code.Description) %>%
+             Job.Code_up, Position.Code.Description) %>%
       setNames(colnames(dict_premier_jobcode %>%
                           select(-JC_in_Dict))),
     bislr_payroll %>%
@@ -743,7 +742,7 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
     # the map_premier_dpt Cost.Center column is character type
     mutate(Cost.Center = as.character(Cost.Center)) %>%
     left_join(map_premier_dpt %>%
-                select(-Effective.Date)) %>%
+                select(-Effective.Start.Date, -Effective.End.Date)) %>%
     mutate(Cost.Center.Map = as.double(Cost.Center.Map)) %>%
     mutate(Cost.Center.Map = case_when(
       is.na(Cost.Center.Map) ~ new_dpt_map,
