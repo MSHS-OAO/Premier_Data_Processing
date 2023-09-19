@@ -246,22 +246,18 @@ processed_data <- processed_data %>%
 # join pay cycle info, cc_xwalk, cdm, and Premier CPT counter
 processed_data <- processed_data %>%
   left_join(y = dict_pay_cycles,
-            by = c("TransDate" = "DATE"),
-            all.x = T) %>%
+            by = c("TransDate" = "DATE")) %>%
   left_join(y = cc_xwalk,
             by = c("FacilityId" = "FacilityId",
-                   "RevDept" = "EPSI Revenue Department"),
-            all.x = T) %>%
+                   "RevDept" = "EPSI Revenue Department")) %>%
   left_join(y = select(cdm_slim, -any_of("CHARGE_DESC")),
-            by = c("ChargeCode" = "CHARGE_CODE"),
-            all.x = T) %>%
+            by = c("ChargeCode" = "CHARGE_CODE")) %>%
   mutate(OPTB_cpt4 = case_when(
     is.na(OPTB_cpt4) ~ "#N/A",
     TRUE ~ OPTB_cpt4)) %>%
   left_join(y = cpt_ref_slim,
             by = c("OPTB_cpt4" = "CPT/HCPCS Code",
-                   "Modifier Code" = "Modifier Code"),
-            all.x = T)
+                   "Modifier Code" = "Modifier Code"))
 
 charge_summary <- processed_data %>%
   group_by(`Labor Department`, TransDate, OPTB_cpt4, `Published Report`) %>%
@@ -302,6 +298,40 @@ non_upload_depts <- charge_summary %>%
          EndDate = format(EndDate, "%m/%d/%Y")) %>%
   select(EntityID, FacilID, `Labor Department`, StartDate, EndDate,
          OPTB_cpt4, Vol, budget)
+
+
+## 0 vol for missing days ----------------------------------------------------
+
+date_range <- data.frame(
+  StartDate = seq(from = as.Date(date_start), to = dist_date, by = "day"),
+  EndDate = seq(from = as.Date(date_start), to = dist_date, by = "day"))
+
+cc_xwalk_unique <- cc_xwalk %>%
+  filter(`Published Report` == "yes") %>%
+  select(`Labor Department`) %>%
+  unique()
+
+xwalk_and_date <- merge(date_range, cc_xwalk_unique)
+
+missing_dept_date <- xwalk_and_date %>%
+  mutate(StartDate = as.character(StartDate, "%m/%d/%Y"),
+         EndDate = as.character(EndDate, "%m/%d/%Y")) %>%
+  anti_join(upload)
+
+zero_rows <- missing_dept_date %>%
+  mutate(EntityID = 729805,
+         FacilID = 630571,
+         `Labor Department` = `Labor Department`,
+         StartDate = StartDate,
+         EndDate = EndDate,
+         OPTB_cpt4 = "G0463",
+         Vol = 0,
+         budget = 0) %>%
+  relocate(`Labor Department`, .after = FacilID) %>%
+  relocate(c(StartDate, EndDate), .before = OPTB_cpt4)
+
+### Combining with upload summary --------------------------------------------
+upload <- rbind(upload, zero_rows)
 
 ## Premier 2.0 Headers ------------------------------------------------------
 
