@@ -303,8 +303,10 @@ non_upload_depts <- charge_summary %>%
 ## 0 vol for missing days ----------------------------------------------------
 
 date_range <- data.frame(
-  StartDate = seq(from = as.Date(date_start), to = dist_date, by = "day"),
-  EndDate = seq(from = as.Date(date_start), to = dist_date, by = "day"))
+  StartDate = seq(from = as.Date(date_start), to = as.Date(dist_date),
+                  by = "day"),
+  EndDate = seq(from = as.Date(date_start), to = as.Date(dist_date),
+                by = "day"))
 
 cc_xwalk_unique <- cc_xwalk %>%
   filter(`Published Report` == "yes") %>%
@@ -373,7 +375,7 @@ na_cc_summary <- processed_data %>%
   filter(END.DATE > date_start & START.DATE < dist_date) %>%
   group_by(FacilityId, RevDept, `Labor Department`, START.DATE, END.DATE) %>%
   summarise(vol = sum(Qty),
-            prem_cpt = sum(Qty * `CPT Procedure Count`)) %>%
+            prem_cpt = sum(Qty * `CPT Procedure Count`, na.rm = T)) %>%
   ungroup()
 
 View(na_cc_summary)
