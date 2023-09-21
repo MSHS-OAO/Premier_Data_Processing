@@ -639,6 +639,10 @@ bislr_or_upload <- rbind(msm_rad_or_data, msw_rad_or_data, msb_rad_or_data,
                          msbi_rad_or_data) %>%
   group_by(`Premier Site`, `Cost Center`, Start, End, CPT4) %>%
   summarise(Volume = n()) %>%
+  mutate(Volume = case_when(
+    is.na(CPT4) ~ 0,
+    TRUE ~ Volume)) %>%
+  mutate(CPT4 = replace_na(CPT4, "71045")) %>%
   mutate(Partner = "729805",
          Budget = premier_budget) %>%
   select(Partner, `Premier Site`, `Cost Center`, Start, End, CPT4, Volume, 
