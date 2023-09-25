@@ -336,7 +336,7 @@ month_days <- seq.Date(floor_date(as.Date(mshs_rad_data$Date[1]), 'month'),
 
 #---------------BISLR--------------------------------------------------
 bislr_rad_data <- mshs_rad_data %>%
-  filter(Org %in% c("RH", "SL", "BI", "BC", "KH", "BH")) %>%
+  filter(Org %in% c("RH", "SL", "BI", "BC", "KH", "PH")) %>%
   #Add CPT code, CPT code description, and charge class
   left_join(cdm_complete_list) %>%
   #Updating special MSBIB resource charge class
