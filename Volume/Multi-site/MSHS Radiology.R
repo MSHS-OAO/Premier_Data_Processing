@@ -56,6 +56,14 @@ map_msq_resource <- read_xlsx(path = paste0(dir_data,"/References",
                               sheet = "Resource Mapping MSQ",
                               col_types = c("text","text","text"))
 
+map_cpt_reference <- read_xlsx(path = paste0(dir_data,"/References",
+                                             "/Radiology RIS Mappings.xlsx"),
+                               sheet = "CPT Reference")
+
+map_cpt_group <- read_xlsx(path = paste0(dir_data,"/References",
+                                         "/Radiology RIS Mappings.xlsx"),
+                           sheet = "CPT Group")
+
 ## CDMs --------------------------------------------------------------------
 import_recent_cdm <- function(dir, site_cdm, file_type) {
   #Compiling Data on Files
@@ -124,6 +132,17 @@ transform_or_data <- function(file_path, org_value, site_value, cost_center_valu
   # Read the most recent CSV file
   data <- read.csv(sorted_files[1], skip = 1)
   
+  # get days in the month
+  month_days <- seq(floor_date(mdy(data$Date[2]), 'month'), 
+                    ceiling_date(mdy(data$Date[2]), 'month') - 1, by = 1)
+  
+  # create data frame for daily upload
+  daily_vol <- data.frame(`Cost Center` = rep(cost_center_value,
+                                              times = length(month_days)),
+                          Start = month_days,
+                          End = month_days,
+                          `Premier Site` = site_value)
+  
   data_filtered <- data %>%
     slice(-1) %>%
     filter(Org %in% org_value) %>%
@@ -132,7 +151,11 @@ transform_or_data <- function(file_path, org_value, site_value, cost_center_valu
            Start = mdy(Date),
            End = mdy(Date),
            CPT4 = "71045") %>%
-    select(`Premier Site`, `Cost Center`, Start, End, CPT4)
+    select(`Premier Site`, `Cost Center`, Start, End, CPT4) %>%
+    right_join(daily_vol, by = c("Cost Center" = "Cost.Center",
+                                 "Start" = "Start",
+                                 "End" = "End",
+                                 "Premier Site" = "Premier.Site"))
   
   data_transformed <- data_filtered %>%
     mutate(Start = paste0(substr(Start, 6, 7), "/",
@@ -145,8 +168,8 @@ transform_or_data <- function(file_path, org_value, site_value, cost_center_valu
   return(data_transformed)
 }
 
-msh_rad_or_data <- transform_or_data(file_path = paste0(dir_data, "/OR Source Data")
-                                     , org_value = "RM", 
+msh_rad_or_data <- transform_or_data(file_path = paste0(dir_data, "/OR Source Data"),
+                                     org_value = "RM", 
                                      site_value =  "NY0014",
                                      cost_center_value = "MSHRIS21008OR")
 
@@ -310,9 +333,18 @@ rows_pre_join <- nrow(mshs_rad_data)
 mshs_rad_data <- mshs_rad_data %>%
   left_join(map_premier_sites)
 
+#quality check on number of rows from left join
+if (rows_pre_join != nrow(mshs_rad_data)) {
+  stop("Duplicate rows created! Check Dictionaries for duplicates.")
+}
+
+# get days in the month
+month_days <- seq.Date(floor_date(as.Date(mshs_rad_data$Date[1]), 'month'), 
+                       as.Date(ceiling_date(mshs_rad_data$Date[1], 'month') - 1), by = 1)
+
 #---------------BISLR--------------------------------------------------
 bislr_rad_data <- mshs_rad_data %>%
-  filter(Org %in% c("RH", "SL", "BI", "BC", "KH", "BH")) %>%
+  filter(Org %in% c("RH", "SL", "BI", "BC", "KH", "PH")) %>%
   #Add CPT code, CPT code description, and charge class
   left_join(cdm_complete_list) %>%
   #Updating special MSBIB resource charge class
@@ -355,16 +387,11 @@ bislr_rad_data <- mshs_rad_data %>%
   #Add in Paycycle End Dates
   left_join(map_paycycle)
 
-#quality check on number of rows from left join
-if (rows_pre_join != nrow(mshs_rad_data)) {
-  stop("Duplicate rows created! Check Dictionaries for duplicates.")
-}
-
+#---------------MSH---------------------------------------------------------
 
 #modifiers we want to keep
 acceptable_modifiers <- c("26","50","53","tc")
 
-#---------------MSH---------------------------------------------------------
 msh_rad_data <- mshs_rad_data %>%
   filter(Org %in% "RM") %>%
   mutate(
@@ -392,13 +419,31 @@ msh_rad_data <- mshs_rad_data %>%
   filter(!is.na(`Dummy Cost Center`)) %>%
   rename(`Cost Center` = `Dummy Cost Center`) %>%
   mutate(`Premier Site` = "NY0014",
-         Start = paste0(substr(Date,6,7), "/",
-                        substr(Date,9,10), "/",
-                        substr(Date,1,4)),
-         End = paste0(substr(Date,6,7), "/",
-                      substr(Date,9,10), "/",
-                      substr(Date,1,4))) %>%
+         Start = as.Date(Date),
+         End = as.Date(Date)) %>%
   select(`Premier Site`, `Cost Center`, Start, End, CPT4)
+
+# create data frame for daily upload
+msh_daily_vol <- data.frame(`Cost Center` = rep(unique(msh_rad_data$`Cost Center`),
+                                                times = length(month_days))) %>%
+  arrange(Cost.Center) %>%
+  mutate(Start = rep(month_days, length(unique(msh_rad_data$`Cost Center`))),
+         End = rep(month_days, length(unique(msh_rad_data$`Cost Center`))),
+         `Premier Site` = rep("NY0014", length(rep(unique(msh_rad_data$`Cost Center`),
+                                                   times = length(month_days)))))
+
+# ensure each cost center has a row for each day
+msh_rad_data <- msh_rad_data %>%
+  right_join(msh_daily_vol, by = c("Cost Center" = "Cost.Center",
+                                   "Start" = "Start",
+                                   "End" = "End",
+                                   "Premier Site" = "Premier Site")) %>%
+  mutate(Start = paste0(substr(Start,6,7), "/",
+                        substr(Start,9,10), "/",
+                        substr(Start,1,4)),
+         End = paste0(substr(End,6,7), "/",
+                      substr(End,9,10), "/",
+                      substr(End,1,4)))
 
 #--------------Neuro---------------------------------------------
 neuro_rad_data <- mshs_rad_data %>%
@@ -424,18 +469,40 @@ neuro_rad_data <- mshs_rad_data %>%
   #Add in necessary columns for upload
   mutate(`Premier Site` = "NY0014",
          `Cost Center` = "MSHRIS21050",
-         Start = paste0(
-           substr(Date, 6, 7), "/",
-           substr(Date, 9, 10), "/",
-           substr(Date, 1, 4))) %>%
-  mutate(End = Start) %>%
+         Start = as.Date(Date),
+         End = as.Date(Date)) %>%
   #select column order for upload
   select(`Premier Site`, `Cost Center`, Start, End, CPT4)
+
+# create data frame for daily upload
+neuro_daily_vol <- data.frame(`Cost Center` = rep(unique(neuro_rad_data$`Cost Center`),
+                                                  times = length(month_days))) %>%
+  arrange(Cost.Center) %>%
+  mutate(Start = rep(month_days, length(unique(neuro_rad_data$`Cost Center`))),
+         End = rep(month_days, length(unique(neuro_rad_data$`Cost Center`))),
+         `Premier Site` = rep("NY0014", length(rep(unique(neuro_rad_data$`Cost Center`),
+                                                   times = length(month_days)))))
+# ensure each cost center has a row for each day
+neuro_rad_data <- neuro_rad_data %>%
+  right_join(neuro_daily_vol, by = c("Cost Center" = "Cost.Center",
+                                     "Start" = "Start",
+                                     "End" = "End",
+                                     "Premier Site" = "Premier Site")) %>%
+  mutate(Start = paste0(substr(Start,6,7), "/",
+                        substr(Start,9,10), "/",
+                        substr(Start,1,4)),
+         End = paste0(substr(End,6,7), "/",
+                      substr(End,9,10), "/",
+                      substr(End,1,4)))
 
 #bind both files for upload
 MSH_upload <- rbind(msh_rad_data, neuro_rad_data, msh_rad_or_data) %>%
   group_by(`Premier Site`, `Cost Center`, Start, End, CPT4) %>%
   summarise(volume = n()) %>%
+  mutate(volume = case_when(
+    is.na(CPT4) ~ 0,
+    TRUE ~ volume)) %>%
+  mutate(CPT4 = replace_na(CPT4, "71045")) %>%
   mutate(Partner = "729805",
          Budget = premier_budget,
          volume = as.numeric(volume)) %>%
@@ -475,18 +542,41 @@ msq_rad_data <- left_join(msq_rad_data, CDM_join) %>%
   mutate(CPT4 = paste0(`CPT Code` ,Modifier)) %>%
   left_join(map_cost_centers) %>%
   filter(!is.na(`Dummy Cost Center`)) %>%
-  mutate(Start = paste0(
-    substr(Date,6,7),"/",
-    substr(Date,9,10),"/",
-    substr(Date,1,4))) %>%
-  mutate(End = Start) %>%
+  mutate(Start = as.Date(Date),
+         End = as.Date(Date)) %>%
   select(`Premier Site`, `Dummy Cost Center`, Start, End, CPT4) %>%
   rename(`Cost Center` = `Dummy Cost Center`)
+
+# create data frame for daily upload
+msq_daily_vol <- data.frame(`Cost Center` = rep(unique(msq_rad_data$`Cost Center`),
+                                                times = length(month_days))) %>%
+  arrange(Cost.Center) %>%
+  mutate(Start = rep(month_days, length(unique(msq_rad_data$`Cost Center`))),
+         End = rep(month_days, length(unique(msq_rad_data$`Cost Center`))),
+         `Premier Site` = rep("NY0014", length(rep(unique(msq_rad_data$`Cost Center`),
+                                                   times = length(month_days)))))
+
+# ensure each cost center has a row for each day
+msq_rad_data <- msq_rad_data %>%
+  right_join(msq_daily_vol, by = c("Cost Center" = "Cost.Center",
+                                   "Start" = "Start",
+                                   "End" = "End",
+                                   "Premier Site" = "Premier Site")) %>%
+  mutate(Start = paste0(substr(Start,6,7), "/",
+                        substr(Start,9,10), "/",
+                        substr(Start,1,4)),
+         End = paste0(substr(End,6,7), "/",
+                      substr(End,9,10), "/",
+                      substr(End,1,4)))
 
 #combine upload files
 MSQ_upload <- rbind(msq_rad_data, msq_rad_or_data) %>%
   group_by(`Premier Site`, `Cost Center`, Start, End, CPT4) %>%
   summarise(Volume = n()) %>%
+  mutate(Volume = case_when(
+    is.na(CPT4) ~ 0,
+    TRUE ~ Volume)) %>%
+  mutate(CPT4 = replace_na(CPT4, "71045")) %>%
   mutate(Partner = "729805",
          Budget = premier_budget) %>%
   select(Partner, `Premier Site`, `Cost Center`, Start, End, CPT4, Volume, 
@@ -496,6 +586,20 @@ MSQ_upload <- rbind(msq_rad_data, msq_rad_or_data) %>%
 
 ## Premier Upload Files ----------------------------------------------------
 create_premier_upload <- function(df, selected_sites) {
+  premier_daily_vol <- df %>%
+    filter(!is.na(`Cost Center`),
+           `Premier Site` %in% selected_sites) %>%
+    select(`Cost Center`, `Premier Site`) %>%
+    distinct()
+  
+  premier_daily_vol <- data.frame(`Cost Center` = rep(premier_daily_vol$`Cost Center`, 
+                                                      times = length(month_days)),
+                                  `Premier Site` = rep(premier_daily_vol$`Premier Site`, 
+                                                       times = length(month_days))) %>%
+    arrange(Cost.Center) %>%
+    mutate(Start = rep(month_days, length(unique(premier_daily_vol$`Cost Center`))),
+           End = rep(month_days, length(unique(premier_daily_vol$`Cost Center`))),
+           Corp = rep(premier_corp, nrow(premier_daily_vol) * length(month_days)))
   return_df <- df %>%
     select(`Premier Site`, `Cost Center`, Date, `CPT Code & Mod`) %>%
     mutate(Volume = 1) %>%
@@ -508,14 +612,30 @@ create_premier_upload <- function(df, selected_sites) {
     summarise(Volume = sum(Volume)) %>%
     #Creating columns needed
     mutate(Corp = premier_corp,
-           Bud = premier_budget,
-           `Start Date` = format(as.Date(Date, format = "%Y-%m-%d"),
-                                 format = "%m/%d/%Y"),
-           `End Date` = `Start Date`) %>%
+           Start = as.Date(Date),
+           End = as.Date(Date)) %>%
     #Selecting and arranging columns in Premier format
     ungroup() %>%
-    select(Corp, `Premier Site`, `Cost Center`, `Start Date`, `End Date`,
-           `CPT Code & Mod`, Volume, Bud)
+    select(Corp, `Premier Site`, `Cost Center`, Start, End,
+           `CPT Code & Mod`, Volume)
+  
+  return_df <- return_df %>%
+    right_join(premier_daily_vol, by = c("Cost Center" = "Cost.Center",
+                                         "Start" = "Start",
+                                         "End" = "End",
+                                         "Premier Site" = "Premier.Site",
+                                         "Corp" = "Corp")) %>%
+    mutate(Start = paste0(substr(Start,6,7), "/",
+                          substr(Start,9,10), "/",
+                          substr(Start,1,4)),
+           End = paste0(substr(End,6,7), "/",
+                        substr(End,9,10), "/",
+                        substr(End,1,4))) %>%
+    mutate(Volume = case_when(
+      is.na(`CPT Code & Mod`) ~ 0,
+      TRUE ~ Volume)) %>%
+    mutate(`CPT Code & Mod` = replace_na(`CPT Code & Mod`, "71045"),
+           Bud = premier_budget)
 }
 
 msmw_upload <- create_premier_upload(df = bislr_rad_data,
@@ -527,23 +647,68 @@ bislr_or_upload <- rbind(msm_rad_or_data, msw_rad_or_data, msb_rad_or_data,
                          msbi_rad_or_data) %>%
   group_by(`Premier Site`, `Cost Center`, Start, End, CPT4) %>%
   summarise(Volume = n()) %>%
+  mutate(Volume = case_when(
+    is.na(CPT4) ~ 0,
+    TRUE ~ Volume)) %>%
+  mutate(CPT4 = replace_na(CPT4, "71045")) %>%
   mutate(Partner = "729805",
          Budget = premier_budget) %>%
   select(Partner, `Premier Site`, `Cost Center`, Start, End, CPT4, Volume, 
          Budget)
 ## Quality Charts ----------------------------------------------------------
-quality_chart <- rbind(msmw_upload, msbib_upload)
+colnames(MSH_upload) <- c("Corporation Code", "Entity Code", "Cost Center Code",
+                          "Start Date", "End Date", "CPT Code", "Actual Volume",
+                          "Budget Volume")
+colnames(MSQ_upload) <- c("Corporation Code", "Entity Code", "Cost Center Code",
+                          "Start Date", "End Date", "CPT Code", "Actual Volume",
+                          "Budget Volume")
+colnames(msmw_upload) <- c("Corporation Code", "Entity Code", "Cost Center Code",
+                           "Start Date", "End Date", "CPT Code", "Actual Volume",
+                           "Budget Volume")
+colnames(msbib_upload) <- c("Corporation Code", "Entity Code", "Cost Center Code",
+                            "Start Date", "End Date", "CPT Code", "Actual Volume",
+                            "Budget Volume")
+colnames(bislr_or_upload) <- c("Corporation Code", "Entity Code", "Cost Center Code",
+                               "Start Date", "End Date", "CPT Code", "Actual Volume",
+                               "Budget Volume")
+
+quality_chart <- rbind(MSH_upload, MSQ_upload, msmw_upload, msbib_upload,
+                       bislr_or_upload)
+
+quality_chart <- quality_chart %>%
+  mutate(`Start Date` = mdy(`Start Date`),
+         `End Date` = mdy(`End Date`),
+         Quarter = quarters(`End Date`)) %>%
+  mutate(`Concatenate for lookup` = paste0(substr(`End Date`,1,4), Quarter, `CPT Code`), 
+         Volume = as.numeric(`Actual Volume`)) %>%
+  left_join(.,map_cpt_reference) %>%
+  filter(!is.na(`Facility Practice Expense RVU Factor`) | !is.na(`CPT Procedure Count`)) %>%
+  left_join(map_paycycle, by = c("End Date" = "Date")) %>%
+  left_join(map_cpt_group, by = c("Cost Center Code" = "Department.ID")) %>%
+  mutate(True_Volume = case_when(
+    CPT.Group == "Procedure" ~ Volume * `CPT Procedure Count`,
+    CPT.Group == "RVU" ~ Volume * `Facility Practice Expense RVU Factor`)) %>%
+  ungroup() %>%
+  group_by(`Cost Center Code`, Department.Description, CPT.Group,
+           `Pay Period End Date`) %>%
+  #na.omit() %>% #Removes NA department
+  summarise(Volume = sum(True_Volume, na.rm = T)) %>%
+  arrange(`Pay Period End Date`) %>%
+  pivot_wider(id_cols = c(`Cost Center Code`, Department.Description, CPT.Group),
+              names_from = `Pay Period End Date`, values_from = Volume)
+
+View(quality_chart)
 
 # Outputs -----------------------------------------------------------------
 write.table(msmw_upload,
             file = paste0(dir_data,
                           "/Upload Files",
                           "/MSMW RIS CPT_",
-                          format(as.Date(min(msmw_upload$`End Date`),
+                          format(as.Date(min(msmw_upload$End),
                                          format = "%m/%d/%Y"),
                                  "%Y-%m-%d"),
                           " to ",
-                          format(as.Date(max(msmw_upload$`End Date`),
+                          format(as.Date(max(msmw_upload$End),
                                          format = "%m/%d/%Y"),
                                  "%Y-%m-%d"),
                           ".csv"),
@@ -554,11 +719,11 @@ write.table(msbib_upload,
             file = paste0(dir_data,
                           "/Upload Files",
                           "/MSBIB RIS CPT_",
-                          format(as.Date(min(msbib_upload$`End Date`),
+                          format(as.Date(min(msbib_upload$End),
                                          format = "%m/%d/%Y"),
                                  "%Y-%m-%d"),
                           " to ",
-                          format(as.Date(max(msbib_upload$`End Date`),
+                          format(as.Date(max(msbib_upload$End),
                                          format = "%m/%d/%Y"),
                                  "%Y-%m-%d"),
                           ".csv"),
@@ -610,3 +775,12 @@ write.table(MSQ_upload, file = paste0(dir_data,
             sep = ",",
             row.names = F,
             col.names = F)
+
+write.xlsx(quality_chart, file = paste0(dir_data,
+                                        "/Quality Check",
+                                        "/MSHS RIS CPT Quality Check_",
+                                        as.character(Sys.time(),
+                                                     format = "%Y-%m-%d"),
+                                        ".xlsx"),
+           sep = ",",
+           colNames = T)
