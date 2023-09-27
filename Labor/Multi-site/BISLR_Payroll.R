@@ -972,7 +972,7 @@ fte_summary_path <- paste0("//researchsan02b/shr2/deans/Presidents/",
 fte_summary <- rbind(fte_summary,
                      read.xlsx2(file = paste0(fte_summary_path,
                                               "fte_summary.xlsx"),
-                                colClasses = c(rep("character", 9),
+                                colClasses = c(rep("character", 8),
                                                rep("numeric", 2),
                                                "character"),
                                 sheetName = "fte_summary") %>%
@@ -997,7 +997,7 @@ fte_summary <- fte_summary %>%
   left_join(map_uni_reports %>%
               filter(is.na(CLOSED) & DEPARTMENT.BREAKDOWN == 1) %>%
               select(DEFINITION.CODE, DEFINITION.NAME, ORACLE.COST.CENTER,
-                     SERVICE.LINE, CORPORATE.SERVICE.LINE, VP) %>%
+                     CORPORATE.SERVICE.LINE, VP) %>%
               distinct(),
             by = c("Department" = "ORACLE.COST.CENTER")) %>%
   left_join(rbind(
@@ -1017,7 +1017,7 @@ fte_summary <- fte_summary %>%
       select(-Corporation.Code),
     by = c("Site" = "Site", "Department" = "Cost.Center")) %>%
   select(Site, Department, Cost.Center.Description,
-         DEFINITION.CODE, DEFINITION.NAME, SERVICE.LINE,
+         DEFINITION.CODE, DEFINITION.NAME,
          CORPORATE.SERVICE.LINE, VP, dist_date,
          Avg_FTEs_worked, Avg_FTEs_paid, capture_time)
 
