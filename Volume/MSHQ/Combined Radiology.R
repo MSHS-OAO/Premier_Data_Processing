@@ -12,7 +12,8 @@ MSQ_RIS_dir <- paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
                   "Productivity/Volume - Data/MSQ Data/RIS/")
 
 #month and year of charge detail
-month_year <- "JUL2022"
+month_year <- "JUN2023"
+
 #Diagnostic OR scaling factor
 diagnostic_scaling <- 2.69
 
@@ -43,8 +44,11 @@ RIS_MSQ <- read.csv(paste0(MSQ_RIS_dir,"Charge Detail/",
                        "MSQ_RIS_",month_year,".csv"), 
                 colClasses = c(rep("character",21)))
 #read in MSQ CDM
-MSQ_CDM <- read_xlsx(paste0(MSQ_RIS_dir, "CDM/MSQ CDM.xlsx"), 
-                     col_types = rep("text",55))
+MSQ_CDM <- read_xlsx(paste0(MSQ_RIS_dir, "CDM/MSQ_CDM_combined.xlsx"), 
+                     col_types = rep("text",21))
+#read in MSQ resource mapping
+msq_resource <- read_xlsx(paste0(MSQ_RIS_dir, "Mapping/Resource_Mapping.xlsx"),
+                          col_types = rep("text",3))
 #Read in modality mapping file
 modality <- read_xlsx(paste0(RIS_dir,"Mapping/Modality_Mapping.xlsx"))
 #Read in PAT mapping
@@ -73,6 +77,7 @@ Dep_ID <- read_xlsx(paste0(MSQ_RIS_dir,"Mapping/Dep_ID.xlsx"),
 Dep_Description_Mapping <- read_xlsx(paste0(MSQ_RIS_dir, "Mapping/",
                                             "Dep_Description_Mapping.xlsx"),
                                      col_types = c("text", "text", "text"))
+
 #remove whitespaces
 RIS[,1:21] <- sapply(RIS[,1:21], trimws)
 RIS_neuro[,1:21] <- sapply(RIS_neuro[,1:21], trimws)
@@ -278,12 +283,13 @@ RIS_MSQ_charge_mod <- RIS_MSQ_charge %>%
 
 #select columns from CDM for join
 MSQ_CDM_join <- MSQ_CDM %>%
-  select(`CHARGE CODE`,`CHARGE DESC`,`DEPARTMENT CODE`,`GENERAL CPT4 CODE`) %>%
-  rename(charge_code = `CHARGE CODE`) %>%
+  select(Code, description, AlternateCode) %>%
+  rename(charge_code = Code) %>%
   distinct()
 #join charge detail with CDM, PAT, and DEP IT
 RIS_MSQ_cpt4 <- left_join(RIS_MSQ_charge_mod, MSQ_CDM_join) %>%
-  filter(!is.na(`GENERAL CPT4 CODE`)) %>%
+  filter(!is.na(charge_code)) %>%
+  left_join(msq_resource) %>%
   left_join(PAT, by = c("Pat.Type" = "Code")) %>%
   left_join(Dep_ID, by = c("DEPARTMENT CODE" = "Dept")) %>%
   mutate(Identifier = paste0(Org,"-",`DEPARTMENT CODE`,"-",`IP or OP`)) %>%

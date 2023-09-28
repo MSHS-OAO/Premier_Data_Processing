@@ -1,458 +1,360 @@
-# Loading Libraries -------------------------------------------------------
+# Libraries ---------------------------------------------------------------
+
 library(readxl)
 library(xlsx)
 library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(writexl)
+# Assigning Directory(ies) ------------------------------------------------
 
-# Importing Dictionaries --------------------------------------------------
-default_folder <-
-  "J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSBI Data/Union Square"
+## Shared Drive Path (Generic) --------------------------------------------
+j_drive <- paste0("//researchsan02b/shr2/deans/Presidents")
 
-if (exists("Pay Cycles.xlsx")) {
-  dictionary_pay_cylces <-
-    read_xlsx(
-      "Pay Cycles.xlsx",
-      sheet = 1,
-      col_types = c(
-        "date",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "date",
-        "date",
-        "skip"
-      )
-    )
-} else {
-  path_dictionary_pay_cylces <-
-    choose.files(
-      default = default_folder,
-      caption = "Select Pay Cycles File",
-      multi = F
-    )
-  dictionary_pay_cylces <-
-    read_xlsx(
-      path_dictionary_pay_cylces,
-      sheet = 1,
-      col_types = c(
-        "date",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "skip",
-        "date",
-        "date",
-        "skip"
-      )
-    )
-}
-dictionary_pay_cylces$Date <- as.Date(dictionary_pay_cylces$Date)
-dictionary_pay_cylces$`Start Date` <-
-  as.Date(dictionary_pay_cylces$`Start Date`)
-dictionary_pay_cylces$`End Date` <-
-  as.Date(dictionary_pay_cylces$`End Date`)
-path_dictionary_Premier_volume <-
-  choose.files(
-    default = default_folder,
-    caption = "Select DUS Main Dictionary",
-    multi = F
-  )
-dictionary_Premier_volume <-
-  read_xlsx(
-    path_dictionary_Premier_volume,
-    sheet = "VolumeID to Cost center # Map",
-    col_types = c("guess", "text"),
-    col_names = c("Volume ID", "Cost Center"),
-    skip = 1
-  )
 
-# eIDX/IDX Dictionaries
-# Rollup + Department Map for Visits:
-dictionary_eIDX_rollup_department <-
-  read_xlsx(
-    path_dictionary_Premier_volume,
-    sheet = "Sch Loc to Dept Map visit e.IDX",
-    col_types = c("skip", "skip", "text", "text", "text", "skip", "skip", "skip")
-  )
-# Volume ID (Premier),Type, and eIDX/idx Department Map:
-dictionary_eIDX_departments <-
-  read_xlsx(
-    path_dictionary_Premier_volume,
-    sheet = "New eIDX visit - volID map",
-    col_types = c("text", "text", "text", "skip")
-  )
-# Merging volID/departnent map with the cost center map
-dictionary_eIDX <-
-  merge(
-    x = dictionary_eIDX_departments,
-    y = dictionary_Premier_volume,
-    by.x = "VolumeID",
-    by.y = "Volume ID",
-    all.x = T
-  )
-# Departments to Remove
-remove_departments_eIDX <-
-  read_xlsx(path_dictionary_Premier_volume, sheet = "eIDX_IDX Departments to Remove")
-# Epic Dictionaries
-# Importing the Dictionaries
-dictionary_Epic_department_VolID <-
-  read_xlsx(
-    path_dictionary_Premier_volume,
-    sheet = "New Epic Volume ID Map",
-    col_types = c("text", "text", "skip")
-  )
-# Merging Dictionaries into one
-dictionary_EPIC <-
-  merge(
-    dictionary_Epic_department_VolID,
-    dictionary_Premier_volume,
-    by.x = "Volume ID",
-    by.y = "Volume ID"
-  )
-# Departments to Remove
-remove_departments_Epic <-
-  dictionary_Epic_department_VolID[dictionary_Epic_department_VolID$`Volume ID` %in% c("X", "TBD"), "Department"]
+# Data References ---------------------------------------------------------
 
-# Importing eIDX/IDX Data -------------------------------------------------
-answer_eIDX <-
-  select.list(
-    choices = c("Yes", "No"),
-    title = "Is there an eIDX/IDX file?",
-    multiple = F,
-    graphics = T
-  )
-if (answer_eIDX == "Yes") {
-  path_eIDX <-
-    choose.files(
-      default = default_folder,
-      caption = "Select the eIDX/IDX file",
-      multi = F
-    )
-  choices_eIDX_sheets <- c(excel_sheets(path_eIDX), "None")
-  sheet_eIDX <-
-    select.list(
-      choices = choices_eIDX_sheets,
-      title = "Select eIDX Arrived Visits Sheet",
-      graphics = T
-    )
-  if (sheet_eIDX == "None") {
-    data_eIDX_visits <- NA
+## Pay cycles -------------------------------------------------------------
+dict_pay_cycles <- read_xlsx(
+  paste0(
+    j_drive, "/SixSigma/MSHS Productivity/Productivity/Universal Data/",
+    "Mapping/MSHS_Pay_Cycle.xlsx"
+  ),
+  col_types = c("date", "date", "date", "skip")
+  # bringing in the date as "text" results in the excel number representation
+  # of a date
+)
+
+# dates originally come in as POSIXct, so they're being converted to Date
+dict_pay_cycles <- dict_pay_cycles %>%
+  mutate(DATE = format(as.Date(DATE), "%m/%d/%Y"),
+         START.DATE = format(as.Date(START.DATE), "%m/%d/%Y"),
+         END.DATE = format(as.Date(END.DATE), "%m/%d/%Y"))
+
+
+## Dictionary ------------------------------------------------------------
+
+path_dict_prem <- paste0(j_drive,
+                         "/SixSigma/MSHS Productivity/Productivity",
+                         "/Volume - Data/MSBI Data/Union Square/",
+                         "R Code/MSUS Epic Dictionary.xlsx")
+
+dict_epic <- read_xlsx(
+  path_dict_prem,
+  sheet = 1,
+  skip = 0
+)
+
+dict_epic_short <- dict_epic %>%
+  select(`Epic Department Name`, `Volume ID`, `Cost Center`, `volume ratio`)
+
+
+### rehab offsite ---------------------------------------------------------
+
+dict_rehab_docs <- read_xlsx(
+  path_dict_prem,
+  sheet = 2,
+  skip = 0
+)
+
+
+# Data Import -------------------------------------------------------------
+
+path_data_epic <- choose.files(
+  default = paste0(j_drive,
+                   "/SixSigma/MSHS Productivity/Productivity",
+                   "/Volume - Data/MSBI Data/Union Square",
+                   "/Source Data"),
+  caption = "Select Epic file",
+  multi = F
+)
+
+
+## Skip rows and import ---------------------------------------------------
+
+# The data is not provided in a consistent way.  The number of extra rows
+# at the top of the file varies.
+
+skip_ct <- 0
+d_check <- 1
+skip_ct_max <- 5
+
+while (d_check != 0 & skip_ct < skip_ct_max) {
+  col_check <- read_xlsx(path_data_epic, sheet = 1, skip = skip_ct, n_max = 10)
+  
+  if ("Department" %in% colnames(col_check) |
+      "DEPARTMENT_NAME" %in% colnames(col_check)) {
+    data_raw <- read_xlsx(path_data_epic, sheet = 1, skip = skip_ct)
+    d_check <- 0
+    rm(col_check)
   } else {
-    data_eIDX_visits <-
-      as.matrix(read_xlsx(path = path_eIDX, sheet = sheet_eIDX))
+    skip_ct <- skip_ct + 1
   }
-  sheet_IDX <-
-    select.list(
-      choices = choices_eIDX_sheets,
-      title = "Select IDX Arrived Visits Sheet",
-      graphics = T
-    )
-  if (sheet_IDX == "None") {
-    data_IDX_visits <- NA
-  } else {
-    data_IDX_visits <-
-      as.matrix(read_xlsx(path = path_eIDX, sheet = sheet_IDX))
-  }
-  # importing data
-  if (length(data_eIDX_visits) == 1 | length(data_IDX_visits == 1)) {
-    if (length(data_IDX_visits) == 1 & length(data_eIDX_visits) != 1) {
-      data_eIDXIDX_visits <- as.data.frame(data_eIDX_visits)
-    } else if (length(data_IDX_visits) != 1 &
-      length(data_eIDX_visits) != 1) {
-      data_eIDXIDX_visits <- as.data.frame(data_IDX_visits)
-    } else {
-      data_eIDXIDX_visits <-
-        merge.data.frame(data_eIDX_visits,
-          data_IDX_visits,
-          all.x = T,
-          all.y = T
-        )
-    }
-  } # merging data from eIDX/IDX
-
-  # Pre Processing eIDX/IDX Data --------------------------------------------
-  data_eIDXIDX_visits$`Sch Visit Num` <-
-    as.numeric(as.character(data_eIDXIDX_visits$`Sch Visit Num`))
-  data_eIDXIDX_visits$`SchDateId Date (MM/DD/YYYY)` <-
-    as.Date(data_eIDXIDX_visits$`SchDateId Date (MM/DD/YYYY)`,
-      tryFormats = "%m/%d/%Y"
-    )
-  data_eIDXIDX_visits$`Sch SchDept` <-
-    as.character(data_eIDXIDX_visits$`Sch SchDept`)
-  data_eIDXIDX_visits$`Sch SchDeptSch SchLoc` <-
-    paste0(
-      data_eIDXIDX_visits$`Sch SchDept`,
-      data_eIDXIDX_visits$`Sch SchLoc`
-    )
-  data_eIDXIDX_visits <-
-    arrange(
-      data_eIDXIDX_visits,
-      `SchDateId Date (MM/DD/YYYY)`,
-      `Sch SchDeptSch SchLoc`
-    ) # sorting data
-  data_eIDXIDX_visits <-
-    merge(
-      x = data_eIDXIDX_visits,
-      y = dictionary_eIDX_rollup_department,
-      by = "Sch SchDeptSch SchLoc",
-      all.x = T
-    )
-  data_eIDXIDX_visits <-
-    merge(
-      data_eIDXIDX_visits,
-      subset(
-        dictionary_eIDX,
-        select = c("Department", "VolumeID", "Cost Center")
-      ),
-      by = "Department",
-      all.x = T
-    )
-  data_eIDXIDX_visits <-
-    merge(
-      x = data_eIDXIDX_visits,
-      y = dictionary_pay_cylces,
-      by.x = "SchDateId Date (MM/DD/YYYY)",
-      by.y = "Date",
-      all.x = T
-    )
 }
-# Importing Epic Data -----------------------------------------------------
-list_path_data_Epic <-
-  as.list(choose.files(
-    default = default_folder,
-    caption = "Select Epic file(s)",
-    multi = T
+# alternatively, to help with date handling, could bring all columns
+# in as character strings
+
+
+if (skip_ct == skip_ct_max) {
+  stop(paste0("The raw data is not in the appropriate format.\n",
+              "Identify the appropriate file and restart")
+  )
+}
+
+# if the atypical file format has been provided, the column names
+# need to be changed in order for the rest of the script to work
+if ("DEPARTMENT_NAME" %in% colnames(data_raw)) {
+  data_raw <- data_raw %>%
+    rename(Department = DEPARTMENT_NAME,
+           Provider = PROV_NAME,
+           `Appt Time` = APPT_TIME)
+  
+  # if there are NA dates then Date of Service can be used instead
+  data_raw <- data_raw %>%
+    mutate(`Appt Time` = case_when(
+      is.na(`Appt Time`) ~ DATE_OF_SERVICE,
+      TRUE ~ `Appt Time`
+    ))
+}
+
+
+# Data Pre-processing -----------------------------------------------------
+
+data_epic <- data_raw %>%
+  select(Department, Provider, `Appt Time`) %>%
+  filter(! is.na(`Appt Time`))
+
+
+## date formatting, check, pay periods -------------------------------------
+
+data_epic <- data_epic %>%
+  mutate(`Appt Date` = stringr::str_sub(
+    `Appt Time`, 1, nchar("00/00/0000"))
+  )
+
+if ("POSIXct" %in% class(data_epic$`Appt Time`)) {
+  data_epic <- data_epic %>%
+    mutate(`Appt Date` = format(lubridate::ymd(`Appt Date`), "%m/%d/%Y"))
+}
+# alternatively, could bring all columns of raw data as character
+
+data_date_min <- min(as.Date(data_epic$`Appt Date`, "%m/%d/%Y"))
+data_date_max <- max(as.Date(data_epic$`Appt Date`, "%m/%d/%Y"))
+
+date_ok <- winDialog(type = c("yesno"),
+                     message = paste0("The date range for the data is:\n",
+                                      data_date_min, "\n",
+                                      "to\n",
+                                      data_date_max, "\n\n",
+                                      "Is this correct?"))
+
+if (date_ok == "NO") {
+  stop(paste0("Please get the data for the correct date range.\n",
+              "Then restart running this script.")
+  )
+}
+
+data_epic <- data_epic %>%
+  left_join(dict_pay_cycles, by = c("Appt Date" = "DATE"))
+
+
+## Join Dept & Vol ID -----------------------------------------------------
+
+data_epic_row <- nrow(data_epic)
+data_epic <- data_epic %>%
+  left_join(dict_epic_short, c("Department" = "Epic Department Name"))
+data_epic_row2 <- nrow(data_epic)
+
+winDialog(type = "ok",
+          message = paste0("The number of rows in data increased\n",
+                           "when joining Volume IDs.\n\n",
+                           "This can be expected because of special\n",
+                           "rolled-up volumes.\n\n",
+                           "The row increase was:\n",
+                           data_epic_row2 - data_epic_row, "\n\n",
+                           "Press OK to continue."))
+
+
+## Visit counter ----------------------------------------------------------
+
+# rehab offsite docs that are not included docs get 0
+# all others keep their ratio
+data_epic <- data_epic %>%
+  rename(volume = `volume ratio`) %>%
+  mutate(volume = case_when(
+    Department %in% dict_rehab_docs$`Epic Department Name` &
+      !(Provider %in% dict_rehab_docs$Provider) ~ 0,
+    TRUE ~ volume
   ))
-list_data_Epic <-
-  lapply(list_path_data_Epic, function(x) {
-    read_xlsx(path = x, sheet = 1, skip = 1)
-  })
 
-# Pre Processing Epic Data ------------------------------------------------
-merge_multiple_dataframes <- function(list.dfs) {
-  if (length(list.dfs) == 1) {
-    return(as.data.frame(list.dfs[1]))
-  }
-  output <- list.dfs[1]
-  for (i in 2:length(list.dfs)) {
-    output <-
-      merge.data.frame(output, list.dfs[i], all.x = T, all.y = T)
-  }
-  return(output)
+
+## upload summary ---------------------------------------------------------
+summary_upload <- data_epic %>%
+  group_by(`Cost Center`, START.DATE, END.DATE, `Volume ID`) %>%
+  summarize(visits = sum(volume)) %>%
+  mutate(visits = round(visits, digits = 0)) %>%
+  ungroup() %>%
+  filter(!is.na(`Volume ID`)) %>%
+  filter(!(`Volume ID` %in% c("TBD", "X")))
+
+
+## Add rows for volume ID with 0 volume ------------------------------------
+
+data_dates <- data_epic %>%
+  select(START.DATE, END.DATE) %>%
+  unique()
+
+dict_epic_unique <- dict_epic %>%
+  select(`Cost Center`, `Volume ID`) %>%
+  unique()
+
+dict_and_date <- merge(data_dates, dict_epic_unique)
+
+missing_vol_id_date <- dict_and_date %>%
+  anti_join(data_epic)
+
+zero_rows <- missing_vol_id_date %>%
+  mutate(visits = 0) %>%
+  relocate(`Cost Center`, .before = START.DATE)
+
+zero_depts <- dict_epic_short %>%
+  filter(`Volume ID` %in% zero_rows$`Volume ID`)
+
+# would be better to display Cost Center name and the volume IDs
+if (length(unique(zero_depts$`Epic Department Name`)) > 0) {
+  winDialog(message = paste0(
+    "These Departments had a pay period with 0 volume:\r\r",
+    paste(sort(unique(zero_depts$`Epic Department Name`)),
+          collapse = "\n\n")),
+    type = "ok")
 }
-data_Epic <- merge_multiple_dataframes(list_data_Epic)
-data_Epic$`Appt Date` <-
-  unname(sapply(
-    data_Epic$Appt.Time,
-    FUN = function(x) {
-      unlist(strsplit(x, " "))[1]
-    }
-  )) # separating the Appt Time into Appt Date
-data_Epic$`Appt Date` <-
-  as.Date(data_Epic$`Appt Date`, tryFormats = "%m/%d/%Y")
-data_Epic$Appt.Time <-
-  paste(unname(sapply(
-    data_Epic$Appt.Time,
-    FUN = function(x) {
-      unlist(strsplit(x, " "))[2]
-    }
-  )), unname(sapply(
-    data_Epic$Appt.Time,
-    FUN = function(x) {
-      unlist(strsplit(x, " "))[3]
-    }
-  ))) # Replace the Appt Time Column with the Hour of the appointment
-data_Epic <- arrange(data_Epic, `Appt Date`, `Department`)
-data_Epic <-
-  merge(
-    x = data_Epic,
-    y = dictionary_EPIC,
-    by = "Department",
-    all.x = T
-  )
-data_Epic <-
-  merge(
-    x = data_Epic,
-    y = dictionary_pay_cylces,
-    by.x = "Appt Date",
-    by.y = "Date",
-    all.x = T
-  )
 
-# Merging Data from Epic & eIDX/IDX ------------------------------------------------
-# Removing Departments
 
-if (answer_eIDX == "Yes") {
-  data_eIDXIDX_merge <-
-    data_eIDXIDX_visits[!(data_eIDXIDX_visits$`Sch SchDept` %in% remove_departments_eIDX$`Sch SchDept`), ]
+### Combining with upload summary --------------------------------------------
+summary_upload <- rbind(summary_upload, zero_rows)
 
-  # Date Range Check
-  # eIDX/IDX
-  choices_date_range_eIDX <-
-    format(
-      unique(data_eIDXIDX_visits$`SchDateId Date (MM/DD/YYYY)`),
-      "%m/%d/%Y"
+
+# Data Formatting ---------------------------------------------------------
+
+upload_file <- summary_upload %>%
+  mutate(entity = "729805",
+         facility = "630571",
+         budget = "0") %>%
+  relocate(c(entity, facility), .before = `Cost Center`)
+
+
+# Quality Checks ----------------------------------------------------------
+
+## new departments --------------------------------------------------------
+
+new_dept <- data_epic %>%
+  filter(is.na(volume)) %>%
+  select(Department) %>%
+  unique()
+
+if (length(new_dept$Department) > 0) {
+  new_dept_stop <- winDialog(
+    message = paste0("These Departments are not in the dictionary:\r\r",
+                     paste(unique(new_dept$Department), collapse = "\n\n"),
+                     "\r\r",
+                     "Press \"OK\" to continue\r",
+                     "Press \"Cancel\" to stop running this script"),
+    type = "okcancel")
+  
+  if (new_dept_stop == "CANCEL") {
+    stop(paste0("Incorporate the new depts into the dictionary as desired.\n",
+                "Restart the script after the dictionary is as desired.")
     )
-  remove_dates_eIDX <-
-    select.list(
-      choices = c("None", choices_date_range_eIDX),
-      title = "eIDX/IDX:Remove Dates?",
-      multiple = T,
-      graphics = T,
-      preselect = "None"
-    )
-  if (remove_dates_eIDX != "None" | is.na(remove_dates_eIDX)) {
-    remove_dates_eIDX <-
-      as.Date(remove_dates_eIDX, tryFormats = "%m/%d/%Y")
-    data_eIDXIDX_merge <-
-      data_eIDXIDX_visits[!(data_eIDXIDX_visits$`SchDateId Date (MM/DD/YYYY)` %in% remove_dates_eIDX), ]
   }
   
-  # Selecting only needed columns
-  data_eIDXIDX_merge <-
-    data_eIDXIDX_merge[, c(
-      "Cost Center",
-      "Start Date",
-      "End Date",
-      "VolumeID",
-      "Sch Visit Num"
-    )]
-  colnames(data_eIDXIDX_merge) <-
-    c("Cost Center", "Start Date", "End Date", "Volume ID", "Volume")
-}
-
-data_Epic_merge <-
-  data_Epic[!data_Epic$Department %in% remove_departments_Epic, ]
-
-# remove dates if user chooses
-# Epic
-choices_date_range_Epic <-
-  format(unique(data_Epic$`Appt Date`), "%m/%d/%Y")
-remove_dates_Epic <-
-  select.list(
-    choices = c("None", choices_date_range_Epic),
-    title = "Epic:Remove Dates?",
-    multiple = T,
-    graphics = T,
-    preselect = "None"
-  )
-if (remove_dates_Epic != "None" | is.na(remove_dates_Epic)) {
-  remove_dates_Epic <-
-    as.Date(remove_dates_Epic, tryFormats = "%m/%d/%Y")
-  data_Epic_merge <-
-    data_Epic_merge[!(data_Epic_merge$`Appt Date` %in% remove_dates_Epic), ]
-} # remove dates if user chooses
-
-# Selecting only needed columns
-data_Epic_merge <-
-  data_Epic_merge[, c("Cost Center", "Start Date", "End Date", "Volume ID")]
-data_Epic_merge$Volume <-
-  rep(1, length(data_Epic_merge$`Cost Center`))
-colnames(data_Epic_merge) <-
-  c("Cost Center", "Start Date", "End Date", "Volume ID", "Volume")
-
-# Merging Data
-if (answer_eIDX == "Yes") {
-  data_visits <- rbind(data_eIDXIDX_merge, data_Epic_merge)
 } else {
-  data_visits <- data_Epic_merge
-}
-# Removing NA Vol IDs and Cost Centers
-remove_NA_vol <- data_visits[which(is.na(data_visits$VolumeID)), ]
-if (length(remove_NA_vol$VolumeID) != 0) {
-  data_visits <-
-    data_visits[!data_visits$VolumeID %in% remove_NA_vol$VolumeID, ]
-}
-remove_NA_CC <-
-  data_visits[which(is.na(data_visits$`Cost Center`)), ]
-if (length(remove_NA_CC$`Cost Center`) != 0) {
-  data_visits <-
-    data_visits[!data_visits$`Cost Center` %in% remove_NA_CC$`Cost Center`, ]
+  new_dept_stop <- "OK"
+  message("No new departments identified.")
 }
 
-# Creating Premier Upload -------------------------------------------------
-# Created needed columns
-data_visits$`Entity ID` <-
-  rep("729805", length(data_visits$`Cost Center`))
-data_visits$`Facility ID` <-
-  rep("630571", length(data_visits$`Cost Center`))
-data_visits$Budget <- rep("0", length(data_visits$`Cost Center`))
-# Aggregating Data
-data_visits <-
-  aggregate(
-    data_visits$Volume,
-    by = list(
-      data_visits$`Entity ID`,
-      data_visits$`Facility ID`,
-      data_visits$`Cost Center`,
-      data_visits$`Start Date`,
-      data_visits$`End Date`,
-      data_visits$`Volume ID`,
-      data_visits$Budget
-    ),
-    FUN = "sum"
-  )
-colnames(data_visits) <-
-  c(
-    "Corporate ID",
-    "Facility ID",
-    "Cost Center",
-    "Start Date",
-    "End Date",
-    "Volume ID",
-    "Budget",
-    "Volume"
-  )
-# Formatting Data
-data_visits <-
-  arrange(data_visits, `Start Date`, `End Date`, `Cost Center`, `Volume ID`)
-data_visits <-
-  subset(
-    data_visits,
-    select = c(
-      "Corporate ID",
-      "Facility ID",
-      "Cost Center",
-      "Start Date",
-      "End Date",
-      "Volume ID",
-      "Volume",
-      "Budget"
-    )
-  )
-data_visits$`Start Date` <-
-  format(data_visits$`Start Date`, "%m/%d/%Y")
-data_visits$`End Date` <- format(data_visits$`End Date`, "%m/%d/%Y")
+# Visualization -----------------------------------------------------------
+#consolidate plot groups into the MSUS Epic Dict
+#add note column to the upload file so it can bind to trend data file
+new_trend_data <- upload_file %>%
+  mutate(Note = NA) %>%
+  mutate(START.DATE = mdy(START.DATE)) %>%
+  mutate(START.DATE = as.Date(START.DATE, format = "%Y-%m-%d")) %>%
+  mutate(END.DATE = mdy(END.DATE)) %>%
+  mutate(END.DATE = as.Date(END.DATE, format = "%Y-%m-%d"))
 
-# Exporting Premier Upload File -------------------------------------------
-file_name_Premier <-
-  paste0(
-    "MSDUS_Department Volumes_",
-    format(min(
-      as.Date(data_visits$`Start Date`, "%m/%d/%Y")
-    ), "%d%b%Y"),
-    " to ",
-    format(max(
-      as.Date(data_visits$`End Date`, "%m/%d/%Y")
-    ), "%d%b%Y"),
-    ".csv"
-  )
-path_folder_Premier_export <-
-  choose.dir(default = default_folder, caption = "Select folder to export Premier upload file")
+#read in trend data file
+old_trend_data <- read_xlsx(paste0(j_drive, "/SixSigma/MSHS Productivity",
+                                   "/Productivity/Volume - Data/MSBI Data",
+                                   "/Union Square/Calculation Worksheets",
+                                   "/MSDUS_trend_data.xlsx"),
+                            sheet = 1) %>%
+  mutate(START.DATE = as.Date(START.DATE)) %>%
+  mutate(END.DATE = as.Date(END.DATE)) %>%
+  mutate(`Volume ID` = as.character(`Volume ID`))
+
+#combine new upload data with the existing trend data
+updated_trend_data <- rbind(old_trend_data, new_trend_data) %>%
+  mutate(START.DATE = as.Date(START.DATE)) %>%
+  mutate(END.DATE = as.Date(END.DATE)) %>%
+  unique()
+
+#overwrite trend data file with updated trend data
+write_xlsx(updated_trend_data, paste0(j_drive, "/SixSigma/MSHS Productivity",
+                                      "/Productivity/Volume - Data/MSBI Data",
+                                      "/Union Square/Calculation Worksheets",
+                                      "/MSDUS_trend_data.xlsx"))
+
+#format dict_epic for a left join
+trend_groups <- dict_epic %>%
+  select("Volume ID", "Plot Group", "Cost Center Name") %>%
+  mutate(`Volume ID` = as.character(`Volume ID`)) %>%
+  na.omit() %>%
+  unique()
+
+#prepare the updated trend data for visualization
+plot_trend_data <- updated_trend_data %>%
+  left_join(trend_groups,
+            by = c("Volume ID" = "Volume ID")) %>%
+  arrange(desc(START.DATE)) %>%
+  mutate(NEW.NAME = paste0(`Cost Center Name`,
+                           " - ",
+                           as.character(`Volume ID`))) %>%
+  filter(START.DATE >= today() - 180)
+
+#creating multiple-bar plots (x = volume ID, y = volume, and
+#each bar indicates the volume on a specific end date)
+#each plot is depicts sets of volume ids with similar visit counts
+for (i in c("low", "med", "high")){
+  plot <- ggplot(data = filter(plot_trend_data, `Plot Group` == i),
+         mapping = aes(x = `NEW.NAME`, y = `visits`, fill = `END.DATE`)) +
+    geom_bar(position = "dodge2", stat = "identity") +
+    coord_flip() + 
+    labs(y = "Visits per Pay Period", x = "Cost Center & Volume ID") + 
+    ggtitle(paste0("MSDUS Visit Trends: ", i, " volume group"))
+  print(plot)
+}
+# File Saving -------------------------------------------------------------
+
+date_min_char <- format(as.Date(data_date_min, "%m/%d/%Y"), "%Y-%m-%d")
+date_max_char <- format(as.Date(data_date_max, "%m/%d/%Y"), "%Y-%m-%d")
+
+file_name_premier <-
+  paste0("MSDUS_Department Volumes_", date_min_char, "_to_", date_max_char,
+         ".csv")
+path_folder_premier_export <- paste0(j_drive,
+                                     "/SixSigma/MSHS Productivity/Productivity",
+                                     "/Volume - Data/MSBI Data/Union Square",
+                                     "/Calculation Worksheets")
 write.table(
-  data_visits,
-  file = paste0(path_folder_Premier_export, "\\", file_name_Premier),
+  upload_file,
+  file = paste0(path_folder_premier_export, "\\", file_name_premier),
   row.names = F,
   col.names = F,
   sep = ","
 )
+
+message(paste0("\nUpload file written to:\n",
+               paste0(path_folder_premier_export, "\\", file_name_premier,
+                      "\n")))
+
+# Script End --------------------------------------------------------------
