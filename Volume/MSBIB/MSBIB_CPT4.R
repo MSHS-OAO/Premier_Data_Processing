@@ -313,27 +313,17 @@ cc_xwalk_unique <- cc_xwalk %>%
   select(`Labor Department`) %>%
   unique()
 
-xwalk_and_date <- merge(date_range, cc_xwalk_unique)
-
-missing_dept_date <- xwalk_and_date %>%
+xwalk_and_date <- merge(date_range, cc_xwalk_unique) %>%
   mutate(StartDate = as.character(StartDate, "%m/%d/%Y"),
          EndDate = as.character(EndDate, "%m/%d/%Y")) %>%
-  anti_join(upload)
-
-zero_rows <- missing_dept_date %>%
   mutate(EntityID = 729805,
          FacilID = 630571,
-         `Labor Department` = `Labor Department`,
-         StartDate = StartDate,
-         EndDate = EndDate,
-         OPTB_cpt4 = "G0463",
-         Vol = 0,
-         budget = 0) %>%
-  relocate(`Labor Department`, .after = FacilID) %>%
-  relocate(c(StartDate, EndDate), .before = OPTB_cpt4)
+         budget = 0)
 
-### Combining with upload summary --------------------------------------------
-upload <- rbind(upload, zero_rows)
+upload <- upload %>%
+  right_join(missing_dept_date) %>%
+  mutate(Vol = replace_na(Vol, 0),
+         OPTB_cpt4 = replace_na(OPTB_cpt4, "G0463"))
 
 ## Premier 2.0 Headers ------------------------------------------------------
 
