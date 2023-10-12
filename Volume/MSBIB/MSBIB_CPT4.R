@@ -321,7 +321,7 @@ xwalk_and_date <- merge(date_range, cc_xwalk_unique) %>%
          budget = 0)
 
 upload <- upload %>%
-  right_join(missing_dept_date) %>%
+  right_join(xwalk_and_date) %>%
   mutate(Vol = replace_na(Vol, 0),
          OPTB_cpt4 = replace_na(OPTB_cpt4, "G0463"))
 
