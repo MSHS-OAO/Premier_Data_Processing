@@ -250,10 +250,16 @@ new_start_end <- function(upload_file) {
 #                                              'NY2162', map_CC_Vol))
 data_upload_MSMW <- new_start_end(
   rbind(upload_file(site_names[4], "NY2162", map_CC_Vol),
-        upload_file(site_names[3], "NY2163", map_CC_Vol)))
+        upload_file(site_names[3], "NY2163", map_CC_Vol))) %>%
+  `colnames<-`(c("Corporation Code", "Entity Code", "Cost Center Code", 
+                 "Start Date", "End Date", "Volume Code", "Actual Volume",
+                 "Budget Volume"))
 data_upload_MSBIB <- new_start_end(
   rbind(upload_file(site_names[1], "630571", map_CC_Vol),
-        upload_file(site_names[2], "630571", map_CC_Vol)))
+        upload_file(site_names[2], "630571", map_CC_Vol))) %>%
+  `colnames<-`(c("Corporation Code", "Entity Code", "Cost Center Code", 
+                 "Start Date", "End Date", "Volume Code", "Actual Volume",
+                 "Budget Volume"))
 
 ## Premier 2.0 Headers ------------------------------------------------------
 
