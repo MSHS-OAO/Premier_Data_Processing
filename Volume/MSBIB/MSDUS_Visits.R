@@ -345,11 +345,23 @@ path_folder_premier_export <- paste0(j_drive,
                                      "/SixSigma/MSHS Productivity/Productivity",
                                      "/Volume - Data/MSBI Data/Union Square",
                                      "/Calculation Worksheets")
+
+upload_cols <- c("Corporation Code",
+                 "Entity Code",
+                 "Cost Center Code",
+                 "Start Date",
+                 "End Date",
+                 "Volume Code",
+                 "Actual Volume",
+                 "Budget Volume")
+
+colnames(upload_file) <- upload_cols
+
 write.table(
   upload_file,
   file = paste0(path_folder_premier_export, "\\", file_name_premier),
   row.names = F,
-  col.names = F,
+  col.names = T,
   sep = ","
 )
 
