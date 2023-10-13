@@ -92,7 +92,10 @@ CSPDdf1 <- CSPDdf %>%
   select(Health_System_ID, `Premier Site`, `Cost Center`,
          `Start Date`, `End Date`, `Vol ID`, Volume, Budget) %>%
   mutate(`Start Date` = as.character(`Start Date`, format = "%m/%d/%Y"),
-         `End Date` = as.character(`End Date`, format = "%m/%d/%Y"))
+         `End Date` = as.character(`End Date`, format = "%m/%d/%Y")) %>%
+  `colnames<-`(c("Corporation Code", "Entity Code", "Cost Center Code", 
+                 "Start Date", "End Date", "Volume Code", "Actual Volume",
+                 "Budget Volume"))
 
 #DATA REPOSITORY---------------------------------------------------------
 #1 read master
@@ -110,10 +113,10 @@ validation <- CSPDdf1 %>%
 #4 Validation and upload
 write.table(validation, paste0(dir, "/CSPD Validation.csv"),
             row.names = F,
-            col.names = F,
+            col.names = T,
             sep = ",")
 
 write.table(CSPDdf1, paste0(dir, "/Multisite_CSPD Volumes_.csv"),
             row.names = F,
-            col.names = F,
+            col.names = T,
             sep = ",")

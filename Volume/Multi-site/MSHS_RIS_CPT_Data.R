@@ -341,6 +341,20 @@ msbib_upload <- create_premier_upload(df = mshs_rad_data,
 ## Quality Charts ----------------------------------------------------------
 quality_chart <- rbind(msmw_upload, msbib_upload)
 
+## Premier 2.0 Headers ------------------------------------------------------
+
+upload_cols <- c("Corporation Code",
+                 "Entity Code",
+                 "Cost Center Code",
+                 "Start Date",
+                 "End Date",
+                 "CPT Code",
+                 "Actual Volume",
+                 "Budget Volume")
+
+colnames(msmw_upload) <- upload_cols
+colnames(msbib_upload) <- upload_cols
+
 # Outputs -----------------------------------------------------------------
 write.table(msmw_upload,
             file = paste0(dir_data,
@@ -356,7 +370,7 @@ write.table(msmw_upload,
                           ".csv"),
             sep = ",",
             row.names = F,
-            col.names = F)
+            col.names = T)
 write.table(msbib_upload,
             file = paste0(dir_data,
                           "/Upload Files",
@@ -371,4 +385,4 @@ write.table(msbib_upload,
                           ".csv"),
             sep = ",",
             row.names = F,
-            col.names = F)
+            col.names = T)
