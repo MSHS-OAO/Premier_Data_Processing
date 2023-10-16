@@ -61,7 +61,8 @@ pay_period_mapping <- read_xlsx(paste0(mapping_path,
                                        "MSHS_Pay_Cycle.xlsx"))
 # code conversion mapping file to convert legacy to oracle cc
 code_conversion <- read_xlsx(paste0(mapping_path,
-                                    "MSHS_Code_Conversion_Mapping.xlsx"))
+                                    "MSHS_Code_Conversion_Mapping.xlsx")) %>%
+  filter(PAYROLL != "MSMW")
 # report mapping file for QC check to identify published departments
 report_info <- read_xlsx(paste0(mapping_path,
                                 "MSHS_Reporting_Definition_Mapping.xlsx"))
@@ -132,13 +133,13 @@ rm(raw_data_prev)
 
 #user needs most recent zero and upload files
 msbib_zero_old <- recent_file(path = paste0(project_path, "MSBIB/Zero"),
-                              text_cols = rep("character", 14))
+                              text_cols = rep("character", 14), file_header = T)
 msbib_upload_old <- recent_file(path = paste0(project_path, "MSBIB/Uploads"),
-                                text_cols = rep("character", 14))
+                                text_cols = rep("character", 14), file_header = T)
 mshq_zero_old <- recent_file(path = paste0(project_path, "MSHQ/Zero"),
-                             text_cols = rep("character", 14))
+                             text_cols = rep("character", 14), file_header = T)
 mshq_upload_old <- recent_file(path = paste0(project_path, "MSHQ/Uploads"),
-                               text_cols = rep("character", 14))
+                               text_cols = rep("character", 14), file_header = T)
 
 # Constants ------------------------------------------------------
 
@@ -333,7 +334,6 @@ jc_dict_upload <- processed_data %>%
   distinct() %>%
   mutate(Job.Title = substr(Job.Title, 1, 50))
 
-
 ## Summarizing Hours and Expenses-------------------------------------------
 
 # all daily hours need to be summed up
@@ -494,11 +494,6 @@ jc_dict_upload <- jc_dict_upload %>%
          esd = NA,
          exp_date = NA)
 
-# there could be another step inserted here to remove any jobcodes
-# that have already been defined in the JC dictionary or universal file.
-# This part of code is based on the legacy system that is looking for
-# department-jobcode combinations that were not previously defined
-
 jc_dict_upload_cols <- c("Corporation Code",
                          "Entity Code",
                          "Job Code",
@@ -527,7 +522,7 @@ upload_payroll_cols <- c("Corporation Code",
                          "Expense")
 
 colnames(upload_new) <- upload_payroll_cols
-colnames(msqh_zero_new) <- upload_payroll_cols
+colnames(mshq_zero_new) <- upload_payroll_cols
 colnames(msbib_zero_new) <- upload_payroll_cols
 
 ## Upload Files -----------------------------------------------------------
