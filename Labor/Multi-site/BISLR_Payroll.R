@@ -114,44 +114,44 @@ map_uni_paycycles <- read_xlsx(paste0(dir_universal,
 
 ## Premier Reference Files -------------------------------------------------
 dict_premier_dpt <- read.csv(paste0(dir_universal,
-                                    "/Premier/Dictionary Exports",
-                                    "/DepartmentDictionary.csv"),
+                                    "/Premier/2.0 Dictionary Exports",
+                                    "/CostCenterDictionary.csv"),
                              col.names = c("Corporation.Code", "Site",
                                            "Cost.Center",
                                            "Cost.Center.Description"),
                              sep = ",")
-map_premier_dpt <- read.csv(paste0(dir_universal, "/Premier/Mapping Exports",
-                                   "/DepartmentMapping.csv"),
-                            col.names = c("Effective.Date", "Corporation.Code",
+map_premier_dpt <- read.csv(paste0(dir_universal, "/Premier/2.0 Mapping Exports",
+                                   "/CostCenterMapping.csv"),
+                            col.names = c("Effective.Start.Date", 
+                                          "Effective.End.Date",
+                                          "Corporation.Code",
                                           "Site", "Cost.Center",
                                           "Cost.Center.Map"),
                             sep = ",")
 dict_premier_jobcode <- read.csv(paste0(dir_universal,
-                                        "/Premier/Dictionary Exports",
-                                        "/DeptJobCodeDictionary.csv"),
+                                        "/Premier/2.0 Dictionary Exports",
+                                        "/JobCodeDictionary.csv"),
                                  col.names = c("Corporation.Code", "Site",
-                                               "Cost.Center", "Job.Code",
-                                               "Job.Code.Description"),
+                                               "Job.Code",
+                                               "Job.Code.Description",
+                                               "Default.Agency.Hourly.Rate",
+                                               "Effective Start Date",
+                                               "Expiration Date"),
                                  sep = ",")
 dict_premier_report <- read.csv(paste0(dir_universal,
-                                       "/Premier/Dictionary Exports",
+                                       "/Premier/2.0 Dictionary Exports",
                                        "/DepartmentDef.csv"),
                                 col.names = c("Corporation.Code", "Site",
-                                              "Report.Name", "Report.ID",
-                                              "Cost.Center", "Report.Type",
-                                              "Threshold.Type", "Target.Type",
-                                              "Exclude.Report.Rollup",
-                                              "Effective.Date", "Paycycle.Type",
-                                              "Exclude.Admin.Rollup",
-                                              "Exclude.Action.Plan",
-                                              "blank14", "blank15",
-                                              "blank16", "blank17"),
-                                sep = ",", fill = T)
+                                              "Report.ID", "Cost.Center", 
+                                              "Effective.Date"),
+                                sep = ",")
 
 dict_premier_paycode <- read.csv(paste0(dir_universal,
-                                        "/Premier/Dictionary Exports",
+                                        "/Premier/2.0 Dictionary Exports",
                                         "/PayCodeDictionaryExport.csv"),
-                                 header = TRUE,
+                                 col.names = c("Partner.or.Health.System.ID",
+                                               "Facility.or.Hospital.ID",
+                                               "Pay.Code", "Pay.Code.Name"),
                                  sep = ",")
 
 
@@ -175,6 +175,7 @@ pay_cycles_uploaded <- pay_cycles_uploaded %>%
 dict_premier_dpt <- dict_premier_dpt %>%
   mutate(Cost.Center = as.character(Cost.Center), Dpt_in_Dict = 1)
 dict_premier_jobcode <- dict_premier_jobcode %>%
+  select(1:4) %>%
   mutate(JC_in_Dict = 1)
 
 reports_dept <- str_split(dict_premier_report$Cost.Center,
@@ -309,14 +310,12 @@ bislr_payroll <- raw_payroll %>%
                      DPT.WRKD = Cost.Center,
                      WRKDpt_in_Dict = Dpt_in_Dict)) %>%
   left_join(dict_premier_jobcode %>%
-              select(Site, Cost.Center, Job.Code, JC_in_Dict) %>%
+              select(Site, Job.Code, JC_in_Dict) %>%
               rename(Home.FacilityOR.Hospital.ID = Site,
-                     DPT.HOME = Cost.Center,
                      HOMEJC_in_Dict = JC_in_Dict)) %>%
   left_join(dict_premier_jobcode %>%
-              select(Site, Cost.Center, Job.Code, JC_in_Dict) %>%
+              select(Site, Job.Code, JC_in_Dict) %>%
               rename(Facility.Hospital.Id_Worked = Site,
-                     DPT.WRKD = Cost.Center,
                      WRKJC_in_Dict = JC_in_Dict)) %>%
   mutate(Job.Code_up = substr(Job.Code, 1, 10),
          Approved.Hours.per.Pay.Period = case_when(
@@ -716,7 +715,7 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
     bislr_payroll %>%
       filter(is.na(WRKJC_in_Dict), PROVIDER == 0) %>%
       select(PartnerOR.Health.System.ID, Facility.Hospital.Id_Worked,
-             DPT.WRKD, Job.Code_up, Position.Code.Description) %>%
+             Job.Code_up, Position.Code.Description) %>%
       setNames(colnames(dict_premier_jobcode %>%
                           select(-JC_in_Dict))),
     bislr_payroll %>%
@@ -743,7 +742,7 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
     # the map_premier_dpt Cost.Center column is character type
     mutate(Cost.Center = as.character(Cost.Center)) %>%
     left_join(map_premier_dpt %>%
-                select(-Effective.Date)) %>%
+                select(-Effective.Start.Date, -Effective.End.Date)) %>%
     mutate(Cost.Center.Map = as.double(Cost.Center.Map)) %>%
     mutate(Cost.Center.Map = case_when(
       is.na(Cost.Center.Map) ~ new_dpt_map,
@@ -826,66 +825,6 @@ if (nrow(premier_missing_paycode) > 0) {
   }
 }
 
-
-### Dummy Report Dict ------------------------------------------------------
-
-# These reports are those that have the Cost Center mapped when the
-# Home Cost Center is not in an existing report.  If the home cost center
-# is not in an existing report, the Premier Employee Level Detail report
-# will not display the employee's hour detail.
-
-
-upload_report_dict <- bislr_payroll %>%
-  # Home Facility is used because we're mainly interested in the
-  # Home Department for the dummy reports that are being updated
-  select(Home.FacilityOR.Hospital.ID, DPT.HOME, DPT.WRKD) %>%
-  left_join(report_list %>%
-              filter(Report.ID %in% dummy_report_ids) %>%
-              select(Site, Cost.Center) %>%
-              rename(Facility.Hospital.Id_Worked = Site,
-                     DPT.WRKD = Cost.Center) %>%
-              mutate(WRKD.DPT.in.Report = 1)) %>%
-  left_join(report_list %>%
-              filter(Report.ID %in% dummy_report_ids) %>%
-              select(Site, Cost.Center) %>%
-              rename(Home.FacilityOR.Hospital.ID = Site,
-                     DPT.HOME = Cost.Center) %>%
-              mutate(HOME.DPT.in.Report = 1)) %>%
-  filter(WRKD.DPT.in.Report == 1, is.na(HOME.DPT.in.Report)) %>%
-  select(-DPT.WRKD, -Facility.Hospital.Id_Worked, -WRKD.DPT.in.Report,
-         -HOME.DPT.in.Report) %>%
-  rename(Site = Home.FacilityOR.Hospital.ID, Cost.Center = DPT.HOME) %>%
-  rbind(report_list %>%
-          filter(Report.ID %in% dummy_report_ids) %>%
-          select(Site, Cost.Center)) %>%
-  unique()
-
-upload_report_dict_qc <- upload_report_dict %>%
-  group_by(Site) %>%
-  summarize(Cost.Center = paste(Cost.Center, collapse = "; ")) %>%
-  mutate(num_char = nchar(Cost.Center))
-
-if (max(upload_report_dict_qc$num_char >= 3000)) {
-  showDialog(
-    title = "Dummy Report Cost Centers Overflow",
-    message = paste0("There are too many characters in the Dummy Report ",
-                     "Cost Center list.  If you upload this file and try ",
-                     "to publish, the publishing job will stall and break ",
-                     "Premier.  PLEASE PLEASE PLEASE reduce the number of ",
-                     "Cost Centers included in the report before Publishing ",
-                     "Premier data.")
-    )
-}
-
-upload_report_dict <- upload_report_dict %>%
-  group_by(Site) %>%
-  summarize(Cost.Center = paste(Cost.Center, collapse = ":")) %>%
-  left_join(dict_premier_report %>%
-    filter(Report.ID %in% dummy_report_ids) %>%
-    select(-contains("blank"), -Cost.Center) %>%
-    distinct_at(vars(Site), .keep_all = T)) %>%
-  relocate(Site, .after = Corporation.Code) %>%
-  relocate(Cost.Center, .after = Report.ID)
 
 # Quality Checks -------------------------------------------------------
 
@@ -1296,49 +1235,162 @@ date_range <- paste0(
   format(distribution_date, "%Y-%m-%d")
 )
 
+## Premier 2.0 output format updates --------------------------------------
+
+### department dict & map -------------------------------------------------
+
+upload_dict_dpt_cols <- c("Corporation Code",
+                          "Entity Code",
+                          "Cost Center Code",
+                          "Cost Center Name")
+
+colnames(upload_dict_dpt) <- upload_dict_dpt_cols
+
+upload_map_dpt <- upload_map_dpt %>%
+  mutate(expiration_date = NA) %>%
+  relocate(expiration_date, .after = effective_date)
+
+upload_map_dpt_cols <- c("Effective Start Date",
+                         "Expiration Date",
+                         "Corporation Code",
+                         "Entity Code",
+                         "Cost Center Code",
+                         "Premier Standard Dept Code")
+
+colnames(upload_map_dpt) <- upload_map_dpt_cols
+
+
+### jobcode dict & map ----------------------------------------------------
+
+upload_dict_jc <- upload_dict_dpt_jc %>%
+  mutate(Cost.Center = NULL) %>%
+  distinct() %>%
+  mutate(dahr = NA,
+         esd = NA,
+         exp_date = NA)
+
+# there could be another step inserted here to remove any jobcodes
+# that have already been defined in the JC dictionary or universal file.
+# This part of code is based on the legacy system that is looking for
+# department-jobcode combinations that were not previously defined
+
+upload_dict_jc_cols <- c("Corporation Code",
+                         "Entity Code",
+                         "Job Code",
+                         "Job Code Name",
+                         "Default Agency Hourly Rate",
+                         "Effective Start Date",
+                         "Expiration Date")
+  
+colnames(upload_dict_jc) <- upload_dict_jc_cols
+
+
+upload_map_dpt_jc <- upload_map_dpt_jc %>%
+  mutate(exp_date = NA) %>%
+  relocate(exp_date, .after = effective_date) %>%
+  relocate(Job.Code, .before = Cost.Center)
+
+upload_map_dpt_jc_cols <- c("Effective Start Date",
+                            "Expiration Date",
+                            "Corporation Code",
+                            "Entity Code",
+                            "Entity Job Code",
+                            "Cost Center Code",
+                            "Premier Standard Dept Code",
+                            "Premier Standard Job Code",
+                            "Allocation Percentage")
+
+colnames(upload_map_dpt_jc) <- upload_map_dpt_jc_cols
+
+### paycode dict & map ----------------------------------------------------
+
+if (exists("upload_dict_paycode")) {
+  
+  upload_dict_paycode_cols <- c("Corporation Code",
+                                "Entity Code",
+                                "Pay Code",
+                                "Pay Code Name")
+  
+  colnames(upload_dict_paycode) <- upload_dict_paycode_cols
+  
+  upload_map_paycode <- upload_map_paycode %>%
+    mutate(exp_date = NA) %>%
+    relocate(exp_date, .after = eff_date)
+  
+  upload_map_paycode_cols <- c("Effective Start Date",
+                               "Expiration Date",
+                               "Corporation Code",
+                               "Entity Code",
+                               "Entity Pay Code",
+                               "Premier Standard Pay Code",
+                               "Include Hours",
+                               "Include Expenses",
+                               "Allocation Percentage")
+  
+  colnames(upload_map_paycode) <- upload_map_paycode_cols
+  
+}
+
+
+### payroll ---------------------------------------------------------------
+
+upload_payroll_cols <- c("Corporation Code",
+                         "Home Entity Code",
+                         "Home Cost Center Code",
+                         "Worked Entity Code",
+                         "Worked Cost Center Code",
+                         "Start Date",
+                         "End Date",
+                         "Employee Code",
+                         "Employee Name",
+                         "Approved Hours per Pay Period",
+                         "Job Code",
+                         "Pay Code",
+                         "Hours",
+                         "Expense")
+
+colnames(upload_payroll) <- upload_payroll_cols
+
 ## Reference Files --------------------------------------------------------
+
+
 
 write.table(upload_dict_dpt,
             file = paste0(dir_BISLR, "/BISLR_Department Dictionary_",
                           date_range, ".csv"),
-            row.names = F, col.names = F, sep = ",")
+            row.names = F, col.names = T, sep = ",")
 
 
 write.table(upload_map_dpt,
             file = paste0(dir_BISLR, "/BISLR_Department Map_",
-                          date_range, ".csv"),
-            row.names = F, col.names = F, sep = ",")
+                          date_range, "_check.csv"),
+            row.names = F, col.names = T, sep = ",", na = "")
 
 
-write.table(upload_dict_dpt_jc,
-            file = paste0(dir_BISLR, "/BISLR_Department Job Code Dictionary_",
+write.table(upload_dict_jc,
+            file = paste0(dir_BISLR, "/BISLR_Job Code Dictionary_",
                           date_range, ".csv"),
-            row.names = F, col.names = F, sep = ",")
+            row.names = F, col.names = T, sep = ",", na = "")
 
 
 write.table(upload_map_dpt_jc,
             file = paste0(dir_BISLR, "/BISLR_Department Job Code Map_",
                           date_range, ".csv"),
-            row.names = F, col.names = F, sep = ",")
+            row.names = F, col.names = T, sep = ",", na = "")
 
 
 if (exists("upload_dict_paycode")) {
   write.table(upload_dict_paycode,
               file = paste0(dir_BISLR, "/BISLR_Pay Code Dictionary_",
                             date_range, ".csv"),
-              row.names = F, col.names = F, sep = ",")
+              row.names = F, col.names = T, sep = ",")
 
   write.table(upload_map_paycode,
               file = paste0(dir_BISLR, "/BISLR_Pay Code Map_",
                             date_range, ".csv"),
-              row.names = F, col.names = F, sep = ",")
+              row.names = F, col.names = T, sep = ",")
 
 }
-
-write.table(upload_report_dict,
-            file = paste0(dir_BISLR, "/BISLR_Dummy Report Dictionary_",
-                          date_range, ".csv"),
-            row.names = F, col.names = F, sep = ",")
 
 if (nrow(filter_dates) > 0) {
   write.xlsx(pay_cycles_uploaded,
@@ -1353,16 +1405,16 @@ if (nrow(filter_dates) > 0) {
 # or should this simply be muted so the NULL return is not printed in
 # the console?
 sapply(
-  seq_len(length(unique(upload_payroll$Facility.Hospital.Id_Worked))),
+  seq_len(length(unique(upload_payroll$`Worked Entity Code`))),
   function(x) {
     write.table(
       filter(upload_payroll,
-             Facility.Hospital.Id_Worked ==
-               unique(upload_payroll$Facility.Hospital.Id_Worked)[x]),
+             `Worked Entity Code` ==
+               unique(upload_payroll$`Worked Entity Code`)[x]),
       file = paste0(dir_BISLR, "/",
-                    unique(upload_payroll$Facility.Hospital.Id_Worked)[x],
+                    unique(upload_payroll$`Worked Entity Code`)[x],
                     "_Payroll_", date_range, ".csv"),
-      row.names = F, col.names = F, sep = ",")
+      row.names = F, col.names = T, sep = ",")
   }
 )
 

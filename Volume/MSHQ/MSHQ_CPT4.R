@@ -96,17 +96,10 @@ upload_master <- function(){
   write.xlsx(as.data.frame(master_trend),"J:\\deans\\Presidents\\SixSigma\\MSHS Productivity\\Productivity\\Volume - Data\\MSH Data\\Charges\\Master\\master_trend.xlsx",
              row.names = F)
   upload <- MSHQ %>% ungroup() %>% select(c(1:8))
-  upload <<- upload
-  start <- as.Date(min(MSHQ$START),format = "%m/%d/%Y")
-  end <- as.Date(max(MSHQ$END),format = "%m/%d/%Y")
-  smonth <- month(start)
-  smonth <- toupper(month.abb[month(smonth)])
-  emonth <- smonth
-  sday <- format(as.Date(start, format="%Y-%m-%d"), format="%d")
-  eday <- format(as.Date(end, format="%Y-%m-%d"), format="%d")
-  syear <- substr(start, start=1, stop=4)
-  eyear <- substr(end, start=1, stop=4)
-  name <- paste0("MSHQ_CPT4_",sday,smonth,syear," to ",eday,emonth,eyear,".csv")
+  colnames(upload) <- c("Corporation Code", "Entity Code", "Cost Center Code",
+                        "Start Date", "End Date", "CPT Code", "Actual Volume", 
+                        "Budget Volume")
+  name <- paste0("MSHQ_CPT4_", as.Date(min(MSHQ$START),format = "%m/%d/%Y"), "_", as.Date(max(MSHQ$END),format = "%m/%d/%Y"),".csv")
   upload_path <- paste0("J:\\deans\\Presidents\\SixSigma\\MSHS Productivity\\Productivity\\Volume - Data\\MSH Data\\Charges\\Uploads\\",name)
   write.table(upload,upload_path,sep = ",",row.names = F,col.names = F)
 }

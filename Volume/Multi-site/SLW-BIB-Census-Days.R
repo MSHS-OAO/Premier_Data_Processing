@@ -250,10 +250,30 @@ new_start_end <- function(upload_file) {
 #                                              'NY2162', map_CC_Vol))
 data_upload_MSMW <- new_start_end(
   rbind(upload_file(site_names[4], "NY2162", map_CC_Vol),
-        upload_file(site_names[3], "NY2163", map_CC_Vol)))
+        upload_file(site_names[3], "NY2163", map_CC_Vol))) %>%
+  `colnames<-`(c("Corporation Code", "Entity Code", "Cost Center Code", 
+                 "Start Date", "End Date", "Volume Code", "Actual Volume",
+                 "Budget Volume"))
 data_upload_MSBIB <- new_start_end(
   rbind(upload_file(site_names[1], "630571", map_CC_Vol),
-        upload_file(site_names[2], "630571", map_CC_Vol)))
+        upload_file(site_names[2], "630571", map_CC_Vol))) %>%
+  `colnames<-`(c("Corporation Code", "Entity Code", "Cost Center Code", 
+                 "Start Date", "End Date", "Volume Code", "Actual Volume",
+                 "Budget Volume"))
+
+## Premier 2.0 Headers ------------------------------------------------------
+
+upload_cols <- c("Corporation Code",
+                 "Entity Code",
+                 "Cost Center Code",
+                 "Start Date",
+                 "End Date",
+                 "Volume Code",
+                 "Actual Volume",
+                 "Budget Volume")
+
+colnames(data_upload_MSMW) <- upload_cols
+colnames(data_upload_MSBIB) <- upload_cols
 
 # Export Files ------------------------------------------------------------
 write.table(data_upload_MSMW,
@@ -270,7 +290,7 @@ write.table(data_upload_MSMW,
                             format(pp.end, "%Y-%m-%d")
                           },
                           ".csv"),
-            sep = ",", row.names = F, col.names = F)
+            sep = ",", row.names = F, col.names = T)
 write.table(data_upload_MSBIB,
             file = paste0(dir, "/Upload Files", "/MSBIB_Census Days_",
                           if (exists("pp.start.new")) {
@@ -285,7 +305,7 @@ write.table(data_upload_MSBIB,
                             format(pp.end, "%Y-%m-%d")
                           },
                           ".csv"),
-            sep = ",", row.names = F, col.names = F)
+            sep = ",", row.names = F, col.names = T)
 
 # Generating Quality Chart ------------------------------------------------
 quality_chart <- function(data, site.census) {

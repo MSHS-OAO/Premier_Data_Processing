@@ -82,11 +82,15 @@ jcdict <- function(end){
   #create job code dictionary
   jcdict <- df %>%
     select(PartnerOR.Health.System.ID, Home.FacilityOR.Hospital.ID,
-           Department.IdWHERE.Worked, Job.Code, Position.Code.Description) %>%
+           Job.Code, Position.Code.Description) %>%
     distinct()
-  mon <- toupper(month.abb[month(as.Date(end,format = "%m/%d/%Y"))])
+  colnames(jcdict) <- c("Corporation Code", "Entity Code", "Job Code", "Job Code Name")
   #save new job code dictionary
-  write.table(jcdict,paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Labor - Data/MSH/Payroll/MSH Labor/Calculation Worksheets/JCDict/MSHQ_JCdict_",substr(end,4,5),mon,substr(end,7,11),".csv"),sep=",",row.names = F,col.names = F)
+  write.table(jcdict,paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
+                            "Productivity/Labor - Data/MSH/Payroll/MSH Labor/",
+                            "Calculation Worksheets/JCDict/MSHQ_JCdict_",
+                            as.Date(end, format = "%m/%d/%Y"), ".csv"),
+              sep=",", row.names = F, col.names = T)
   return(df)
 }
 #Create Department dict
@@ -98,20 +102,19 @@ depdict <- function(end){
   worked <- df %>% 
     select(PartnerOR.Health.System.ID, Facility.Hospital.Id_Worked,
            Department.IdWHERE.Worked,Department.Name.Worked.Dept)
-  col <- c("Partner","Hosp","CC","CC.Description")
+  col <- c("Corporation Code", "Entity Code", "Cost Center Code", "Cost Center Name")
   colnames(home) <- col
   colnames(worked) <- col
   #combine home and worked department dictionaries and remove duplicates
   depdict <- rbind(home,worked) %>% 
-    mutate(CC.Description = substr(CC.Description,1,50)) %>%
+    mutate(`Cost Center Name` = substr(`Cost Center Name`,1,50)) %>%
     distinct()
-  mon <- toupper(month.abb[month(as.Date(end,format = "%m/%d/%Y"))])
   #save department dictionary
   write.table(depdict,paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
                              "Productivity/Labor - Data/MSH/Payroll/MSH Labor/",
                              "Calculation Worksheets/DepDict/MSHQ_DepDict_",
-                             substr(end,4,5),mon,substr(end,7,11),".csv"),
-              sep=",",row.names = F,col.names = F)
+                             as.Date(end, format = "%m/%d/%Y"), ".csv"),
+              sep=",",row.names = F,col.names = T)
 }
 #Creates Department Mapping file for new departments
 depmap <- function(end){
@@ -126,7 +129,7 @@ depmap <- function(end){
     distinct()
   #leftjoin formatted raw file with department mapping file
   depmap <- left_join(df,depmap,by=c("Department.IdWHERE.Worked"="V3")) %>%
-    mutate(Effective = "01012010")
+    mutate(Effective = "01/01/2010")
   #place any unmapped departments in a dataframe
   newdep <- depmap %>% 
     filter(is.na(V5)) %>% 
@@ -136,11 +139,13 @@ depmap <- function(end){
   if(nrow(newdep) > 0){
     #if new departments then create mapping file
     newdep <- newdep %>% 
-      mutate(V5 = "10095")
+      mutate(V5 = "10095") %>%
+      mutate(`Expiration Date` = "", .after = Effective)
     depmap <- depmap %>% 
       filter(!is.na(V5)) %>% 
       select(Effective, PartnerOR.Health.System.ID, Facility.Hospital.Id_Worked,
-             Department.IdWHERE.Worked,V5) %>% 
+             Department.IdWHERE.Worked,V5) %>%
+      mutate(`Expiration Date` = "", .after = Effective) %>%
       distinct()
     #combine all previously mapped departments and newly mapped departments
     depmap <- rbind(depmap,newdep)
@@ -150,42 +155,48 @@ depmap <- function(end){
       filter(!is.na(V5)) %>% 
       select(Effective, PartnerOR.Health.System.ID, Facility.Hospital.Id_Worked,
              Department.IdWHERE.Worked,V5) %>% 
+      mutate(`Expiration Date` = "", .after = Effective) %>%
       distinct() 
   }
-  mon <- toupper(month.abb[month(as.Date(end,format = "%m/%d/%Y"))])
+  colnames(depmap) <- c("Effective Start Date", "Expiration Date",
+                        "Corporation Code", "Entity Code", "Cost Center Code",
+                        "Premier Standard Dept Code")
   #save new department mappign file
   write.table(depmap,paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
                             "Productivity/Labor - Data/MSH/Payroll/MSH Labor/",
                             "Calculation Worksheets/DepMap/MSHQ_DepMap_",
-                            substr(end,4,5),mon,substr(end,7,11),".csv")
-              ,sep=",",row.names = F,col.names = F)
+                            as.Date(end, format = "%m/%d/%Y"), ".csv")
+              ,sep=",",row.names = F,col.names = T)
   return(depmap)
 }
 #Create JC mapping file
 jcmap <- function(end){
   #join formatted labor file with new department mapping
   jcmap <- left_join(
-    df,depmap,by=c("Department.IdWHERE.Worked"="Department.IdWHERE.Worked")) 
+    df,depmap,by=c("Department.IdWHERE.Worked"="Cost Center Code")) 
   #check again for unmapped departments
-  newdep <- filter(jcmap,is.na(V5)) 
+  newdep <- jcmap %>%
+    filter(is.na(`Premier Standard Dept Code`))
   if(nrow(newdep) > 0){
     #if still unmapped departments, tell user the department mappings was not updated correctly
     message("Deparment mapping was not updated correctly")
   }
   #if everything is mapped then create jobcode mapping file
   jcmap <- jcmap %>% 
-    select(Effective, PartnerOR.Health.System.ID.x,
-           Facility.Hospital.Id_Worked.x,Department.IdWHERE.Worked,Job.Code,V5,
-           PREMIER.J.C) %>% 
-    mutate(Allocation = "100") %>% 
+    select(`Effective Start Date`, `Expiration Date`, `Corporation Code`,
+           `Entity Code`, Job.Code, Department.IdWHERE.Worked,
+           `Premier Standard Dept Code`, PREMIER.J.C) %>% 
+    mutate(`Allocation Percentage` = "100") %>% 
+    rename(`Entity Job Code` = Job.Code,
+           `Cost Center Code` = Department.IdWHERE.Worked,
+           `Premier Standard Job Code` = PREMIER.J.C) %>%
     distinct()
-  mon <- toupper(month.abb[month(as.Date(end,format = "%m/%d/%Y"))])
   #save jc mapping
   write.table(jcmap,paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
                            "Productivity/Labor - Data/MSH/Payroll/MSH Labor/",
                            "Calculation Worksheets/JCmap/MSHQ_JCMap_",
-                           substr(end,4,5),mon,substr(end,7,11),".csv"),
-              sep=",",row.names = F,col.names = F)
+                           as.Date(end, format = "%m/%d/%Y"), ".csv"),
+              sep=",",row.names = F,col.names = T)
 }
 #Create payroll upload
 upload <- function(start,end){
@@ -200,6 +211,12 @@ upload <- function(start,end){
              Employee.Name,Approved,Job.Code,Pay.Code) %>%
     summarise(Hours = sum(Hours,na.rm = T),
               Expense = sum(Expense,na.rm = T))
+  colnames(payroll) <- c("Corporation Code", "Home Entity Code",
+                        "Home Cost Cneter Code", "Worked Entity Code",
+                        "Worked Cost Center Code", "Start Date", "End Date",
+                        "Employee Code", "Employee Name",
+                        "Approved Hours per Pay Period", "Job Code", "Pay Code",
+                        "Hours", "Expense")
   return(payroll)
 }
 #Trend worked Hours by cost center
@@ -255,17 +272,13 @@ worktrend <- function(){
 }
 #Save payroll file
 save_payroll <- function(start,end){
-  #establish dates for saving files
-  smon <- toupper(month.abb[month(as.Date(start,format = "%m/%d/%Y"))])
-  emon <- toupper(month.abb[month(as.Date(end,format = "%m/%d/%Y"))])
-  mon <- toupper(month.abb[month(as.Date(end,format = "%m/%d/%Y"))])
   #save payroll upload
   write.table(payroll,paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
                              "Productivity/Labor - Data/MSH/Payroll/MSH Labor/",
                              "Calculation Worksheets/Uploads/MSHQ_Payroll_",
-                             substr(start,4,5),smon,substr(start,7,11)," to ",
-                             substr(end,4,5),emon,substr(end,7,11),".csv"),
-              sep=",",row.names = F,col.names = F)
+                             as.Date(start, format = "%m/%d/%Y"), "_",
+                             as.Date(end, format = "%m/%d/%Y"), ".csv"),
+              sep=",",row.names = F,col.names = T)
   #save trend data in RDS form
   saveRDS(trend,paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/",
                       "Productivity/Labor - Data/MSH/Payroll/MSH Labor/",
@@ -275,14 +288,14 @@ save_payroll <- function(start,end){
                                "MSHS Productivity/Productivity/Labor - Data/",
                                "MSH/Payroll/MSH Labor/Calculation Worksheets/",
                                "Worked Trend/CC Worked Trend_",
-                               substr(end,4,5),mon,substr(end,7,11),".csv"),
+                               as.Date(end, format = "%m/%d/%Y"),".csv"),
               sep=",",row.names = F,col.names = T)
 }
 
 ## Function Execution --------------------------------------------------------
 #Enter start and end date needed for payroll upload
-start <- "02/26/2023" 
-end <- "03/25/2023"
+start <- "06/17/2023" 
+end <- "07/29/2023"
 df <- labor(start,end)
 #If you need to update jobcode list for new jobcodes leave R and do that in excel
 #"J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Useful Tools & Templates/Job Code Mappings/MSH MSQ Position Mappings.xlsx"

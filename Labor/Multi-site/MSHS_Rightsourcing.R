@@ -61,7 +61,8 @@ pay_period_mapping <- read_xlsx(paste0(mapping_path,
                                        "MSHS_Pay_Cycle.xlsx"))
 # code conversion mapping file to convert legacy to oracle cc
 code_conversion <- read_xlsx(paste0(mapping_path,
-                                    "MSHS_Code_Conversion_Mapping.xlsx"))
+                                    "MSHS_Code_Conversion_Mapping.xlsx")) %>%
+  filter(PAYROLL != "MSMW")
 # report mapping file for QC check to identify published departments
 report_info <- read_xlsx(paste0(mapping_path,
                                 "MSHS_Reporting_Definition_Mapping.xlsx"))
@@ -132,13 +133,13 @@ rm(raw_data_prev)
 
 #user needs most recent zero and upload files
 msbib_zero_old <- recent_file(path = paste0(project_path, "MSBIB/Zero"),
-                              text_cols = rep("character", 14))
+                              text_cols = rep("character", 14), file_header = T)
 msbib_upload_old <- recent_file(path = paste0(project_path, "MSBIB/Uploads"),
-                                text_cols = rep("character", 14))
+                                text_cols = rep("character", 14), file_header = T)
 mshq_zero_old <- recent_file(path = paste0(project_path, "MSHQ/Zero"),
-                             text_cols = rep("character", 14))
+                             text_cols = rep("character", 14), file_header = T)
 mshq_upload_old <- recent_file(path = paste0(project_path, "MSHQ/Uploads"),
-                               text_cols = rep("character", 14))
+                               text_cols = rep("character", 14), file_header = T)
 
 # Constants ------------------------------------------------------
 
@@ -333,7 +334,6 @@ jc_dict_upload <- processed_data %>%
   distinct() %>%
   mutate(Job.Title = substr(Job.Title, 1, 50))
 
-
 ## Summarizing Hours and Expenses-------------------------------------------
 
 # all daily hours need to be summed up
@@ -483,6 +483,50 @@ View(high_payrate)
 
 # File Saving -------------------------------------------------------------
 
+## Premier 2.0 output format updates --------------------------------------
+
+### Jobcode Dictionary Format ---------------------------------------------
+
+jc_dict_upload <- jc_dict_upload %>%
+  mutate(Cost.Center = NULL) %>%
+  distinct() %>%
+  mutate(dahr = NA,
+         esd = NA,
+         exp_date = NA)
+
+jc_dict_upload_cols <- c("Corporation Code",
+                         "Entity Code",
+                         "Job Code",
+                         "Job Code Name",
+                         "Default Agency Hourly Rate",
+                         "Effective Start Date",
+                         "Expiration Date")
+
+colnames(jc_dict_upload) <- jc_dict_upload_cols
+
+### Upload Format ---------------------------------------------------------
+
+upload_payroll_cols <- c("Corporation Code",
+                         "Home Entity Code",
+                         "Home Cost Center Code",
+                         "Worked Entity Code",
+                         "Worked Cost Center Code",
+                         "Start Date",
+                         "End Date",
+                         "Employee Code",
+                         "Employee Name",
+                         "Approved Hours per Pay Period",
+                         "Job Code",
+                         "Pay Code",
+                         "Hours",
+                         "Expense")
+
+colnames(upload_new) <- upload_payroll_cols
+colnames(mshq_zero_new) <- upload_payroll_cols
+colnames(msbib_zero_new) <- upload_payroll_cols
+
+## Upload Files -----------------------------------------------------------
+
 if (sites == "MSHS" | sites == "MSHQ") {
   # save MSHQ upload
   write.table(filter(upload_new, hospital == "NY0014"),
@@ -490,14 +534,14 @@ if (sites == "MSHS" | sites == "MSHQ") {
                      "MSHQ/Uploads/MSHQ_Rightsourcing_",
                      min(mdy(upload_new$start_date)), "_",
                      max(mdy(upload_new$Earnings.E.D)), ".csv"),
-              row.names = F, col.names = F, sep = ",")
+              row.names = F, col.names = T, sep = ",")
 
   # save MSHQ zero file
   write.table(mshq_zero_new, paste0(project_path,
                                     "MSHQ/Zero/MSHQ_Rightsourcing Zero_",
                                     min(mdy(mshq_zero_new$date.start)), "_",
                                     max(mdy(mshq_zero_new$date.end)), ".csv"),
-              row.names = F, col.names = F, sep = ",")
+              row.names = F, col.names = T, sep = ",")
 }
 
 if (sites == "MSHS" | sites == "MSBIB") {
@@ -507,15 +551,17 @@ if (sites == "MSHS" | sites == "MSBIB") {
                      "MSBIB/Uploads/MSBIB_Rightsourcing_",
                      min(mdy(upload_new$start_date)), "_",
                      max(mdy(upload_new$Earnings.E.D)), ".csv"),
-              row.names = F, col.names = F, sep = ",")
+              row.names = F, col.names = T, sep = ",")
 
   # save MSBIB zero file
   write.table(msbib_zero_new, paste0(project_path,
                                     "MSBIB/Zero/MSBIB_Rightsourcing Zero_",
                                     min(mdy(msbib_zero_new$date.start)), "_",
                                     max(mdy(msbib_zero_new$date.end)), ".csv"),
-              row.names = F, col.names = F, sep = ",")
+              row.names = F, col.names = T, sep = ",")
 }
+
+## Jobcode Items -----------------------------------------------------------
 
 # overwrite job code list
 write.table(jobcode_list_new, paste0(project_path, "Rightsource Job Code.csv"),
@@ -526,7 +572,7 @@ write.table(jc_dict_upload, paste0(project_path, "Jobcode Dictionary/",
                                    "MSHS_Jobcode Dictionary_",
                                    max(mdy(upload_new$Earnings.E.D)),
                                    ".csv"),
-            row.names = F, col.names = F, sep = ",")
+            row.names = F, col.names = T, sep = ",", na = "")
 
 # save unmapped cost center list
 write.table(cc_map_fail, paste0(project_path, "Failed Cost Center Mappings/",
