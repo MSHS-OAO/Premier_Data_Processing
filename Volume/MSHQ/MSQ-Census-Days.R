@@ -76,7 +76,7 @@ save <- function(){
                  min(as.Date(export$`Start Date`, format = "%m/%d/%Y")),"_",
                  max(as.Date(export$`End Date`, format = "%m/%d/%Y")),".csv")
   #save export in MSQ uploads folder
-  write.table(export,file=name,sep=",",col.names=F,row.names=F)
+  write.table(export,file=name,sep=",",col.names=T,row.names=F)
 }
 
 
