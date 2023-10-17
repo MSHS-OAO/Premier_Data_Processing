@@ -27,6 +27,9 @@ upload <- function(){
     summarise(Census = sum(`Census Days`,na.rm = T)) %>%
     ungroup() %>%
     mutate(Budget = "0")
+  colnames(export) <- c("Corporation Code", "Entity Code", "Cost Center Code",
+                        "Start Date", "End Date", "Volume Code", "Actual Code",
+                        "Budget Volume")
   export <<- export
 }
 
@@ -47,12 +50,15 @@ trend <- function(){
     #pivot old trend to long to prepare for appending current export data
     trend_old <- trend_old %>% 
       pivot_longer(cols = 4:ncol(trend_old),names_to = "End",values_to = "Census")
+    colnames(trend_old) <- c("DepartmentName", "CC", "VolID", "End Date", "Actual Code")
     #prepare export data for appending to old trend
     trend_new <- volumeID %>% 
-      left_join(export,by = c("CC", "VolID")) %>%
-      select(DepartmentName,CC,VolID,End,Census) 
-    trend_new <- rbind(trend_old,trend_new) %>%
-      pivot_wider(id_cols = c(DepartmentName,CC,VolID),names_from = End,values_from = Census)
+      left_join(export,by = c("CC" = "Cost Center Code",
+                              "VolID" = "Volume Code")) %>%
+      select(DepartmentName, `CC`, `VolID`, `End Date`,
+             `Actual Code`) 
+    trend_new <- do.call("rbind", list(trend_old, trend_new)) %>%
+      pivot_wider(id_cols = c(DepartmentName,CC,VolID),names_from = `End Date`,values_from = `Actual Code`)
     trend_new <<- trend_new
   } else {
     stop("Raw file overlaps with master")
@@ -63,19 +69,14 @@ save <- function(){
   saveRDS(master_new,"J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSQ Data/Patient Days/Calculation Files/master/master.rds")
   write.table(trend_new,"J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSQ Data/Patient Days/Calculation Files/trend/Census_trend.csv",
               sep = ",", row.names = F)
-  #prepare variables for export file name
-  MinDate <- as.Date(min(export$Start),format = "%m/%d/%Y")
-  MaxDate <- as.Date(max(export$End),format = "%m/%d/%Y")
-  smonth <- toupper(month.abb[month(MinDate)])
-  emonth <- toupper(month.abb[month(MaxDate)])
-  sday <- format(as.Date(MinDate, format="%Y-%m-%d"), format="%d")
-  eday <- format(as.Date(MaxDate, format="%Y-%m-%d"), format="%d")
-  syear <- substr(MinDate, start=1, stop=4)
-  eyear <- substr(MaxDate, start=1, stop=4)
   #create file name
-  name <- paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSQ Data/Patient Days/Calculation Files/Uploads/","MSQ_Census Days_",sday,smonth,syear," to ",eday,emonth,eyear,".csv")
+  name <- paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/",
+                 "Volume - Data/MSQ Data/Patient Days/Calculation Files/",
+                 "Uploads/MSQ_Census Days_",
+                 min(as.Date(export$`Start Date`, format = "%m/%d/%Y")),"_",
+                 max(as.Date(export$`End Date`, format = "%m/%d/%Y")),".csv")
   #save export in MSQ uploads folder
-  write.table(export,file=name,sep=",",col.names=F,row.names=F)
+  write.table(export,file=name,sep=",",col.names=T,row.names=F)
 }
 
 

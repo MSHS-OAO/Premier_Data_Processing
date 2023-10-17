@@ -11,6 +11,7 @@ rev_map <- read_excel("J:\\deans\\Presidents\\SixSigma\\MSHS Productivity\\Produ
   distinct()
 #Bring in CPT reference table
 #For months: January,April,July,October there is a new cpt_ref to download
+# https://communities.premierinc.com/display/OUG/Data+Management%3A+Productivity+%28Legacy%29+Topics
 cpt_ref <- read_excel("J:\\deans\\Presidents\\SixSigma\\MSHS Productivity\\Productivity\\Volume - Data\\MSH Data\\RIS\\Mapping\\CPT_Ref.xlsx") %>%
   select(1,2,3,6,11,12)
 
@@ -25,11 +26,12 @@ charges <- function(MSH,MSQ){
   MSQ <- MSQ %>% 
     filter(!is.na(SINAI.CODE))
   #combine MSH and MSQ charge details
-  MSHQ <- rbind(MSH,MSQ)
+  MSHQ <- rbind(MSH,MSQ) %>%
+    mutate(REV.DEP = as.character(REV.DEP))
   #remove blank CPT lines
   MSHQ <- filter(MSHQ,!is.na(CPT))
   #establish what quarter of the year it is
-  if(max(MSHQ$MONTH) < 4){
+  if(max(as.numeric(MSHQ$MONTH)) < 4){
     Q <<- 1
   } else if(max(MSHQ$MONTH) < 7){
     Q <<- 2
@@ -94,32 +96,26 @@ upload_master <- function(){
   write.xlsx(as.data.frame(master_trend),"J:\\deans\\Presidents\\SixSigma\\MSHS Productivity\\Productivity\\Volume - Data\\MSH Data\\Charges\\Master\\master_trend.xlsx",
              row.names = F)
   upload <- MSHQ %>% ungroup() %>% select(c(1:8))
-  upload <<- upload
-  start <- as.Date(min(MSHQ$START),format = "%m/%d/%Y")
-  end <- as.Date(max(MSHQ$END),format = "%m/%d/%Y")
-  smonth <- month(start)
-  smonth <- toupper(month.abb[month(smonth)])
-  emonth <- smonth
-  sday <- format(as.Date(start, format="%Y-%m-%d"), format="%d")
-  eday <- format(as.Date(end, format="%Y-%m-%d"), format="%d")
-  syear <- substr(start, start=1, stop=4)
-  eyear <- substr(end, start=1, stop=4)
-  name <- paste0("MSHQ_CPT4_",sday,smonth,syear," to ",eday,emonth,eyear,".csv")
+  colnames(upload) <- c("Corporation Code", "Entity Code", "Cost Center Code",
+                        "Start Date", "End Date", "CPT Code", "Actual Volume", 
+                        "Budget Volume")
+  name <- paste0("MSHQ_CPT4_", as.Date(min(MSHQ$START),format = "%m/%d/%Y"), "_", as.Date(max(MSHQ$END),format = "%m/%d/%Y"),".csv")
   upload_path <- paste0("J:\\deans\\Presidents\\SixSigma\\MSHS Productivity\\Productivity\\Volume - Data\\MSH Data\\Charges\\Uploads\\",name)
   write.table(upload,upload_path,sep = ",",row.names = F,col.names = F)
 }
 
-#Bring in all sheets in charges file
+# choose path for this months data
 path <- file.choose()
 sheetnames <- excel_sheets(path)
-mylist <- lapply(excel_sheets(path), read_excel, path = path, col_names = F)
+mylist <- lapply(excel_sheets(path), read_excel, path = path, col_names = T)
 names(mylist) <- sheetnames
+# print sheets in selected file
 names(mylist)
 
 #Enter Year of data
-Year <- "2022"
-#Execute functions
-MSHQ <- charges(MSH = mylist[[4]],MSQ = mylist[[3]])
+Year <- "2023"
+# tell charges function which sheet is MSH and which is MSQ
+MSHQ <- charges(MSH = mylist[[1]],MSQ = mylist[[2]])
 #Create master and master trend
 master()
 #Review master trend

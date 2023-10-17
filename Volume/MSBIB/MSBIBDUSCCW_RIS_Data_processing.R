@@ -216,5 +216,16 @@ charge_summary <- charge_summary %>%
 vol_folder <- "J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSBI Data/RIS Data"
 
 
-write.table(charge_summary, file = paste0(vol_folder,"/RIS upload.csv"), row.names = F, col.names = F, sep = ",")
+upload_cols <- c("Corporation Code",
+                 "Entity Code",
+                 "Cost Center Code",
+                 "Start Date",
+                 "End Date",
+                 "CPT Code",
+                 "Actual Volume",
+                 "Budget Volume")
+
+colnames(charge_summary) <- upload_cols
+
+write.table(charge_summary, file = paste0(vol_folder,"/RIS upload.csv"), row.names = F, col.names = T, sep = ",")
 write.csv(all_result_long, file = paste0(vol_folder,"/RIS processed data.csv"), row.names = F, col.names = T, sep = ",")

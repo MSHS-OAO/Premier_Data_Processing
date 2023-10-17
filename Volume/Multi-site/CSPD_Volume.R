@@ -89,10 +89,13 @@ CSPDdf1 <- CSPDdf %>%
   filter(`Start Date` >= start_date, `End Date` <= end_date) %>%
   left_join(volume_mapping,
             by = c("Department ID" = "Old Cost Center")) %>%
-  select(Health_System_ID, `Facility or Hospital ID`, `Department ID`,
+  select(Health_System_ID, `Premier Site`, `Cost Center`,
          `Start Date`, `End Date`, `Vol ID`, Volume, Budget) %>%
   mutate(`Start Date` = as.character(`Start Date`, format = "%m/%d/%Y"),
-         `End Date` = as.character(`End Date`, format = "%m/%d/%Y"))
+         `End Date` = as.character(`End Date`, format = "%m/%d/%Y")) %>%
+  `colnames<-`(c("Corporation Code", "Entity Code", "Cost Center Code", 
+                 "Start Date", "End Date", "Volume Code", "Actual Volume",
+                 "Budget Volume"))
 
 #DATA REPOSITORY---------------------------------------------------------
 #1 read master
@@ -104,16 +107,16 @@ new_master <- rbind(old_master, CSPDdf1)
 
 #3 validation
 validation <- CSPDdf1 %>%
-  pivot_wider(id_cols = `Department ID`, names_from = `End Date`,
+  pivot_wider(id_cols = `Cost Center`, names_from = `End Date`,
               values_from = Volume)
 
 #4 Validation and upload
 write.table(validation, paste0(dir, "/CSPD Validation.csv"),
             row.names = F,
-            col.names = F,
+            col.names = T,
             sep = ",")
 
 write.table(CSPDdf1, paste0(dir, "/Multisite_CSPD Volumes_.csv"),
             row.names = F,
-            col.names = F,
+            col.names = T,
             sep = ",")

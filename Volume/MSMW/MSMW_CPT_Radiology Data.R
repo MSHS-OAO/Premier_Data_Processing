@@ -4,8 +4,8 @@ library(readxl)
 library(xlsx)
 
 # Constants ---------------------------------------------------------------
-start_date <- as.Date("2022-07-03")
-end_date <- as.Date("2022-07-30")
+start_date <- as.Date("2022-08-28")
+end_date <- as.Date("2022-09-24")
 #Defining paths
 dir <- paste0("J:/deans/Presidents/SixSigma/MSHS Productivity",
               "/Productivity/Volume - Data")
@@ -155,6 +155,9 @@ quality_chart <- rad_data %>%
               values_fn = sum,
               names_from = "Pay Period End Date") %>%
   arrange(Org, `Cost Center`)
+
+# Creating RDS ------------------------------------------------------------
+
 
 # Exporting Files ---------------------------------------------------------
 write.table(upload_file,
