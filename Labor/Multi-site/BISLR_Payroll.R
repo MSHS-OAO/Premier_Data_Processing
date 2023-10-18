@@ -30,7 +30,7 @@ showDialog(
 
 # Constants ---------------------------------------------------------------
 new_dpt_map <- 10095
-map_effective_date_dpt <- as.Date("2010-01-01")
+map_effective_date_dpt <- as.Date("2016-01-01")
 corp_code <- 729805
 jc_alloc_pct <- 100
 
@@ -120,14 +120,6 @@ dict_premier_dpt <- read.csv(paste0(dir_universal,
                                            "Cost.Center",
                                            "Cost.Center.Description"),
                              sep = ",")
-map_premier_dpt <- read.csv(paste0(dir_universal, "/Premier/2.0 Mapping Exports",
-                                   "/CostCenterMapping.csv"),
-                            col.names = c("Effective.Start.Date", 
-                                          "Effective.End.Date",
-                                          "Corporation.Code",
-                                          "Site", "Cost.Center",
-                                          "Cost.Center.Map"),
-                            sep = ",")
 dict_premier_jobcode <- read.csv(paste0(dir_universal,
                                         "/Premier/2.0 Dictionary Exports",
                                         "/JobCodeDictionary.csv"),
@@ -143,7 +135,9 @@ dict_premier_report <- read.csv(paste0(dir_universal,
                                        "/DepartmentDef.csv"),
                                 col.names = c("Corporation.Code", "Site",
                                               "Report.ID", "Cost.Center", 
-                                              "Effective.Date"),
+                                              "Effective.Date", 
+                                              "Expiration Date",
+                                              "Delete Cost Center Association"),
                                 sep = ",")
 
 dict_premier_paycode <- read.csv(paste0(dir_universal,
@@ -178,30 +172,12 @@ dict_premier_jobcode <- dict_premier_jobcode %>%
   select(1:4) %>%
   mutate(JC_in_Dict = 1)
 
-reports_dept <- str_split(dict_premier_report$Cost.Center,
-  pattern = ":", simplify = T) %>%
-  as.data.frame()
-report_list <- lapply(
-  seq_len(nrow(reports_dept)),
-  function(x) {
-    pivot_longer(reports_dept[x, ],
-                 cols = everything())
-  }
-)
-report_list <- lapply(seq_len(length(report_list)),
-                      function(x) subset(report_list[[x]], value != ""))
-report_list <- lapply(
-  seq_len(length(report_list)),
-  function(x) {
-    mutate(report_list[[x]],
-      Site = dict_premier_report$Site[x],
-      Report.ID = dict_premier_report$Report.ID[x],
-      Effective.Date = dict_premier_report$Effective.Date[x])
-  }
-)
-report_list <- do.call(rbind, report_list) %>%
-  rename(Cost.Center = value) %>%
-  select(-name)
+report_list <- dict_premier_report %>%
+  filter(Report.ID != "--UCCD--") %>%
+  select(Cost.Center, Site, Report.ID) %>%
+  distinct()
+# In the future, there's potential for a cost center to show up in multiple
+# reports if we begin moving cost centers across reports.
 
 dist_dates <- map_uni_paycycles %>%
   select(END.DATE, PREMIER.DISTRIBUTION) %>%
@@ -715,15 +691,15 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
     bislr_payroll %>%
       filter(is.na(WRKJC_in_Dict), PROVIDER == 0) %>%
       select(PartnerOR.Health.System.ID, Facility.Hospital.Id_Worked,
-             Job.Code_up, Position.Code.Description) %>%
-      setNames(colnames(dict_premier_jobcode %>%
-                          select(-JC_in_Dict))),
+             Job.Code_up, Position.Code.Description, DPT.WRKD) %>%
+      setNames(c(colnames(dict_premier_jobcode %>%
+                          select(-JC_in_Dict)), "Cost.Center")),
     bislr_payroll %>%
       filter(is.na(HOMEJC_in_Dict), PROVIDER == 0) %>%
       select(PartnerOR.Health.System.ID, Home.FacilityOR.Hospital.ID,
-             DPT.HOME, Job.Code_up, Position.Code.Description) %>%
-      setNames(colnames(dict_premier_jobcode %>%
-                          select(-JC_in_Dict)))) %>%
+             Job.Code_up, Position.Code.Description, DPT.HOME) %>%
+      setNames(c(colnames(dict_premier_jobcode %>%
+                            select(-JC_in_Dict)), "Cost.Center"))) %>%
     # for the future, we might look out for handling descriptions
     # that have special characters, such as & (ampersand)
     # mutate(Job.Code.Description = case_when(
@@ -739,14 +715,6 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
   row_count <- nrow(upload_dict_dpt_jc)
   upload_map_dpt_jc <- upload_dict_dpt_jc %>%
     select(-Job.Code.Description) %>%
-    # the map_premier_dpt Cost.Center column is character type
-    mutate(Cost.Center = as.character(Cost.Center)) %>%
-    left_join(map_premier_dpt %>%
-                select(-Effective.Start.Date, -Effective.End.Date)) %>%
-    mutate(Cost.Center.Map = as.double(Cost.Center.Map)) %>%
-    mutate(Cost.Center.Map = case_when(
-      is.na(Cost.Center.Map) ~ new_dpt_map,
-      TRUE ~ Cost.Center.Map)) %>%
     left_join(map_uni_jobcodes %>%
                 filter(PAYROLL == "BISLR") %>%
                 select(J.C, PREMIER.J.C) %>%
@@ -1152,8 +1120,9 @@ employee_reg_hours_qc_detail <- bislr_payroll %>%
             by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
   left_join(filter(select(map_uni_reports, DEFINITION.CODE, DEFINITION.NAME,
                           ORACLE.COST.CENTER, DEPARTMENT.BREAKDOWN, CLOSED),
-                   is.na(CLOSED)),
-            c("DPT.WRKD" = "ORACLE.COST.CENTER")) %>%
+                   is.na(CLOSED),
+                   DEPARTMENT.BREAKDOWN == 1),
+                   c("DPT.WRKD" = "ORACLE.COST.CENTER")) %>%
   inner_join(employee_reg_hours_qc) %>%
   arrange(-pp_overage_coeff, Employee.Name, End.Date, Start.Date,
           DPT.WRKD, Pay.Code)
@@ -1195,7 +1164,8 @@ employee_tot_hours_qc_detail <- bislr_payroll %>%
             by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
   left_join(filter(select(map_uni_reports, DEFINITION.CODE, DEFINITION.NAME,
                           ORACLE.COST.CENTER, DEPARTMENT.BREAKDOWN, CLOSED),
-                   is.na(CLOSED)),
+                   is.na(CLOSED),
+                   DEPARTMENT.BREAKDOWN == 1),
             c("DPT.WRKD" = "ORACLE.COST.CENTER")) %>%
   inner_join(employee_tot_hours_qc) %>%
   arrange(-pp_overage_coeff, Employee.Name, End.Date, Start.Date,
@@ -1286,9 +1256,11 @@ colnames(upload_dict_jc) <- upload_dict_jc_cols
 
 
 upload_map_dpt_jc <- upload_map_dpt_jc %>%
-  mutate(exp_date = NA) %>%
+  mutate(exp_date = NA,
+         prem_std_dpt = NA) %>%
   relocate(exp_date, .after = effective_date) %>%
-  relocate(Job.Code, .before = Cost.Center)
+  relocate(Job.Code, .before = Cost.Center) %>%
+  relocate(prem_std_dpt, .after = Cost.Center)
 
 upload_map_dpt_jc_cols <- c("Effective Start Date",
                             "Expiration Date",
