@@ -91,7 +91,7 @@ upload <- function(){
     mutate(Start.Date = format(Start.Date,format = "%m/%d/%Y"),
            End.Date = format(End.Date,format = "%m/%d/%Y"))
   colnames(upload) <- c("Corporation Code", "Entity Code", "Cost Center Code",
-                        "Start Date", "End Date", "Volume Code", "Actual Code",
+                        "Start Date", "End Date", "Volume Code", "Actual Volume",
                         "Budget Volume")
   return(upload)
 }

@@ -28,7 +28,7 @@ upload <- function(){
     ungroup() %>%
     mutate(Budget = "0")
   colnames(export) <- c("Corporation Code", "Entity Code", "Cost Center Code",
-                        "Start Date", "End Date", "Volume Code", "Actual Code",
+                        "Start Date", "End Date", "Volume Code", "Actual Volume",
                         "Budget Volume")
   export <<- export
 }
