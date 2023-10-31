@@ -493,7 +493,7 @@ View(high_payrate)
 ### Jobcode Dictionary Format ---------------------------------------------
 
 jc_dict_upload <- jc_dict_upload %>%
-  mutate(Cost.Center = NULL) %>%
+  mutate(wrkd_dept_oracle = NULL) %>%
   distinct() %>%
   mutate(dahr = NA,
          esd = NA,
