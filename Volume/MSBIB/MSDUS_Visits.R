@@ -6,11 +6,31 @@ library(dplyr)
 library(lubridate)
 library(ggplot2)
 library(writexl)
+
+library(rstudioapi)
+library(DBI)
+library(odbc)
+library(dplyr)
+library(dbplyr)
+library(glue)
+
+
+# WORKBENCH ---------------------------------------------------------------
+
+showDialog(
+  title = "Workbench Reminder",
+  message = paste0("Those script must be run on Workbench.  ",
+                   "If running from desktop, please stop and ",
+                   "open on Workbench.")
+)
+
 # Assigning Directory(ies) ------------------------------------------------
 
-## Shared Drive Path (Generic) --------------------------------------------
-j_drive <- paste0("//researchsan02b/shr2/deans/Presidents")
+## Shared Drive Path --------------------------------------------
+j_drive <- paste0("/SharedDrive/deans/Presidents/")
 
+dir_universal <- paste0(j_drive, "SixSigma/MSHS Productivity",
+                        "/Productivity/Universal Data/")
 
 # Data References ---------------------------------------------------------
 
@@ -31,6 +51,61 @@ dict_pay_cycles <- dict_pay_cycles %>%
          START.DATE = format(as.Date(START.DATE), "%m/%d/%Y"),
          END.DATE = format(as.Date(END.DATE), "%m/%d/%Y"))
 
+dict_PC_raw <- read.xlsx(paste0(dir_universal, "/Mapping/MSHS_Pay_Cycle.xlsx"),
+                         sheetIndex = 1)
+
+# there's opportunity to clean up the date import to only pull the file
+# in once
+
+### Date Selection -------------------------------------------------------
+# select the date range to pull
+
+#Table of distribution dates earlier than the current date
+dist_dates <- dict_PC_raw %>%
+  select(END.DATE, PREMIER.DISTRIBUTION) %>%
+  distinct() %>%
+  # drop_na() %>%
+  arrange(END.DATE) %>%
+  filter(PREMIER.DISTRIBUTION %in% c(TRUE, 1),
+         END.DATE < as.POSIXct(Sys.Date()))
+
+
+#Selecting the most recent distribution date
+pp.end <- max(dist_dates$END.DATE)
+pp.start <- dist_dates %>%
+  arrange(END.DATE) %>%
+  select(END.DATE)
+pp.start <- pp.start$END.DATE[nrow(pp.start) - 1] + lubridate::days(1)
+
+#Confirming date range
+answer <- showQuestion(
+  title = "Date Range",
+  message = paste0(
+    "Date range will be: ", pp.start, " to ", pp.end, ".        ",
+    "If this is correct, press OK.  ",
+    "If this is not correct, press Cancel and ",
+    "you will be prompted to provide the correct date range."))
+
+if (answer == FALSE) {
+  pp.start <- as.Date(
+    rstudioapi::showPrompt(
+      title = "pp.start input",
+      message = paste0("What is the date you'd like the data to start from?\r",
+                       "\rPlease enter the date in YYYY-MM-DD format")))
+  pp.end <- as.Date(
+    rstudioapi::showPrompt(
+      title = "pp.end input",
+      message = paste0("What is the date you'd like the data to go up to?\r",
+                       "\rPlease enter the date in YYYY-MM-DD format")))
+}
+
+if (pp.start > pp.end) {
+  showDialog(
+    title = "date errors",
+    message = paste0("The start date you entered is after the end date.  ",
+                     "You can expect errors to arise later in the script.")
+  )
+}
 
 ## Dictionary ------------------------------------------------------------
 
@@ -48,6 +123,7 @@ dict_epic <- read_xlsx(
 dict_epic_short <- dict_epic %>%
   select(`Epic Department Name`, `Volume ID`, `Cost Center`, `volume ratio`)
 
+epic_dpts <- unique(dict_epic_short$`Epic Department Name`)
 
 ### rehab offsite ---------------------------------------------------------
 
@@ -60,118 +136,46 @@ dict_rehab_docs <- read_xlsx(
 
 # Data Import -------------------------------------------------------------
 
-path_data_epic <- choose.files(
-  default = paste0(j_drive,
-                   "/SixSigma/MSHS Productivity/Productivity",
-                   "/Volume - Data/MSBI Data/Union Square",
-                   "/Source Data"),
-  caption = "Select Epic file",
-  multi = F
-)
+# set up connection to schema
+con <- dbConnect(odbc(), "OAO Cloud DB Armando")
 
-
-## Skip rows and import ---------------------------------------------------
-
-# The data is not provided in a consistent way.  The number of extra rows
-# at the top of the file varies.
-
-skip_ct <- 0
-d_check <- 1
-skip_ct_max <- 5
-
-while (d_check != 0 & skip_ct < skip_ct_max) {
-  col_check <- read_xlsx(path_data_epic, sheet = 1, skip = skip_ct, n_max = 10)
-  
-  if ("Department" %in% colnames(col_check) |
-      "DEPARTMENT_NAME" %in% colnames(col_check)) {
-    data_raw <- read_xlsx(path_data_epic, sheet = 1, skip = skip_ct)
-    d_check <- 0
-    rm(col_check)
-  } else {
-    skip_ct <- skip_ct + 1
-  }
-}
-# alternatively, to help with date handling, could bring all columns
-# in as character strings
-
-
-if (skip_ct == skip_ct_max) {
-  stop(paste0("The raw data is not in the appropriate format.\n",
-              "Identify the appropriate file and restart")
-  )
-}
-
-# if the atypical file format has been provided, the column names
-# need to be changed in order for the rest of the script to work
-if ("DEPARTMENT_NAME" %in% colnames(data_raw)) {
-  data_raw <- data_raw %>%
-    rename(Department = DEPARTMENT_NAME,
-           Provider = PROV_NAME,
-           `Appt Time` = APPT_TIME)
-  
-  # if there are NA dates then Date of Service can be used instead
-  data_raw <- data_raw %>%
-    mutate(`Appt Time` = case_when(
-      is.na(`Appt Time`) ~ DATE_OF_SERVICE,
-      TRUE ~ `Appt Time`
-    ))
-}
-
+data_raw <- tbl(con,
+                in_schema("VILLEA04", "AMBULATORY_ACCESS_VIEW")) %>%
+  filter(DEPARTMENT %in% epic_dpts,
+         APPT_DATE_YEAR >= as.Date(pp.start),
+         APPT_DATE_YEAR <= as.Date(pp.end)) %>%
+  select(DEPARTMENT, DEPARTMENT_ID, APPT_DATE_YEAR, APPT_STATUS, PROVIDER) %>%
+  filter(APPT_STATUS %in% c("Completed", "Arrived",
+                            "Checked in", "Checked out")) %>%
+  show_query() %>%
+  collect()
 
 # Data Pre-processing -----------------------------------------------------
 
-data_epic <- data_raw %>%
-  select(Department, Provider, `Appt Time`) %>%
-  filter(! is.na(`Appt Time`))
-
-
 ## date formatting, check, pay periods -------------------------------------
 
-data_epic <- data_epic %>%
-  mutate(`Appt Date` = stringr::str_sub(
-    `Appt Time`, 1, nchar("00/00/0000"))
-  )
-
-if ("POSIXct" %in% class(data_epic$`Appt Time`)) {
-  data_epic <- data_epic %>%
-    mutate(`Appt Date` = format(lubridate::ymd(`Appt Date`), "%m/%d/%Y"))
-}
-# alternatively, could bring all columns of raw data as character
-
-data_date_min <- min(as.Date(data_epic$`Appt Date`, "%m/%d/%Y"))
-data_date_max <- max(as.Date(data_epic$`Appt Date`, "%m/%d/%Y"))
-
-date_ok <- winDialog(type = c("yesno"),
-                     message = paste0("The date range for the data is:\n",
-                                      data_date_min, "\n",
-                                      "to\n",
-                                      data_date_max, "\n\n",
-                                      "Is this correct?"))
-
-if (date_ok == "NO") {
-  stop(paste0("Please get the data for the correct date range.\n",
-              "Then restart running this script.")
-  )
-}
-
-data_epic <- data_epic %>%
-  left_join(dict_pay_cycles, by = c("Appt Date" = "DATE"))
+data_epic <- data_raw %>%
+  left_join(dict_pay_cycles %>%
+              mutate(
+                DATE = as.Date(DATE, format = "%m/%d/%Y")
+              ),
+            by = c("APPT_DATE_YEAR" = "DATE"))
 
 
 ## Join Dept & Vol ID -----------------------------------------------------
 
 data_epic_row <- nrow(data_epic)
 data_epic <- data_epic %>%
-  left_join(dict_epic_short, c("Department" = "Epic Department Name"))
+  left_join(dict_epic_short, by = c("DEPARTMENT" = "Epic Department Name"))
 data_epic_row2 <- nrow(data_epic)
 
-winDialog(type = "ok",
-          message = paste0("The number of rows in data increased\n",
-                           "when joining Volume IDs.\n\n",
-                           "This can be expected because of special\n",
-                           "rolled-up volumes.\n\n",
-                           "The row increase was:\n",
-                           data_epic_row2 - data_epic_row, "\n\n",
+showDialog(title = "Row Increase",
+          message = paste0("The number of rows in data increased ",
+                           "when joining Volume IDs.  ",
+                           "This can be expected because of roll-up volumes ",
+                           "that were created for a few departments.  ",
+                           "The row increase was: ",
+                           data_epic_row2 - data_epic_row, ".  ",
                            "Press OK to continue."))
 
 
@@ -182,8 +186,8 @@ winDialog(type = "ok",
 data_epic <- data_epic %>%
   rename(volume = `volume ratio`) %>%
   mutate(volume = case_when(
-    Department %in% dict_rehab_docs$`Epic Department Name` &
-      !(Provider %in% dict_rehab_docs$Provider) ~ 0,
+    DEPARTMENT %in% dict_rehab_docs$`Epic Department Name` &
+      !(PROVIDER %in% dict_rehab_docs$Provider) ~ 0,
     TRUE ~ volume
   ))
 
@@ -222,11 +226,13 @@ zero_depts <- dict_epic_short %>%
 
 # would be better to display Cost Center name and the volume IDs
 if (length(unique(zero_depts$`Epic Department Name`)) > 0) {
-  winDialog(message = paste0(
-    "These Departments had a pay period with 0 volume:\r\r",
+  showDialog(
+    title = "Zero Depts",
+    message = paste0(
+    "The following Depts had a pay period with 0 volume:  ",
     paste(sort(unique(zero_depts$`Epic Department Name`)),
-          collapse = "\n\n")),
-    type = "ok")
+          collapse = " | "))
+    )
 }
 
 
@@ -245,34 +251,7 @@ upload_file <- summary_upload %>%
 
 # Quality Checks ----------------------------------------------------------
 
-## new departments --------------------------------------------------------
-
-new_dept <- data_epic %>%
-  filter(is.na(volume)) %>%
-  select(Department) %>%
-  unique()
-
-if (length(new_dept$Department) > 0) {
-  new_dept_stop <- winDialog(
-    message = paste0("These Departments are not in the dictionary:\r\r",
-                     paste(unique(new_dept$Department), collapse = "\n\n"),
-                     "\r\r",
-                     "Press \"OK\" to continue\r",
-                     "Press \"Cancel\" to stop running this script"),
-    type = "okcancel")
-  
-  if (new_dept_stop == "CANCEL") {
-    stop(paste0("Incorporate the new depts into the dictionary as desired.\n",
-                "Restart the script after the dictionary is as desired.")
-    )
-  }
-  
-} else {
-  new_dept_stop <- "OK"
-  message("No new departments identified.")
-}
-
-# Visualization -----------------------------------------------------------
+## Visualization -----------------------------------------------------------
 #consolidate plot groups into the MSUS Epic Dict
 #add note column to the upload file so it can bind to trend data file
 new_trend_data <- upload_file %>%
@@ -302,7 +281,7 @@ updated_trend_data <- rbind(old_trend_data, new_trend_data) %>%
 write_xlsx(updated_trend_data, paste0(j_drive, "/SixSigma/MSHS Productivity",
                                       "/Productivity/Volume - Data/MSBI Data",
                                       "/Union Square/Calculation Worksheets",
-                                      "/MSDUS_trend_data.xlsx"))
+                                      "/MSDUS_trend_data2.xlsx"))
 
 #format dict_epic for a left join
 trend_groups <- dict_epic %>%
@@ -324,19 +303,19 @@ plot_trend_data <- updated_trend_data %>%
 #creating multiple-bar plots (x = volume ID, y = volume, and
 #each bar indicates the volume on a specific end date)
 #each plot is depicts sets of volume ids with similar visit counts
-for (i in c("low", "med", "high")){
+for (i in c("low", "med", "high")) {
   plot <- ggplot(data = filter(plot_trend_data, `Plot Group` == i),
          mapping = aes(x = `NEW.NAME`, y = `visits`, fill = `END.DATE`)) +
     geom_bar(position = "dodge2", stat = "identity") +
-    coord_flip() + 
-    labs(y = "Visits per Pay Period", x = "Cost Center & Volume ID") + 
+    coord_flip() +
+    labs(y = "Visits per Pay Period", x = "Cost Center & Volume ID") +
     ggtitle(paste0("MSDUS Visit Trends: ", i, " volume group"))
   print(plot)
 }
 # File Saving -------------------------------------------------------------
 
-date_min_char <- format(as.Date(data_date_min, "%m/%d/%Y"), "%Y-%m-%d")
-date_max_char <- format(as.Date(data_date_max, "%m/%d/%Y"), "%Y-%m-%d")
+date_min_char <- format(pp.start, "%Y-%m-%d")
+date_max_char <- format(pp.end, "%Y-%m-%d")
 
 file_name_premier <-
   paste0("MSDUS_Department Volumes_", date_min_char, "_to_", date_max_char,
@@ -359,14 +338,14 @@ colnames(upload_file) <- upload_cols
 
 write.table(
   upload_file,
-  file = paste0(path_folder_premier_export, "\\", file_name_premier),
-  row.names = F,
-  col.names = T,
+  file = paste0(path_folder_premier_export, "/", file_name_premier),
+  row.names = FALSE,
+  col.names = TRUE,
   sep = ","
 )
 
 message(paste0("\nUpload file written to:\n",
-               paste0(path_folder_premier_export, "\\", file_name_premier,
+               paste0(path_folder_premier_export, "/", file_name_premier,
                       "\n")))
 
 # Script End --------------------------------------------------------------
