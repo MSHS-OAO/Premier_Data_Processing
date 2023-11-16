@@ -281,7 +281,7 @@ updated_trend_data <- rbind(old_trend_data, new_trend_data) %>%
 write_xlsx(updated_trend_data, paste0(j_drive, "/SixSigma/MSHS Productivity",
                                       "/Productivity/Volume - Data/MSBI Data",
                                       "/Union Square/Calculation Worksheets",
-                                      "/MSDUS_trend_data2.xlsx"))
+                                      "/MSDUS_trend_data.xlsx"))
 
 #format dict_epic for a left join
 trend_groups <- dict_epic %>%
