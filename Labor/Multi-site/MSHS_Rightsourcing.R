@@ -222,7 +222,10 @@ mshq_zero_new <- mshq_upload_old %>%
 
 # apply employee removal filter
 processed_data <- raw_data %>%
-  filter(!Worker.Name %in% employee_removal)
+  filter(!Worker.Name %in% employee_removal) %>%
+  mutate(Worker.Name = gsub("\'", "", Worker.Name),
+         Worker.Name = gsub("\\(Mt Sinai\\)", "", Worker.Name),
+         Worker.Name = gsub(" ,", ",", Worker.Name))
 
 # filter raw data on date range needed for upload
 processed_data <- processed_data %>%
@@ -386,8 +389,10 @@ upload_new <- rolled_up %>%
   mutate(start_date = format(mdy(Earnings.E.D) - 6, format = "%m/%d/%Y"),
          .before = Earnings.E.D) %>%
   mutate(employee_id = paste0(
-    substr(trimws(sub(",.*", "", Worker.Name)), 1, 12),
-    substr(gsub("\\..*", "", week_hours), 1, 3)),
+    substr(trimws(sub(",.*", "", Worker.Name)), 1, 6),
+    substr(gsub("\\..*", "", week_spend), 1, 3),
+    substr(wrkd_dept_oracle, 13, 15),
+    substr(jobcode, 4, 6)),
     .before = Worker.Name) %>%
   mutate(Worker.Name = substr(Worker.Name, 1, 30)) %>%
   mutate(approved_hours = "0", .before = jobcode) %>%
@@ -488,7 +493,7 @@ View(high_payrate)
 ### Jobcode Dictionary Format ---------------------------------------------
 
 jc_dict_upload <- jc_dict_upload %>%
-  mutate(Cost.Center = NULL) %>%
+  mutate(wrkd_dept_oracle = NULL) %>%
   distinct() %>%
   mutate(dahr = NA,
          esd = NA,
@@ -529,35 +534,35 @@ colnames(msbib_zero_new) <- upload_payroll_cols
 
 if (sites == "MSHS" | sites == "MSHQ") {
   # save MSHQ upload
-  write.table(filter(upload_new, hospital == "NY0014"),
+  write.table(filter(upload_new, `Worked Entity Code` == "NY0014"),
               paste0(project_path,
                      "MSHQ/Uploads/MSHQ_Rightsourcing_",
-                     min(mdy(upload_new$start_date)), "_",
-                     max(mdy(upload_new$Earnings.E.D)), ".csv"),
+                     min(mdy(upload_new$`Start Date`)), "_",
+                     max(mdy(upload_new$`End Date`)), ".csv"),
               row.names = F, col.names = T, sep = ",")
 
   # save MSHQ zero file
   write.table(mshq_zero_new, paste0(project_path,
                                     "MSHQ/Zero/MSHQ_Rightsourcing Zero_",
-                                    min(mdy(mshq_zero_new$date.start)), "_",
-                                    max(mdy(mshq_zero_new$date.end)), ".csv"),
+                                    min(mdy(mshq_zero_new$`Start Date`)), "_",
+                                    max(mdy(mshq_zero_new$`End Date`)), ".csv"),
               row.names = F, col.names = T, sep = ",")
 }
 
 if (sites == "MSHS" | sites == "MSBIB") {
   # save MSBIB upload
-  write.table(filter(upload_new, hospital == "630571"),
+  write.table(filter(upload_new, `Worked Entity Code` == "630571"),
               paste0(project_path,
                      "MSBIB/Uploads/MSBIB_Rightsourcing_",
-                     min(mdy(upload_new$start_date)), "_",
-                     max(mdy(upload_new$Earnings.E.D)), ".csv"),
+                     min(mdy(upload_new$`Start Date`)), "_",
+                     max(mdy(upload_new$`End Date`)), ".csv"),
               row.names = F, col.names = T, sep = ",")
 
   # save MSBIB zero file
   write.table(msbib_zero_new, paste0(project_path,
                                     "MSBIB/Zero/MSBIB_Rightsourcing Zero_",
-                                    min(mdy(msbib_zero_new$date.start)), "_",
-                                    max(mdy(msbib_zero_new$date.end)), ".csv"),
+                                    min(mdy(msbib_zero_new$`Start Date`)), "_",
+                                    max(mdy(msbib_zero_new$`End Date`)), ".csv"),
               row.names = F, col.names = T, sep = ",")
 }
 
@@ -570,14 +575,14 @@ write.table(jobcode_list_new, paste0(project_path, "Rightsource Job Code.csv"),
 # save jobcode dictionary upload
 write.table(jc_dict_upload, paste0(project_path, "Jobcode Dictionary/",
                                    "MSHS_Jobcode Dictionary_",
-                                   max(mdy(upload_new$Earnings.E.D)),
+                                   max(mdy(upload_new$`End Date`)),
                                    ".csv"),
             row.names = F, col.names = T, sep = ",", na = "")
 
 # save unmapped cost center list
 write.table(cc_map_fail, paste0(project_path, "Failed Cost Center Mappings/",
                                 "MSHS_Failed Cost Center Mappings_",
-                                max(mdy(upload_new$Earnings.E.D)),
+                                max(mdy(upload_new$`End Date`)),
                                 ".csv"),
             row.names = F, sep = ",")
 

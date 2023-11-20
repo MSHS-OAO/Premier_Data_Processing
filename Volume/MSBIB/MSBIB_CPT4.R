@@ -284,11 +284,7 @@ upload <- charge_summary %>%
   mutate(StartDate = format(StartDate, "%m/%d/%Y"),
          EndDate = format(EndDate, "%m/%d/%Y")) %>%
   select(EntityID, FacilID, `Labor Department`, StartDate, EndDate,
-         OPTB_cpt4, Vol, budget) %>%
-  `colnames<-`(c("Corporation Code", "Entity Code", "Cost Center Code", 
-                 "Start Date", "End Date", "CPT Code", "Actual Volume",
-                 "Budget Volume"))
-
+         OPTB_cpt4, Vol, budget)
 
 non_upload_depts <- charge_summary %>%
   filter(is.na(`Published Report`) | `Published Report` != "yes") %>%
