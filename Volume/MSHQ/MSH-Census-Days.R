@@ -4,6 +4,8 @@ library(tidyr)
 library(readxl)
 library(zoo)
 library(lubridate)
+library(DBI)
+library(odbc)
 
 #--------------raw
 raw <- function(){
@@ -36,8 +38,10 @@ volumeID <- function(){
   volID <- read.csv("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Inpatient Census Days/New Calculation Worksheets/volID.csv",
                     stringsAsFactors = F,colClasses = c(rep("character",6)))
   #read paycycle calendar
-  paycycle <- read_xlsx("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Universal Data/Mapping/MSHS_Pay_Cycle.xlsx") %>%
-    select(DATE,START.DATE,END.DATE) 
+  con_prod <- dbConnect(odbc(), "OAO Cloud DB Production")
+  paycycle <- tbl(con_prod, "LPM_MAPPING_PAYCYCLE") %>%
+    select(PAYCYCLE_DATE,PP_START_DATE,PP_END_DATE) %>% 
+    collect() 
   colnames(paycycle) <- c("Date", "Start.Date", "End.Date")
   paycycle <- paycycle %>%
     mutate(Date = as.Date(Date),
