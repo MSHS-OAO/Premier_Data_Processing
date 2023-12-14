@@ -50,15 +50,15 @@ trend <- function(){
     #pivot old trend to long to prepare for appending current export data
     trend_old <- trend_old %>% 
       pivot_longer(cols = 4:ncol(trend_old),names_to = "End",values_to = "Census")
-    colnames(trend_old) <- c("DepartmentName", "CC", "VolID", "End Date", "Actual Code")
+    colnames(trend_old) <- c("DepartmentName", "CC", "VolID", "End Date", "Actual Volume")
     #prepare export data for appending to old trend
     trend_new <- volumeID %>% 
       left_join(export,by = c("CC" = "Cost Center Code",
                               "VolID" = "Volume Code")) %>%
       select(DepartmentName, `CC`, `VolID`, `End Date`,
-             `Actual Code`) 
+             `Actual Volume`) 
     trend_new <- do.call("rbind", list(trend_old, trend_new)) %>%
-      pivot_wider(id_cols = c(DepartmentName,CC,VolID),names_from = `End Date`,values_from = `Actual Code`)
+      pivot_wider(id_cols = c(DepartmentName,CC,VolID),names_from = `End Date`,values_from = `Actual Volume`)
     trend_new <<- trend_new
   } else {
     stop("Raw file overlaps with master")
