@@ -1,12 +1,15 @@
-dir <- paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity",
+dir <- paste0("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity",
               "/Volume - Data/Multisite Volumes/Census Days")
-dir_universal <- paste0("J:/deans/Presidents/SixSigma/MSHS Productivity",
+dir_universal <- paste0("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity",
                         "/Productivity/Universal Data")
 
 # Load Libraries ----------------------------------------------------------
 library(tidyverse)
 library(xlsx)
 library(openxlsx)
+library(rstudioapi)
+library(DBI)
+library(odbc)
 
 # Constants ---------------------------------------------------------------
 #Current names of sites - one for each site (order matters)
@@ -20,14 +23,17 @@ site_old_names <- list(c("BIB", "MSB"),
 
 # Import Dictionaries -------------------------------------------------------
 map_CC_Vol <- read.xlsx(paste0(dir,
-                               "/BIBSLW_Volume ID_Cost Center_ Mapping.xlsx"))
-dict_PC_raw <- read.xlsx(paste0(dir_universal, "/Mapping/MSHS_Pay_Cycle.xlsx"),
-                     detectDates = T)
-dict_PC <- dict_PC_raw %>% select(DATE, START.DATE, END.DATE) %>% drop_na()
+                               "/BIBSLW_Volume ID_Cost Center_ Mapping.xlsx"),
+                        sheet = 1)
+oao_con <- dbConnect(odbc(), "OAO Cloud DB Production")
+dict_PC_raw <- tbl(oao_con, "LPM_MAPPING_PAYCYCLE") %>% collect()
+dict_PC <- dict_PC_raw %>% select(PAYCYCLE_DATE, PP_START_DATE, PP_END_DATE) %>% drop_na()
 colnames(dict_PC) <- c("Census.Date", "Start.Date", "End.Date")
 
+# this reference will be updated to point to the DB in the future:
 map_reports <- read.xlsx(
   paste0(dir_universal, "/Mapping/MSHS_Reporting_Definition_Mapping.xlsx"),
+  sheet = 1,
   detectDates = T)
 
 
@@ -35,7 +41,9 @@ map_reports <- read.xlsx(
 
 #Table of distribution dates earlier than the current date
 dist_dates <- dict_PC_raw %>%
-  select(END.DATE, PREMIER.DISTRIBUTION) %>%
+  select(PP_END_DATE, PREMIER_DISTRIBUTION) %>%
+  rename(END.DATE = PP_END_DATE,
+         PREMIER.DISTRIBUTION = PREMIER_DISTRIBUTION) %>%
   distinct() %>%
   drop_na() %>%
   arrange(END.DATE) %>%
@@ -51,19 +59,19 @@ pp.start <- dist_dates %>%
 pp.start <- pp.start$END.DATE[nrow(pp.start) - 1] + lubridate::days(1)
 
 #Confirming date range
-answer <- winDialog(
+answer <- showQuestion(
+  title = "Date Range Confirmation",
   message = paste0(
-    "Starting Date will be: ", pp.start, "\r\r",
-    "Ending Date will be: ", pp.end, "\r\r",
-    "If this is correct, press OK\r\r",
-    "If this is not correct, press Cancel and\r",
-    "you will be prompted to provide the correct\r",
+    "Starting Date will be: ", pp.start, " and ",
+    "Ending Date will be: ", pp.end, ".  ",
+    "If this is correct, press OK.  ",
+    "If this is not correct, press Cancel and ",
+    "you will be prompted to provide the correct ",
     "date range."
-  ),
-  type = "okcancel"
+  )
 )
 
-if (answer == "CANCEL") {
+if (answer == FALSE) {
   pp.start <- as.Date(
     rstudioapi::showPrompt(
       title = "pp.start input",
@@ -77,32 +85,40 @@ if (answer == "CANCEL") {
 }
 
 # Import Data -------------------------------------------------------------
-import_recent_file <- function(folder.path, place) {
+import_recent_file <- function(folder.path, place = 1) {
   #Importing File information from Folder
-  File.Name <- list.files(path = folder.path, pattern = "xlsx$", full.names = F)
-  File.Path <- list.files(path = folder.path, pattern = "xlsx$", full.names = T)
-  File.Date <- as.Date(
-    sapply(File.Name,
-           function(x) substr(x, nchar(x) - 12, nchar(x) - 5)),
-    format = "%m.%d.%y")
-  File.Table <<- data.table::data.table(File.Name, File.Date, File.Path) %>%
-    arrange(desc(File.Date))
-  #Importing Data
-  data_recent <- read.xlsx(File.Table$File.Path[place], detectDates = T)
+  df <- file.info(list.files(path = folder.path,
+                             full.names = T,
+                             pattern = "xlsx$")) %>%
+    arrange(desc(mtime))
+  
+  if (length(readxl::excel_sheets(rownames(df)[place])) > 1) {
+    showDialog(title = "File Warning",
+               message = paste0("The most recent file has multiple sheets.  ",
+                                "You may need to do some special handling to ",
+                                "get the correct data."))
+  }
+  
+  data_recent <- read.xlsx(rownames(df)[place],
+                           sheet = 1,
+                           detectDates = T)
   #File Source Column for Reference
-  data_recent <- data_recent %>% mutate(Source = File.Table$File.Path[place])
+  data_recent <- data_recent %>% mutate(Source = rownames(df)[place])
   return(data_recent)
 }
-data_census <- import_recent_file(paste0(dir, "/Source Data"), 1)
-#select which file you want instead of most recent file
+data_census <- import_recent_file(paste0(dir, "/Source Data"), place = 1)
+
+# alternative method to select which file you want instead of most recent file:
 # data_census <- read.xlsx(choose.files(caption = "Select Census File",
 #                                       multi = F,
 #                                       default = paste0(dir, "/Source Data")),
 #                          detectDate = T)
 
+
+# this function is created but never used:
 create_rds <- function(x) {
   file_data <- lapply(File.Table$File.Path,
-                      function(y) read.xlsx(y, detectDates = T))
+                      function(y) read.xlsx(y, sheet = 1, detectDates = T))
   # table_data <- cbind(File.Table,
   #                     sapply(file_data, function(z) range(z$Census.Date)))
   date_range <- sapply(file_data, function(z) range(z$Census.Date))
@@ -142,9 +158,16 @@ if (any(!c(as.vector(unique(data_census$Site), mode = "any")) %in%
                             c(site_names, unlist(site_old_names)))
   new_site_names <- c(as.vector(unique(data_census$Site),
                                 mode = "any"))[new_site_names]
+  showDialog(
+    title = "New Sites",
+    message = paste0(
+      "New site name(s) found: ", paste(new_site_names, collapse = ", "),
+      ".  ",
+      "Consider how to handle the new sites and rerun code if necessary.")
+  )
   warning("New site name(s) found: ", paste(new_site_names, collapse = ", "))
-  stop(paste0("Please update the new site names in the constants section",
-              "and rerun code"))
+  stop(paste0("Consider how to handle the new site(s) and rerun code if ",
+              "necessary."))
 }
 
 #Checking the pay cycle dictionary is up to date
