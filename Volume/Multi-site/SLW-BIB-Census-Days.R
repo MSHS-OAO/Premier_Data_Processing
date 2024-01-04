@@ -198,7 +198,8 @@ if (any(!unique(map_CC_Vol$Site) %in% site_names) |
 }
 
 map_reports <- map_reports %>%
-  filter(CLOSED > pp.end | is.na(CLOSED)) %>%
+  filter(CLOSED > pp.end | is.na(CLOSED),
+         FTE.TREND == 1) %>%
   select(ORACLE.COST.CENTER, DEFINITION.CODE, DEFINITION.NAME) %>%
   distinct() %>%
   drop_na() %>%
@@ -208,7 +209,7 @@ map_reports <- map_reports %>%
 
 data_upload <- left_join(data_census, map_CC_Vol)
 data_upload <- left_join(data_upload, dict_PC)
-#data_upload <- left_join(data_upload, map_reports)
+data_upload <- left_join(data_upload, map_reports)
 
 # QC --------------------------------------------------------------------
 #checking to see if vlookups are duplicating rows
@@ -335,8 +336,8 @@ quality_chart <- function(data, site.census) {
   data_chart <- data_upload %>%
     ungroup() %>%
     filter(Site == site.census) %>%
-    select(#ReportCode,
-           #ReportName,
+    select(ReportCode,
+           ReportName,
            CostCenter,
            Nursing.Station.Code,
            End.Date,
@@ -344,9 +345,8 @@ quality_chart <- function(data, site.census) {
     arrange(Nursing.Station.Code, End.Date) %>%
     mutate(End.Date = format(End.Date, "%Y-%m-%d")) %>%
     pivot_wider(names_from = End.Date, values_from = Census.Day,
-                values_fn = list(Census.Day = sum)) #%>%
-    #mutate(Report = paste(ReportCode, ReportName, sep = "-")) %>%
-    #arrange(Report)
+                values_fn = list(Census.Day = sum)) %>%
+    arrange(ReportCode)
 }
 chart_master <- lapply(as.list(unique(data_upload$Site)),
                        function(x) quality_chart(data_upload, x))
