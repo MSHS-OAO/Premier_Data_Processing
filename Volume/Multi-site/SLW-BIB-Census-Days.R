@@ -1,7 +1,7 @@
-dir <- paste0("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity",
-              "/Volume - Data/Multisite Volumes/Census Days")
-dir_universal <- paste0("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity",
-                        "/Productivity/Universal Data")
+dir <- paste0("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/",
+              "Productivity/Volume - Data/Multisite Volumes/Census Days")
+dir_universal <- paste0("/SharedDrive/deans/Presidents/SixSigma/",
+                        "MSHS Productivity/Productivity/Universal Data")
 
 # Load Libraries ----------------------------------------------------------
 library(tidyverse)
@@ -27,14 +27,16 @@ map_CC_Vol <- read.xlsx(paste0(dir,
                         sheet = 1)
 oao_con <- dbConnect(odbc(), "OAO Cloud DB Production")
 dict_PC_raw <- tbl(oao_con, "LPM_MAPPING_PAYCYCLE") %>% collect()
-dict_PC <- dict_PC_raw %>% select(PAYCYCLE_DATE, PP_START_DATE, PP_END_DATE) %>% drop_na()
+dict_PC <- dict_PC_raw %>%
+  select(PAYCYCLE_DATE, PP_START_DATE, PP_END_DATE) %>%
+  drop_na()
 colnames(dict_PC) <- c("Census.Date", "Start.Date", "End.Date")
 
 # this reference will be updated to point to the DB in the future:
 map_reports <- read.xlsx(
   paste0(dir_universal, "/Mapping/MSHS_Reporting_Definition_Mapping.xlsx"),
   sheet = 1,
-  detectDates = T)
+  detectDates = TRUE)
 
 
 # Constants - Dates--------------------------------------------------------
@@ -88,20 +90,20 @@ if (answer == FALSE) {
 import_recent_file <- function(folder.path, place = 1) {
   #Importing File information from Folder
   df <- file.info(list.files(path = folder.path,
-                             full.names = T,
+                             full.names = TRUE,
                              pattern = "xlsx$")) %>%
     arrange(desc(mtime))
-  
+
   if (length(readxl::excel_sheets(rownames(df)[place])) > 1) {
     showDialog(title = "File Warning",
                message = paste0("The most recent file has multiple sheets.  ",
                                 "You may need to do some special handling to ",
                                 "get the correct data."))
   }
-  
+
   data_recent <- read.xlsx(rownames(df)[place],
                            sheet = 1,
-                           detectDates = T)
+                           detectDates = TRUE)
   #File Source Column for Reference
   data_recent <- data_recent %>% mutate(Source = rownames(df)[place])
   return(data_recent)
@@ -118,7 +120,7 @@ data_census <- import_recent_file(paste0(dir, "/Source Data"), place = 1)
 # this function is created but never used:
 create_rds <- function(x) {
   file_data <- lapply(File.Table$File.Path,
-                      function(y) read.xlsx(y, sheet = 1, detectDates = T))
+                      function(y) read.xlsx(y, sheet = 1, detectDates = TRUE))
   # table_data <- cbind(File.Table,
   #                     sapply(file_data, function(z) range(z$Census.Date)))
   date_range <- sapply(file_data, function(z) range(z$Census.Date))
@@ -144,7 +146,7 @@ if (pp.end > range(data_census$Census.Date)[2] |
                    "start date will be changed to ",
                    format(pp.end, "%Y"), "-01-01"))
     pp.start.new <- as.Date(paste0(format(pp.end, "%Y"), "-01-01"))
-  }else{#If date range requested is outside the range of the census file
+  }else {#If date range requested is outside the range of the census file
     stop(paste0("Data Missing from Census file for Pay Periods Needed. ",
                 "Please add most recent file to the source data folder."))
   }
@@ -231,7 +233,7 @@ upload_file <- function(site.census, site.premier, map_cc) {
     select(Corp, Site, CostCenter, Start.Date, End.Date,
            VolumeID, Census.Day) %>%
     group_by(Corp, Site, CostCenter, Start.Date, End.Date, VolumeID) %>%
-    summarise(Volume = sum(Census.Day, na.rm = T)) %>%
+    summarise(Volume = sum(Census.Day, na.rm = TRUE)) %>%
     mutate(Budget = 0)
   upload <- na.omit(upload)
   #Adding Zeros for nursing stations with no census
@@ -265,7 +267,7 @@ new_start_end <- function(upload_file) {
                                    format(pp.start.new, "%m/%d/%Y"),
                                    upload_file$Start.Date)
     return(upload_file)
-  }else{
+  }else {
     return(upload_file)
   }
 }
@@ -275,13 +277,13 @@ new_start_end <- function(upload_file) {
 data_upload_MSMW <- new_start_end(
   rbind(upload_file(site_names[4], "NY2162", map_CC_Vol),
         upload_file(site_names[3], "NY2163", map_CC_Vol))) %>%
-  `colnames<-`(c("Corporation Code", "Entity Code", "Cost Center Code", 
+  `colnames<-`(c("Corporation Code", "Entity Code", "Cost Center Code",
                  "Start Date", "End Date", "Volume Code", "Actual Volume",
                  "Budget Volume"))
 data_upload_MSBIB <- new_start_end(
   rbind(upload_file(site_names[1], "630571", map_CC_Vol),
         upload_file(site_names[2], "630571", map_CC_Vol))) %>%
-  `colnames<-`(c("Corporation Code", "Entity Code", "Cost Center Code", 
+  `colnames<-`(c("Corporation Code", "Entity Code", "Cost Center Code",
                  "Start Date", "End Date", "Volume Code", "Actual Volume",
                  "Budget Volume"))
 
@@ -304,32 +306,32 @@ write.table(data_upload_MSMW,
             file = paste0(dir, "/Upload Files", "/MSMW_Census Days_",
                           if (exists("pp.start.new")) {
                             format(pp.start.new, "%Y-%m-%d")
-                          }else{
+                          }else {
                             format(pp.start, "%Y-%m-%d")
                           },
                           " to ",
                           if (exists("pp.end.new")) {
                             format(pp.end.new, "%Y-%m-%d")
-                          }else{
+                          }else {
                             format(pp.end, "%Y-%m-%d")
                           },
                           ".csv"),
-            sep = ",", row.names = F, col.names = T)
+            sep = ",", row.names = FALSE, col.names = TRUE)
 write.table(data_upload_MSBIB,
             file = paste0(dir, "/Upload Files", "/MSBIB_Census Days_",
                           if (exists("pp.start.new")) {
                             format(pp.start.new, "%Y-%m-%d")
-                          }else{
+                          }else {
                             format(pp.start, "%Y-%m-%d")
                           },
                           " to ",
                           if (exists("pp.end.new")) {
                             format(pp.end.new, "%Y-%m-%d")
-                          }else{
+                          }else {
                             format(pp.end, "%Y-%m-%d")
                           },
                           ".csv"),
-            sep = ",", row.names = F, col.names = T)
+            sep = ",", row.names = FALSE, col.names = TRUE)
 
 # Generating Quality Chart ------------------------------------------------
 quality_chart <- function(data, site.census) {
@@ -357,14 +359,17 @@ write.xlsx2(chart_master[1],
                           "/Quality Chart_",
                           format(Sys.time(), "%Y-%m-%d"),
                           ".xlsx"),
-            row.names = F,
+            row.names = FALSE,
             sheetName = unique(data_upload$Site)[1])
 sapply(2:length(chart_master),
-       function(x) write.xlsx2(chart_master[x],
-                               file = paste0(dir,
-                                             "/Quality Chart_",
-                                             format(Sys.time(), "%Y-%m-%d"),
-                                             ".xlsx"),
-                               row.names = F,
-                               sheetName = unique(data_upload$Site)[x],
-                               append = T))
+       function(x) {
+         write.xlsx2(chart_master[x],
+                     file = paste0(dir,
+                                   "/Quality Chart_",
+                                   format(Sys.time(), "%Y-%m-%d"),
+                                   ".xlsx"),
+                     row.names = FALSE,
+                     sheetName = unique(data_upload$Site)[x],
+                     append = TRUE)
+       }
+)
