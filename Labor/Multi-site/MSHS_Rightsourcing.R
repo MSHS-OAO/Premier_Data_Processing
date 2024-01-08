@@ -225,7 +225,8 @@ processed_data <- raw_data %>%
   filter(!Worker.Name %in% employee_removal) %>%
   mutate(Worker.Name = gsub("\'", "", Worker.Name),
          Worker.Name = gsub("\\(Mt Sinai\\)", "", Worker.Name),
-         Worker.Name = gsub(" ,", ",", Worker.Name))
+         Worker.Name = gsub(" ,", ",", Worker.Name),
+         Worker.Name = iconv(Worker.Name, from = 'UTF-8', to = 'ASCII//TRANSLIT'))
 
 # filter raw data on date range needed for upload
 processed_data <- processed_data %>%
