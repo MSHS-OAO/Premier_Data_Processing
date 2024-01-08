@@ -94,6 +94,8 @@ if (nrow(new_jobcodes_db) > 0) {
                "Universal Data/Mapping/sftp_sync_decrypt_insert/JobCode/MSHQ/"))
   print(paste("User should add the new jobcode mappings to the DB first and",
               "then continue running the code"))
+} else {
+  print("There are no new jobcodes to be added to the DB")
 }
 
 #### Jobcode Dictionary -----------------------------------------------------
