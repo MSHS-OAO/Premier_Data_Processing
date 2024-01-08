@@ -10,7 +10,7 @@ upload <- function(){
   #remove last row (subtotal row)
   raw1 <- raw1 %>% filter(!is.na(CensusDate))
   raw1 <<- raw1
-  volumeID <- read.csv("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSQ Data/Patient Days/Calculation Files/VolumeID.csv"
+  volumeID <- read.csv("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSQ Data/Patient Days/Calculation Files/VolumeID.csv"
                        ,stringsAsFactors = F,colClasses = c(rep("character",3)))
   export <- raw1 %>%
     select(3:5) %>%
@@ -34,13 +34,13 @@ upload <- function(){
 }
 
 trend <- function(){
-  volumeID <- read.csv("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSQ Data/Patient Days/Calculation Files/VolumeID.csv"
+  volumeID <- read.csv("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSQ Data/Patient Days/Calculation Files/VolumeID.csv"
                        ,stringsAsFactors = F,colClasses = c(rep("character",3)))
   #read in old master
-  master_old <- readRDS("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSQ Data/Patient Days/Calculation Files/master/master.rds")
+  master_old <- readRDS("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSQ Data/Patient Days/Calculation Files/master/master.rds")
   #read in old trend file
-  cols <- read.csv("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSQ Data/Patient Days/Calculation Files/trend/Census_trend.csv")
-  trend_old <- read.csv("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSQ Data/Patient Days/Calculation Files/trend/Census_trend.csv",
+  cols <- read.csv("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSQ Data/Patient Days/Calculation Files/trend/Census_trend.csv")
+  trend_old <- read.csv("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSQ Data/Patient Days/Calculation Files/trend/Census_trend.csv",
                         stringsAsFactors = F,colClasses = c(rep("character",3),rep("numeric",ncol(cols)-3)),check.names = F)
   #bind old master with raw file to create new master
   if(max(master_old$CensusDate) < min(as.Date(raw1$CensusDate,format="%m/%d/%Y"))){
@@ -66,11 +66,11 @@ trend <- function(){
 }
 
 save <- function(){
-  saveRDS(master_new,"J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSQ Data/Patient Days/Calculation Files/master/master.rds")
-  write.table(trend_new,"J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSQ Data/Patient Days/Calculation Files/trend/Census_trend.csv",
+  saveRDS(master_new,"/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSQ Data/Patient Days/Calculation Files/master/master.rds")
+  write.table(trend_new,"/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSQ Data/Patient Days/Calculation Files/trend/Census_trend.csv",
               sep = ",", row.names = F)
   #create file name
-  name <- paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/",
+  name <- paste0("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/",
                  "Volume - Data/MSQ Data/Patient Days/Calculation Files/",
                  "Uploads/MSQ_Census Days_",
                  min(as.Date(export$`Start Date`, format = "%m/%d/%Y")),"_",

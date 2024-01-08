@@ -15,7 +15,7 @@ Hours <- function(){
 Trend <- function(){
   #append master file with the daily ed hour trend
   library(openxlsx)
-  setwd("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/ED Hours/Calculation Worksheets")
+  setwd("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/ED Hours/Calculation Worksheets")
   Master <- read.xlsx(xlsxFile = "ED Hours Daily Trend.xlsx", sheet = 1, detectDates = T)
   #Master$Date <- as.Date(Master$Date, origin = "1899-12-30")
   colnames(Master) <- c("Date","ED LOS")
@@ -25,9 +25,9 @@ Trend <- function(){
 
 Save <- function(){
   #overwrite the master file and save the daily trend for the PP 
-  setwd("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/ED Hours/Calculation Worksheets")
+  setwd("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/ED Hours/Calculation Worksheets")
   library(openxlsx)
-  write.xlsx(current, file = "ED Hours Daily Trend.xlsx", row.names = F, 
+  write.xlsx(current, file = "ED Hours Daily Trend.xlsx", rowNames = F, 
              overwrite = T)
   start <- min(daily$Date)
   end <- max(daily$Date)
@@ -40,12 +40,12 @@ Save <- function(){
   syear <- substr(start, start=1, stop=4)
   eyear <- substr(end, start=1, stop=4)
   name <- paste0("MSH_ED Hours_",sday,smonth,syear," to ",eday,emonth,eyear,".xlsx")
-  write.xlsx(daily, file=name, row.names=F)
+  write.xlsx(daily, file=name, rowNames=F)
 }
 
 #gives a daily ED hour total for the PP
-start <- "02/27/2022"
-end <- "03/26/2022"
+start <- "10/22/2023"
+end <- "11/18/2023"
 daily <- Hours()
 #appends the "daily" dataframe to the master
 Trend()
