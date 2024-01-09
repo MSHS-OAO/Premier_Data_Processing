@@ -94,6 +94,7 @@ raw_payroll <- import_recent_file(paste0(dir_BISLR, "/Source Data"), 1)
 pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR, "/Reference",
                                         "/Pay cycles uploaded_Tracker.xlsx"),
                                  sheetIndex = 1)
+pay_cycles_uploaded_raw <- pay_cycles_uploaded
 msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                       "/Reference/MSUS_removal_list.xlsx"),
                                sheet = 1)
@@ -531,11 +532,16 @@ filter_dates <- bislr_payroll %>%
 
 # Updating pay cycles filter dates dictionary
 if (nrow(filter_dates) > 0) {
-  pay_cycles_uploaded <- rbind(pay_cycles_uploaded,
-                               rename(filter_dates,
-                                      Pay_Cycle_Uploaded = upload_date)) %>%
-    select(-Pay_Cycle_Uploaded) %>%
+  filter_dates_refresh <- filter_dates %>%
+    select(-upload_date) %>%
     mutate(capture_time = as.character(Sys.time()))
+  
+  pay_cycles_uploaded_raw <- pay_cycles_uploaded_raw %>%
+    mutate(Start.Date = as.Date(Start.Date),
+           End.Date = as.Date(End.Date))
+  
+  pay_cycles_upload_refresh <- rbind(pay_cycles_uploaded_raw,
+                                     filter_dates_refresh)
   date_filtering <- filter_dates
 }else{
   showDialog(
@@ -1367,7 +1373,7 @@ if (exists("upload_dict_paycode")) {
 }
 
 if (nrow(filter_dates) > 0) {
-  write.xlsx(pay_cycles_uploaded,
+  write.xlsx(as.data.frame(pay_cycles_upload_refresh),
              file = paste0(dir_BISLR, "/Reference",
                            "/Pay cycles uploaded_Tracker", ".xlsx"),
              row.names = F)
