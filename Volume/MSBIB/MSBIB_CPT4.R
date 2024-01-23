@@ -165,7 +165,7 @@ file_date_names <- dict_pay_cycles %>%
   select(-DATE) %>%
   distinct() %>%
   filter(START.DATE >= date_start,
-         END.DATE <= dist_date + 14) %>%
+         END.DATE <= dist_date + days(14)) %>%
   mutate(range_desc = paste0("F",
                              gsub(" ", "",
                                   gsub(" 0", " ",
