@@ -17,7 +17,9 @@ df <- file.info(list.files(paste0(data_dir, "Universal Data/Labor/Raw Data/",
                            , full.names = T))
 df <- read.csv(rownames(df)[which.max(df$mtime)], header = T, sep = "~",
                stringsAsFactors = F, colClasses = rep("character", 33)) %>%
-  filter(!is.na(JOBCODE))
+  mutate(JOBCODE = case_when(
+    is.na(JOBCODE) ~ "UNKNOWN",
+    TRUE ~ JOBCODE))
 
 ## Read Mapping Files ---------------------------------------------------------
 oao_con <- dbConnect(odbc(), "OAO Cloud DB Production")
@@ -92,6 +94,8 @@ if (nrow(new_jobcodes_db) > 0) {
                "Universal Data/Mapping/sftp_sync_decrypt_insert/JobCode/MSHQ/"))
   print(paste("User should add the new jobcode mappings to the DB first and",
               "then continue running the code"))
+} else {
+  print("There are no new jobcodes to be added to the DB")
 }
 
 #### Jobcode Dictionary -----------------------------------------------------
