@@ -231,7 +231,7 @@ if (nrow(new_cost_centers) > 0) {
   print("The cost center dictionary has been saved")
 }
 
-## Payroll Upload -----------------------------------------------------
+## Payroll Upload -------------------------------------------------------------
 mapping_paycode <- tbl(oao_con, "LPM_MAPPING_PAYCODE") %>%
   collect() %>%
   select(PAYCODE_RAW, PAYCODE_PREMIER)
@@ -263,10 +263,60 @@ upload <- format_df %>%
          `Job Code` = JOBCODE,
          `Pay Code` = PAYCODE_PREMIER)
 
+### Home Cost Center Correcton--------------------------------------------------
+# check for employees wth multiple home cost centers during same time period
+overlap_employees <- upload %>%
+  group_by(`Employee Code`, `Start Date`) %>%
+  summarise(home_cost_centers = n_distinct(`Home Cost Center Code`)) %>%
+  right_join(upload,
+             by = c("Employee Code" = "Employee Code",
+                    "Start Date" = "Start Date")) %>%
+  filter(home_cost_centers > 1) %>%
+  mutate(unique_id = paste(`Employee Code`, `Home Cost Center Code`, 
+                           `Worked Cost Center Code`, `Start Date`, 
+                           `End Date`, `Pay Code`,
+                           sep = "_"))
+# if there are overlaps, save original for archival
+if (nrow(overlap_employees) > 0) {
+  write.csv(overlap_employees, paste0(data_dir, "Labor - Data/MSH/Payroll",
+                                      "/MSH Labor/2.0/processed_files/",
+                                      "home_cc_overlap/overlap_employees_",
+                                      Sys.Date(), ".csv"),
+            row.names = FALSE)
+}
+
+# replace home cc with most common used home cc for each emp and start date combo
+cost_center_replacement <- overlap_employees %>%
+  group_by(`Employee Code`, `Home Cost Center Code`, `Start Date`) %>%
+  summarise(cost_center_count = n()) %>%
+  group_by(`Employee Code`, `Start Date`) %>%
+  filter(cost_center_count == max(cost_center_count)) %>%
+  rename(common_cc = `Home Cost Center Code`) %>%
+  distinct(`Employee Code`, `Start Date`, cost_center_count,
+           .keep_all = TRUE) %>%
+  left_join(upload,
+            by = c("Employee Code" = "Employee Code",
+                   "Start Date" = "Start Date")) %>%
+  mutate(`Home Cost Center Code` = common_cc) %>%
+  select(`Corporation Code`, `Home Entity Code`, `Home Cost Center Code`,
+         `Worked Entity Code`, `Worked Cost Center Code`, `Start Date`,
+         `End Date`, `Employee Code`, `Employee Name`, `Approved Hours per Pay Period`,
+         `Job Code`, `Pay Code`, `Hours`, `Expense`)
+
+# remove employees original data from the upload df
+upload_no_overlap <- upload %>%
+  mutate(unique_id = paste(`Employee Code`, `Home Cost Center Code`, 
+                           `Worked Cost Center Code`, `Start Date`, 
+                           `End Date`, `Pay Code`,
+                           sep = "_")) %>%
+  filter(!(unique_id %in% overlap_employees$unique_id)) %>%
+  rbind(cost_center_replacement) %>%
+  select(-unique_id)
+
 # save premier upload
-write.csv(upload, paste0(data_dir, "Labor - Data/MSH/Payroll",
-                         "/MSH Labor/2.0/processed_files/",
-                         "uploads/","MSHQ_Payroll_",
-                         min(mdy(upload$`Start Date`)), "_", 
-                         max(mdy(upload$`End Date`)),".csv"),
+write.csv(upload_no_overlap, paste0(data_dir, "Labor - Data/MSH/Payroll",
+                                    "/MSH Labor/2.0/processed_files/",
+                                    "uploads/","MSHQ_Payroll_",
+                                    min(mdy(upload$`Start Date`)), "_", 
+                                    max(mdy(upload$`End Date`)),".csv"),
           row.names = FALSE)
