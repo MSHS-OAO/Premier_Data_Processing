@@ -5,17 +5,22 @@ library(dplyr)
 library(lubridate)
 library(tidyr)
 library(stringr)
+library(rstudioapi)
+library(DBI)
+library(odbc)
 
 # Assigning Directory ------------------------------------------------
 
 # rightsourcing project path
-project_path <- paste0("//researchsan02b/shr2/deans/Presidents/SixSigma/",
+project_path <- paste0("/SharedDrive/deans/Presidents/SixSigma/",
                        "MSHS Productivity/Productivity/Labor - Data/",
                        "Rightsourcing Labor/")
 # universal mapping path
-mapping_path <- paste0("//researchsan02b/shr2/deans/Presidents/SixSigma/",
+mapping_path <- paste0("/SharedDrive/deans/Presidents/SixSigma/",
                        "MSHS Productivity/Productivity/universal Data/",
                        "Mapping/")
+
+oao_con <- dbConnect(odbc(), "OAO Cloud DB Production")
 
 # Functions ---------------------------------------------------------------
 
@@ -34,20 +39,20 @@ recent_file <- function(path, file_header = F, encoding = "",
                  sep = delimeter,
                  colClasses = text_cols,
                  na.strings = c("", "NA"))
-
+  
   # need names on columns of previous month's files
   if (premier == TRUE) {
     prem_upload_col_names <- c("partner",
-                             "hosp.home", "dept.home",
-                             "hosp.worked", "dept.worked",
-                             "date.start", "date.end",
-                             "emp.ID", "emp.name",
-                             "budget", "jobcode", "paycode",
-                             "hours", "spend")
-
-  colnames(df) <- prem_upload_col_names
+                               "hosp.home", "dept.home",
+                               "hosp.worked", "dept.worked",
+                               "date.start", "date.end",
+                               "emp.ID", "emp.name",
+                               "budget", "jobcode", "paycode",
+                               "hours", "spend")
+    
+    colnames(df) <- prem_upload_col_names
   }
-
+  
   return(df)
 }
 
@@ -57,8 +62,13 @@ recent_file <- function(path, file_header = F, encoding = "",
 jobcode_list <- read.csv(paste0(project_path,
                                 "Rightsource Job Code.csv"))
 # pay period mapping file to determine max date of next upload
-pay_period_mapping <- read_xlsx(paste0(mapping_path,
-                                       "MSHS_Pay_Cycle.xlsx"))
+pay_period_mapping <- tbl(oao_con, "LPM_MAPPING_PAYCYCLE") %>% collect()
+# modifying column names in order to not have to recode the rest of the script
+pay_period_mapping <- pay_period_mapping %>%
+  rename(DATE = PAYCYCLE_DATE,
+         START.DATE = PP_START_DATE,
+         END.DATE = PP_END_DATE,
+         PREMIER.DISTRIBUTION = PREMIER_DISTRIBUTION)
 # code conversion mapping file to convert legacy to oracle cc
 code_conversion <- read_xlsx(paste0(mapping_path,
                                     "MSHS_Code_Conversion_Mapping.xlsx")) %>%
@@ -76,11 +86,11 @@ raw_data <- recent_file(path = paste0(project_path, "Source Data"),
 
 # user needs previous raw data file to compare column headers
 raw_data_prev <- recent_file(path = paste0(project_path, "Source Data"),
-                        file_header = T,
-                        encoding = "UTF-16LE",
-                        delimeter = "\t",
-                        desc_order = 2,
-                        premier = FALSE)
+                             file_header = T,
+                             encoding = "UTF-16LE",
+                             delimeter = "\t",
+                             desc_order = 2,
+                             premier = FALSE)
 
 
 
@@ -105,23 +115,21 @@ missing_col <- missing_col %>%
 col_check <- rbind(new_col, missing_col)
 
 if (length(col_check$Column) > 0) {
-  col_check_stop <- winDialog(
+  col_check_stop <- showQuestion(
+    title = "Missing columns",
     message = paste0(
-      "There are columns that are new and/or missing.\r",
-      "Review the col_check dataframe for details\r",
-      "\r",
-      "To stop running this script, press \"Cancel\" \r",
-      "\r",
-      "If you have already confirmed that the data is ok\r",
+      "There are columns that are new and/or missing.  ",
+      "Review the col_check dataframe for details.  ",
+      "To stop running this script, press \"Cancel\".  ",
+      "If you have already confirmed that the data is ok ",
       "press \"OK\" to continue running the script."
-    ),
-    type = "okcancel"
+    )
   )
 } else {
-  col_check_stop <- "OK"
+  col_check_stop <- TRUE
 }
 
-if (col_check_stop == "CANCEL") {
+if (col_check_stop == FALSE) {
   stop("Script is discontinued by your request.")
 }
 
@@ -164,18 +172,18 @@ dist_dates <- pay_period_mapping %>%
 distribution_date <- dist_dates$END.DATE[nrow(dist_dates)]
 
 #Confirming distribution date which will be the max of the current upload
-answer <- winDialog(
+answer <- showQuestion(
+  title = "Distribution Date Confirmation",
   message = paste0(
-    "Current distribution will be ", distribution_date, "\r\r",
-    "If this is correct, press OK\r\r",
-    "If this is not correct, press Cancel and\r",
-    "you will be prompted to select the correct\r",
+    "Current distribution will be ", distribution_date, ".  ",
+    "If this is correct, press OK.  ",
+    "If this is not correct, press Cancel and ",
+    "you will be prompted to select the correct ",
     "distribution date."
-    ),
-  type = "okcancel"
+  )
 )
 
-if (answer == "CANCEL") {
+if (answer == FALSE) {
   distribution_date <- select.list(
     choices =
       format(sort.POSIXlt(dist_dates$END.DATE, decreasing = T), "%m/%d/%Y"),
@@ -225,12 +233,13 @@ processed_data <- raw_data %>%
   filter(!Worker.Name %in% employee_removal) %>%
   mutate(Worker.Name = gsub("\'", "", Worker.Name),
          Worker.Name = gsub("\\(Mt Sinai\\)", "", Worker.Name),
-         Worker.Name = gsub(" ,", ",", Worker.Name))
+         Worker.Name = gsub(" ,", ",", Worker.Name),
+         Worker.Name = iconv(Worker.Name, from = 'UTF-8', to = 'ASCII//TRANSLIT'))
 
 # filter raw data on date range needed for upload
 processed_data <- processed_data %>%
   filter(mdy(Earnings.E.D) > min(c(prev_0_max_date_mshq,
-                                  prev_0_max_date_msbib)),
+                                   prev_0_max_date_msbib)),
          mdy(Earnings.E.D) <= distribution_date)
 
 # process department.billed to get oracle home and legacy worked department
@@ -273,13 +282,13 @@ processed_data <- processed_data %>%
 
 # quality check left join to make sure row count has not changed
 if (row_count != nrow(processed_data)) {
-  winDialog(
-    message = paste0("Error in code conversion mapping.",
-                     " Row count has been changed by left join"),
-    type = "ok"
+  showDialog(
+    title = "Join Error",
+    message = paste0("Error in code conversion mapping.  ",
+                     "Row count has been changed by left join")
   )
-  stop(paste0("Error in code conversion mapping.",
-              " Row count has been changed by left join"))
+  stop(paste0("Error in code conversion mapping.  ",
+              "Row count has been changed by left join"))
 }
 
 # get list of legacy cost centers that are not in code conversion
@@ -319,14 +328,15 @@ processed_data <- processed_data %>%
   left_join(jobcode_list_new)
 
 # quality check left join to make sure row count has not changed
+
 if (row_count != nrow(processed_data)) {
-  winDialog(
-    message = paste0("Error in job code mapping.",
-                     " Row count has been changed by left join"),
-    type = "ok"
+  showDialog(
+    title = "Join Error",
+    message = paste0("Error in job code mapping.  ",
+                     "Row count has been changed by left join")
   )
-  stop(paste0("Error in job code mapping.",
-              " Row count has been changed by left join"))
+  stop(paste0("Error in job code mapping.  ",
+              "Row count has been changed by left join"))
 }
 
 # jc dictionary upload for all combinations in the latest raw data file
@@ -347,7 +357,7 @@ processed_data <- processed_data %>%
                                                Holiday.Hours,
                                                na.rm = T),
                      Bill.Type == "Adjustment" ~ Weekly.Hours))
-           
+
 # Day Spend needs to be in numerical decimal format to summarize it
 processed_data <- processed_data %>%
   mutate(Regular.Rate = 
@@ -413,7 +423,7 @@ qc_hours_by_cc <- upload_new %>%
   left_join(distinct(select(code_conversion,
                             COST.CENTER.ORACLE,
                             COST.CENTER.DESCRIPTION.ORACLE)),
-                     by = c("wrkd_dept_oracle" = "COST.CENTER.ORACLE")) %>%
+            by = c("wrkd_dept_oracle" = "COST.CENTER.ORACLE")) %>%
   pivot_wider(id_cols = c(wrkd_dept_oracle, COST.CENTER.DESCRIPTION.ORACLE),
               names_from = Earnings.E.D,
               values_from = Hours)
@@ -540,7 +550,7 @@ if (sites == "MSHS" | sites == "MSHQ") {
                      min(mdy(upload_new$`Start Date`)), "_",
                      max(mdy(upload_new$`End Date`)), ".csv"),
               row.names = F, col.names = T, sep = ",")
-
+  
   # save MSHQ zero file
   write.table(mshq_zero_new, paste0(project_path,
                                     "MSHQ/Zero/MSHQ_Rightsourcing Zero_",
@@ -557,12 +567,12 @@ if (sites == "MSHS" | sites == "MSBIB") {
                      min(mdy(upload_new$`Start Date`)), "_",
                      max(mdy(upload_new$`End Date`)), ".csv"),
               row.names = F, col.names = T, sep = ",")
-
+  
   # save MSBIB zero file
   write.table(msbib_zero_new, paste0(project_path,
-                                    "MSBIB/Zero/MSBIB_Rightsourcing Zero_",
-                                    min(mdy(msbib_zero_new$`Start Date`)), "_",
-                                    max(mdy(msbib_zero_new$`End Date`)), ".csv"),
+                                     "MSBIB/Zero/MSBIB_Rightsourcing Zero_",
+                                     min(mdy(msbib_zero_new$`Start Date`)), "_",
+                                     max(mdy(msbib_zero_new$`End Date`)), ".csv"),
               row.names = F, col.names = T, sep = ",")
 }
 
