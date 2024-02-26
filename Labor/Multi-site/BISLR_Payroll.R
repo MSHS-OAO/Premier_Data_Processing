@@ -4,16 +4,23 @@ library(tidyverse)
 library(readxl)
 library(xlsx)
 library(rstudioapi)
-library(stringr)
+# library(stringr) This is in tidyverse
 library(stringi)
+library(DBI)
+library(odbc)
+
+# conflicted::conflicts_prefer(dplyr::filter)
 
 # clear memory of all objects including those hidden
 rm(list = ls(all.names = TRUE))
 
 # Directories -------------------------------------------------------------
-dir <- "J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity"
+dir <- "/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity"
 dir_BISLR <- paste0(dir, "/Labor - Data/Multi-site/BISLR")
 dir_universal <- paste0(dir, "/Universal Data")
+
+oao_con <- dbConnect(odbc(), "OAO Cloud DB Production")
+# oao_con_dev <- dbConnect(odbc(), "OAO Cloud DB Development")
 
 # User Warnings -----------------------------------------------------------
 
@@ -91,27 +98,27 @@ import_recent_file <- function(folder.path, place) {
 raw_payroll <- import_recent_file(paste0(dir_BISLR, "/Source Data"), 1)
 
 # Import References -------------------------------------------------------
-pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR, "/Reference",
+pay_cycles_uploaded <- read_xlsx(paste0(dir_BISLR, "/Reference",
                                         "/Pay cycles uploaded_Tracker.xlsx"),
-                                 sheetIndex = 1)
+                                 sheet = 1)
 pay_cycles_uploaded_raw <- pay_cycles_uploaded
 msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                       "/Reference/MSUS_removal_list.xlsx"),
                                sheet = 1)
 ## Universal Reference Files -----------------------------------------------
-map_uni_paycodes <- read_xlsx(paste0(dir_universal,
-                                     "/Mapping/MSHS_Paycode_Mapping.xlsx"),
-                              sheet = 1)
-map_uni_jobcodes <- read_xlsx(paste0(dir_universal,
-                                     "/Mapping/MSHS_Jobcode_Mapping.xlsx"),
-                              sheet = 1)
-map_uni_reports <- read_xlsx(paste0(dir_universal,
-                                    "/Mapping",
-                                    "/MSHS_Reporting_Definition_Mapping.xlsx"),
-                             sheet = 1)
-map_uni_paycycles <- read_xlsx(paste0(dir_universal,
-                                      "/Mapping/MSHS_Pay_Cycle.xlsx"),
-                               sheet = 1)
+map_uni_paycodes <- tbl(oao_con, "LPM_MAPPING_PAYCODE") %>%
+  collect()
+map_uni_jobcodes <- tbl(oao_con, "LPM_MAPPING_JOBCODE") %>%
+  collect()
+map_uni_reports <- tbl(oao_con, "LPM_MAPPING_REPDEF") %>%
+  collect()
+map_uni_cost_ctr <- tbl(oao_con, "LPM_MAPPING_COST_CENTER") %>%
+  collect()
+map_uni_key_vol <- tbl(oao_con, "LPM_MAPPING_KEY_VOLUME") %>%
+  collect()
+map_uni_paycycles <- tbl(oao_con, "LPM_MAPPING_PAYCYCLE") %>%
+  collect()
+
 
 ## Premier Reference Files -------------------------------------------------
 dict_premier_dpt <- read.csv(paste0(dir_universal,
@@ -160,9 +167,22 @@ piv_wide_check_prev <- read.csv(paste0(dir_BISLR, "/Quality Checks",
 
 ## References --------------------------------------------------------------
 map_uni_jobcodes <- map_uni_jobcodes %>%
+  rename(J.C = JOBCODE,
+         PAYROLL = PAYROLL,
+         J.C.DESCRIPTION = JOBCODE_DESCRIPTION,
+         PROVIDER = PROVIDER,
+         PREMIER.J.C = JOBCODE_PREMIER,
+         PREMIER.J.C.DESCRIPTION = JOBCODE_PREMIER_DESCRIPTION) %>%
   mutate(J.C = str_trim(J.C)) %>%
   mutate(JC_in_UniversalFile = 1)
 map_uni_paycodes <- map_uni_paycodes %>%
+  rename(RAW.PAY.CODE = PAYCODE_RAW,
+         PAY.CODE = PAYCODE_PREMIER,
+         PAY.CODE.NAME = PAYCODE_DESCRIPTION,
+         PAY.CODE.CATEGORY = PAYCODE_CATEGORY,
+         INCLUDE.HOURS = INCLUDE_HOURS,
+         INCLUDE.EXPENSES = INCLUDE_EXPENSES,
+         WORKED.PAY.CODE = WORKED_PAYCODE) %>%
   mutate(Paycode_in_Universal = 1)
 pay_cycles_uploaded <- pay_cycles_uploaded %>%
   select(-capture_time) %>%
@@ -179,6 +199,31 @@ report_list <- dict_premier_report %>%
   distinct()
 # In the future, there's potential for a cost center to show up in multiple
 # reports if we begin moving cost centers across reports.
+
+
+# modifying column names in order to not have to recode the rest of the script
+map_uni_paycycles <- map_uni_paycycles %>%
+  rename(DATE = PAYCYCLE_DATE,
+         START.DATE = PP_START_DATE,
+         END.DATE = PP_END_DATE,
+         PREMIER.DISTRIBUTION = PREMIER_DISTRIBUTION)
+
+map_uni_reports_orig <- map_uni_reports
+map_uni_reports <- map_uni_reports %>%
+  left_join(map_uni_cost_ctr, relationship = "many-to-many") %>%
+  left_join(map_uni_key_vol, relationship = "many-to-many") %>%
+  rename(DEFINITION.CODE = DEFINITION_CODE,
+         DEFINITION.NAME = DEFINITION_NAME,
+         KEY.VOLUME = KEY_VOLUME,
+         COST.CENTER = LEGACY_COST_CENTER,
+         ORACLE.COST.CENTER = ORACLE_COST_CENTER,
+         COST.CENTER.DESCRIPTION = COST_CENTER_DESCRIPTION,
+         CORPORATE.SERVICE.LINE = CORPORATE_SERVICE_LINE,
+         SITE = SITE,
+         CLOSED = CLOSED,
+         VP = VP,
+         DEPARTMENT.BREAKDOWN = DEPARTMENT_BREAKDOWN)
+  
 
 dist_dates <- map_uni_paycycles %>%
   select(END.DATE, PREMIER.DISTRIBUTION) %>%
@@ -879,7 +924,7 @@ fte_summary <- fte_summary %>%
     Site == "NY2163" ~ "MSM",
     TRUE ~ "Other"))
 
-fte_summary_path <- paste0("//researchsan02b/shr2/deans/Presidents/",
+fte_summary_path <- paste0("/SharedDrive/deans/Presidents/",
                            "SixSigma/MSHS Productivity/Productivity/",
                            "Labor - Data/Multi-site/BISLR/Quality Checks/",
                            "Source Data/")
@@ -923,7 +968,7 @@ fte_summary <- fte_summary %>%
         Site == "NY2162" ~ "MSW",
         Site == "NY2163" ~ "MSM",
         TRUE ~ "Other")),
-    upload_dict_dpt %>%
+    upload_dict_dpt %>% # need to consider when there's no new depts to upload
       mutate(Site = case_when(
         Site == "630571" ~ "MSBIB",
         Site == "NY2162" ~ "MSW",
