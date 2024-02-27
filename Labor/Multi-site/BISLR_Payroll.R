@@ -454,10 +454,17 @@ while (NA %in% unique(bislr_payroll$JC_in_UniversalFile) |
   # MM: I believe Anjelica and I discussed nesting many of these statements
   # within an if() statement based on an "ok" user input from the previous
   # prompt, but there's probably a simpler solution
-  map_uni_jobcodes <- read_xlsx(paste0(dir_universal,
-                                       "/Mapping/MSHS_Jobcode_Mapping.xlsx"),
-                                sheet = 1)
+  
+  # MUST UPDATE THE PROCESS SO DB IS UPDATED BEFORE PROCEEDING
+  map_uni_jobcodes <- tbl(oao_con, "LPM_MAPPING_JOBCODE") %>%
+    collect()
   map_uni_jobcodes <- map_uni_jobcodes %>%
+    rename(J.C = JOBCODE,
+           PAYROLL = PAYROLL,
+           J.C.DESCRIPTION = JOBCODE_DESCRIPTION,
+           PROVIDER = PROVIDER,
+           PREMIER.J.C = JOBCODE_PREMIER,
+           PREMIER.J.C.DESCRIPTION = JOBCODE_PREMIER_DESCRIPTION) %>%
     mutate(J.C = str_trim(J.C)) %>%
     mutate(JC_in_UniversalFile = 1)
 
@@ -529,10 +536,17 @@ while (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
     Sys.sleep(15)
   }
 
-  map_uni_paycodes <- read_xlsx(paste0(dir_universal,
-                                       "/Mapping/MSHS_Paycode_Mapping.xlsx"),
-                                sheet = 1)
+  # MUST UPDATE THE PROCESS SO DB IS UPDATED BEFORE PROCEEDING
+  map_uni_paycodes <- tbl(oao_con, "LPM_MAPPING_PAYCODE") %>%
+    collect()
   map_uni_paycodes <- map_uni_paycodes %>%
+    rename(RAW.PAY.CODE = PAYCODE_RAW,
+           PAY.CODE = PAYCODE_PREMIER,
+           PAY.CODE.NAME = PAYCODE_DESCRIPTION,
+           PAY.CODE.CATEGORY = PAYCODE_CATEGORY,
+           INCLUDE.HOURS = INCLUDE_HOURS,
+           INCLUDE.EXPENSES = INCLUDE_EXPENSES,
+           WORKED.PAY.CODE = WORKED_PAYCODE) %>%
     mutate(Paycode_in_Universal = 1)
 
   row_count <- nrow(bislr_payroll)
@@ -930,12 +944,12 @@ fte_summary_path <- paste0("/SharedDrive/deans/Presidents/",
                            "Source Data/")
 
 fte_summary <- rbind(fte_summary,
-                     read.xlsx2(file = paste0(fte_summary_path,
+                     read_xlsx(path = paste0(fte_summary_path,
                                               "fte_summary.xlsx"),
-                                colClasses = c(rep("character", 8),
+                                col_types = c(rep("text", 8),
                                                rep("numeric", 2),
-                                               "character"),
-                                sheetName = "fte_summary") %>%
+                                               "text"),
+                                sheet = "fte_summary") %>%
                        select(Site, Department, dist_date,
                               Avg_FTEs_worked, Avg_FTEs_paid,
                               capture_time))
@@ -1310,7 +1324,9 @@ colnames(upload_dict_jc) <- upload_dict_jc_cols
 
 upload_map_dpt_jc <- upload_map_dpt_jc %>%
   mutate(exp_date = NA,
-         prem_std_dpt = NA) %>%
+         prem_std_dpt = NA) %>% # it's OK for this to be NA instead of an actual
+                                # value.  all JC mappings have blank for the
+                                # Premier Std Dept
   relocate(exp_date, .after = effective_date) %>%
   relocate(Job.Code, .before = Cost.Center) %>%
   relocate(prem_std_dpt, .after = Cost.Center)
@@ -1386,10 +1402,13 @@ write.table(upload_dict_dpt,
             row.names = F, col.names = T, sep = ",")
 
 
-write.table(upload_map_dpt,
-            file = paste0(dir_BISLR, "/BISLR_Department Map_",
-                          date_range, "_check.csv"),
-            row.names = F, col.names = T, sep = ",", na = "")
+# Dept Mapping is not required in 2.0 and creates an error when uploading
+# Keeping command available in script in case this comes back online
+# in the future.
+# write.table(upload_map_dpt,
+#             file = paste0(dir_BISLR, "/BISLR_Department Map_",
+#                           date_range, ".csv"),
+#             row.names = F, col.names = T, sep = ",", na = "")
 
 
 write.table(upload_dict_jc,
