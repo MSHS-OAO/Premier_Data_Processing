@@ -4,6 +4,8 @@ library(tidyr)
 library(readxl)
 library(zoo)
 library(lubridate)
+library(DBI)
+library(odbc)
 
 #--------------raw
 raw <- function(){
@@ -33,11 +35,13 @@ raw <- function(){
 #------------volumeID
 volumeID <- function(){
   #read volume ID mapping file
-  volID <- read.csv("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Inpatient Census Days/New Calculation Worksheets/volID.csv",
+  volID <- read.csv("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Inpatient Census Days/New Calculation Worksheets/volID.csv",
                     stringsAsFactors = F,colClasses = c(rep("character",6)))
   #read paycycle calendar
-  paycycle <- read_xlsx("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Universal Data/Mapping/MSHS_Pay_Cycle.xlsx") %>%
-    select(DATE,START.DATE,END.DATE) 
+  con_prod <- dbConnect(odbc(), "OAO Cloud DB Production")
+  paycycle <- tbl(con_prod, "LPM_MAPPING_PAYCYCLE") %>%
+    select(PAYCYCLE_DATE,PP_START_DATE,PP_END_DATE) %>% 
+    collect() 
   colnames(paycycle) <- c("Date", "Start.Date", "End.Date")
   paycycle <- paycycle %>%
     mutate(Date = as.Date(Date),
@@ -53,13 +57,13 @@ volumeID <- function(){
 #------------master
 master <- function(){
   #read master file
-  master_old <- readRDS("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Inpatient Census Days/New Calculation Worksheets/Master.RDS")
+  master_old <- readRDS("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Inpatient Census Days/New Calculation Worksheets/Master.RDS")
   #check that max master is less than min of raw file
   if(max(master_old$Date) < min(census_vol$Date) & nrow(census_vol[is.na(census_vol$End.Date),]) == 0){
     #bind raw file with old master
     master_new <- rbind(master_old,census_vol)
     #save new master
-    saveRDS(master_new,"J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Inpatient Census Days/New Calculation Worksheets/Master.RDS")
+    saveRDS(master_new,"/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Inpatient Census Days/New Calculation Worksheets/Master.RDS")
   }
   #pivot new master to trend by pay period
   trend <- master_new %>% 
@@ -74,7 +78,7 @@ master <- function(){
 #------------upload
 upload <- function(){
   #read new master
-  master_new <- readRDS("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Inpatient Census Days/New Calculation Worksheets/Master.RDS")
+  master_new <- readRDS("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Inpatient Census Days/New Calculation Worksheets/Master.RDS")
   #create upload format
   upload <- master_new %>%
     #filter on user inputed dates. remove unmapped units
@@ -99,7 +103,7 @@ upload <- function(){
 #------------save
 save <- function(){
   
-  name <- paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/",
+  name <- paste0("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/",
                  "Volume - Data/MSH Data/Inpatient Census Days/",
                  "New Calculation Worksheets/Uploads/MSH_Census Days_",
                  as.Date(start, format = "%m/%d/%Y"), "_", 
@@ -117,7 +121,7 @@ trend <- master()
 #Upload multiple files if necessary
 
 #start and end should be start and end of what you want to upload
-start = "06/18/2023"
-end = "07/29/2023"
+start = "10/22/2023"
+end = "11/18/2023"
 census_export <- upload()
 save()
