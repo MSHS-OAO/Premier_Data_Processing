@@ -969,7 +969,11 @@ if (fte_summary %>% select(dist_date) %>% distinct() %>% nrow() !=
 row_count <- nrow(fte_summary)
 fte_summary <- fte_summary %>%
   left_join(map_uni_reports %>%
-              filter(is.na(CLOSED) & DEPARTMENT.BREAKDOWN == 1) %>%
+              # try this without limiting to Dept Breakdown so other
+              # Rep Def can be indicated in the fte_summary even
+              # if a report has been turned off or isn't included in
+              # the Dept Breakdown (e.g. Small Dept Def)
+              filter(is.na(CLOSED)) %>% # & DEPARTMENT.BREAKDOWN == 1) %>%
               select(DEFINITION.CODE, DEFINITION.NAME, ORACLE.COST.CENTER,
                      CORPORATE.SERVICE.LINE, VP) %>%
               distinct(),
