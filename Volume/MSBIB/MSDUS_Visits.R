@@ -35,27 +35,29 @@ dir_universal <- paste0(j_drive, "SixSigma/MSHS Productivity",
 # Data References ---------------------------------------------------------
 
 ## Pay cycles -------------------------------------------------------------
-dict_pay_cycles <- read_xlsx(
-  paste0(
-    j_drive, "/SixSigma/MSHS Productivity/Productivity/Universal Data/",
-    "Mapping/MSHS_Pay_Cycle.xlsx"
-  ),
-  col_types = c("date", "date", "date", "skip")
-  # bringing in the date as "text" results in the excel number representation
-  # of a date
-)
 
+oao_con <- dbConnect(odbc(), "OAO Cloud DB Production")
+
+dict_pay_cycles <- tbl(oao_con, "LPM_MAPPING_PAYCYCLE") %>% collect()
+
+dict_PC_raw <- dict_pay_cycles %>%
+  rename(DATE = PAYCYCLE_DATE,
+         START.DATE = PP_START_DATE,
+         END.DATE = PP_END_DATE,
+         PREMIER.DISTRIBUTION = PREMIER_DISTRIBUTION)
+
+# modifying column names in order to not have to recode the rest of the script
 # dates originally come in as POSIXct, so they're being converted to Date
 dict_pay_cycles <- dict_pay_cycles %>%
+  rename(DATE = PAYCYCLE_DATE,
+         START.DATE = PP_START_DATE,
+         END.DATE = PP_END_DATE,
+         PREMIER.DISTRIBUTION = PREMIER_DISTRIBUTION) %>%
   mutate(DATE = format(as.Date(DATE), "%m/%d/%Y"),
-         START.DATE = format(as.Date(START.DATE), "%m/%d/%Y"),
-         END.DATE = format(as.Date(END.DATE), "%m/%d/%Y"))
+        START.DATE = format(as.Date(START.DATE), "%m/%d/%Y"),
+        END.DATE = format(as.Date(END.DATE), "%m/%d/%Y")) %>%
+  select(-PREMIER.DISTRIBUTION)
 
-dict_PC_raw <- read.xlsx(paste0(dir_universal, "/Mapping/MSHS_Pay_Cycle.xlsx"),
-                         sheetIndex = 1)
-
-# there's opportunity to clean up the date import to only pull the file
-# in once
 
 ### Date Selection -------------------------------------------------------
 # select the date range to pull
