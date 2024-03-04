@@ -33,10 +33,32 @@ dict_PC <- dict_PC_raw %>%
 colnames(dict_PC) <- c("Census.Date", "Start.Date", "End.Date")
 
 # this reference will be updated to point to the DB in the future:
-map_reports <- read.xlsx(
-  paste0(dir_universal, "/Mapping/MSHS_Reporting_Definition_Mapping.xlsx"),
-  sheet = 1,
-  detectDates = TRUE)
+# map_reports <- read.xlsx(
+#   paste0(dir_universal, "/Mapping/MSHS_Reporting_Definition_Mapping.xlsx"),
+#   sheet = 1,
+#   detectDates = TRUE)
+
+map_uni_reports <- tbl(oao_con, "LPM_MAPPING_REPDEF") %>%
+  collect()
+map_uni_cost_ctr <- tbl(oao_con, "LPM_MAPPING_COST_CENTER") %>%
+  collect()
+map_uni_key_vol <- tbl(oao_con, "LPM_MAPPING_KEY_VOLUME") %>%
+  collect()
+
+map_reports <- map_uni_reports %>%
+  left_join(map_uni_cost_ctr, relationship = "many-to-many") %>%
+  left_join(map_uni_key_vol, relationship = "many-to-many") %>%
+  rename(DEFINITION.CODE = DEFINITION_CODE,
+         DEFINITION.NAME = DEFINITION_NAME,
+         KEY.VOLUME = KEY_VOLUME,
+         COST.CENTER = LEGACY_COST_CENTER,
+         ORACLE.COST.CENTER = ORACLE_COST_CENTER,
+         COST.CENTER.DESCRIPTION = COST_CENTER_DESCRIPTION,
+         CORPORATE.SERVICE.LINE = CORPORATE_SERVICE_LINE,
+         SITE = SITE,
+         CLOSED = CLOSED,
+         VP = VP,
+         DEPARTMENT.BREAKDOWN = DEPARTMENT_BREAKDOWN)
 
 
 # Constants - Dates--------------------------------------------------------
@@ -200,8 +222,8 @@ if (any(!unique(map_CC_Vol$Site) %in% site_names) |
 }
 
 map_reports <- map_reports %>%
-  filter(CLOSED > pp.end | is.na(CLOSED),
-         FTE.TREND == 1) %>%
+  filter(CLOSED > pp.end | is.na(CLOSED)) %>%
+         # FTE.TREND == 1) %>%
   select(ORACLE.COST.CENTER, DEFINITION.CODE, DEFINITION.NAME) %>%
   distinct() %>%
   drop_na() %>%
@@ -354,6 +376,11 @@ chart_master <- lapply(as.list(unique(data_upload$Site)),
                        function(x) quality_chart(data_upload, x))
 
 # Export Quality Charts ---------------------------------------------------
+
+# Warnings display when the below functions run to create the file
+# might consider using a different function in the future.
+# The warnings may be resolved if java and the package versions match up.
+
 write.xlsx2(chart_master[1],
             file = paste0(dir,
                           "/Quality Chart_",
