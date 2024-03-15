@@ -123,14 +123,14 @@ map_uni_paycycles <- tbl(oao_con, "LPM_MAPPING_PAYCYCLE") %>%
 ## Premier Reference Files -------------------------------------------------
 dict_premier_dpt <- read.csv(paste0(dir_universal,
                                     "/Premier/2.0 Dictionary Exports",
-                                    "/CostCenterDictionary.csv"),
+                                    "/MSTCC.csv"),
                              col.names = c("Corporation.Code", "Site",
                                            "Cost.Center",
                                            "Cost.Center.Description"),
                              sep = ",")
 dict_premier_jobcode <- read.csv(paste0(dir_universal,
                                         "/Premier/2.0 Dictionary Exports",
-                                        "/JobCodeDictionary.csv"),
+                                        "/MSTJOBCODE.csv"),
                                  col.names = c("Corporation.Code", "Site",
                                                "Job.Code",
                                                "Job.Code.Description",
@@ -140,7 +140,7 @@ dict_premier_jobcode <- read.csv(paste0(dir_universal,
                                  sep = ",")
 dict_premier_report <- read.csv(paste0(dir_universal,
                                        "/Premier/2.0 Dictionary Exports",
-                                       "/DepartmentDef.csv"),
+                                       "/MDDCCREL.csv"),
                                 col.names = c("Corporation.Code", "Site",
                                               "Report.ID", "Cost.Center", 
                                               "Effective.Date", 
@@ -150,12 +150,24 @@ dict_premier_report <- read.csv(paste0(dir_universal,
 
 dict_premier_paycode <- read.csv(paste0(dir_universal,
                                         "/Premier/2.0 Dictionary Exports",
-                                        "/PayCodeDictionaryExport.csv"),
+                                        "/MSTPAYCODE.csv"),
                                  col.names = c("Partner.or.Health.System.ID",
                                                "Facility.or.Hospital.ID",
                                                "Pay.Code", "Pay.Code.Name"),
                                  sep = ",")
-
+map_premier_jobcode <- read.csv(paste0(dir_universal,
+                                       "/Premier/2.0 Mapping Exports",
+                                       "/MAPJOBCODE.csv"),
+                                col.names = c("Effective.Start.Date",
+                                              "Expiration.Date",
+                                              "Corporation.Code", "Site",
+                                              "Job.Code",
+                                              "Cost.Center.Code",
+                                              "Premier.Standard.Dept.Code",
+                                              "Premier.Standard.Job.Code",
+                                              "Allocation.Percentage",
+                                              "Job.Code.Name"),
+                                sep = ",")
 
 ## Quality - piv_wide_check ------------------------------------------------
 
@@ -191,6 +203,10 @@ dict_premier_dpt <- dict_premier_dpt %>%
   mutate(Cost.Center = as.character(Cost.Center), Dpt_in_Dict = 1)
 dict_premier_jobcode <- dict_premier_jobcode %>%
   select(1:4) %>%
+  mutate(JC_in_Dicty = 1)
+map_premier_jobcode <- map_premier_jobcode %>%
+  filter(Premier.Standard.Job.Code != "9999") %>%
+  select(Corporation.Code, Site, Job.Code, Cost.Center.Code) %>%
   mutate(JC_in_Dict = 1)
 
 report_list <- dict_premier_report %>%
@@ -333,14 +349,20 @@ bislr_payroll <- raw_payroll %>%
               rename(Facility.Hospital.Id_Worked = Site,
                      DPT.WRKD = Cost.Center,
                      WRKDpt_in_Dict = Dpt_in_Dict)) %>%
-  left_join(dict_premier_jobcode %>%
-              select(Site, Job.Code, JC_in_Dict) %>%
+  left_join(map_premier_jobcode %>%
+              select(Site, Job.Code, Cost.Center.Code, JC_in_Dict) %>%
               rename(Home.FacilityOR.Hospital.ID = Site,
-                     HOMEJC_in_Dict = JC_in_Dict)) %>%
-  left_join(dict_premier_jobcode %>%
-              select(Site, Job.Code, JC_in_Dict) %>%
+                     HOMEJC_in_Dict = JC_in_Dict),
+            by = c("Home.FacilityOR.Hospital.ID" = "Home.FacilityOR.Hospital.ID",
+                   "Job.Code" = "Job.Code",
+                   "DPT.HOME" = "Cost.Center.Code")) %>%
+  left_join(map_premier_jobcode %>%
+              select(Site, Job.Code, Cost.Center.Code, JC_in_Dict) %>%
               rename(Facility.Hospital.Id_Worked = Site,
-                     WRKJC_in_Dict = JC_in_Dict)) %>%
+                     WRKJC_in_Dict = JC_in_Dict),
+            by = c("Facility.Hospital.Id_Worked" = "Facility.Hospital.Id_Worked",
+                   "Job.Code" = "Job.Code",
+                   "DPT.WRKD" = "Cost.Center.Code")) %>%
   mutate(Job.Code_up = substr(Job.Code, 1, 10),
          Approved.Hours.per.Pay.Period = case_when(
            is.na(Approved.Hours.per.Pay.Period) ~ 0,
@@ -439,10 +461,10 @@ while (NA %in% unique(bislr_payroll$JC_in_UniversalFile) |
                        paste0("There are still new job codes and/or \n",
                               "PROVIDER values of NA.\n")
                      },
-                     "Update Universal Job Code File before continuing. \n",
+                     "Update Universal Job Code DB Table before continuing. \n",
                      "\nIf there are new Job Codes they were written to a ",
                      "file in this directory:\n'", new_jc_path, "'\n\n",
-                     "\n Has the mapping file been completely updated?",
+                     "\n Has the mapping Production DB Table been completely updated?",
                      "\n \n If you want to quit running the code select NO \n",
                      " then click the stop code button in the console"),
                  ok = "YES", cancel = "NO")
@@ -455,7 +477,11 @@ while (NA %in% unique(bislr_payroll$JC_in_UniversalFile) |
   # within an if() statement based on an "ok" user input from the previous
   # prompt, but there's probably a simpler solution
   
-  # MUST UPDATE THE PROCESS SO DB IS UPDATED BEFORE PROCEEDING
+  # in order to make udpates you must:
+  # 1. add info to the Development Table
+  # 2. run the the sftp_sync_descrypt_insert Document on RStudio Connect
+  #    (by using the refresh icon on the Document page)
+  #    to get updates on the Dev Table into the Production table
   map_uni_jobcodes <- tbl(oao_con, "LPM_MAPPING_JOBCODE") %>%
     collect()
   map_uni_jobcodes <- map_uni_jobcodes %>%
@@ -526,7 +552,7 @@ while (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
                    "limit.\n")
           }
         },
-        "Update Universal Pay Code File before continuing. \n",
+        "Update Universal Pay Code DB Table before continuing. \n",
         "\n Have new pay codes been added?",
         "\n \n If you want to quit running the code select No \n",
         " then click the stop code button in the console"),
@@ -536,7 +562,11 @@ while (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
     Sys.sleep(15)
   }
 
-  # MUST UPDATE THE PROCESS SO DB IS UPDATED BEFORE PROCEEDING
+  # in order to make udpates you must:
+  # 1. add info to the Development Table
+  # 2. run the the sftp_sync_descrypt_insert Document on RStudio Connect
+  #    (by using the refresh icon on the Document page)
+  #    to get updates on the Dev Table into the Production table
   map_uni_paycodes <- tbl(oao_con, "LPM_MAPPING_PAYCODE") %>%
     collect()
   map_uni_paycodes <- map_uni_paycodes %>%
@@ -760,13 +790,13 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
       select(PartnerOR.Health.System.ID, Facility.Hospital.Id_Worked,
              Job.Code_up, Position.Code.Description, DPT.WRKD) %>%
       setNames(c(colnames(dict_premier_jobcode %>%
-                          select(-JC_in_Dict)), "Cost.Center")),
+                          select(-JC_in_Dicty)), "Cost.Center")),
     bislr_payroll %>%
       filter(is.na(HOMEJC_in_Dict), PROVIDER == 0) %>%
       select(PartnerOR.Health.System.ID, Home.FacilityOR.Hospital.ID,
              Job.Code_up, Position.Code.Description, DPT.HOME) %>%
       setNames(c(colnames(dict_premier_jobcode %>%
-                            select(-JC_in_Dict)), "Cost.Center"))) %>%
+                            select(-JC_in_Dicty)), "Cost.Center"))) %>%
     # for the future, we might look out for handling descriptions
     # that have special characters, such as & (ampersand)
     # mutate(Job.Code.Description = case_when(
