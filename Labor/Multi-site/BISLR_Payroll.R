@@ -285,7 +285,14 @@ View(piv_wide_check_prev)
 ## Data  --------------------------------------------------------------------
 row_count <- nrow(raw_payroll)
 
-bislr_payroll <- raw_payroll %>%
+if ("Job.Code.Description" %in% colnames(raw_payroll)) {
+  bislr_payroll <- raw_payroll %>%
+    rename(Position.Code.Description = Job.Code.Description)
+} else {
+  bislr_payroll <- raw_payroll
+}
+
+bislr_payroll <- bislr_payroll %>%
   mutate(DPT.WRKD = paste0(substr(Full.COA.for.Worked, 1, 3),
                            substr(Full.COA.for.Worked, 41, 44),
                            substr(Full.COA.for.Worked, 5, 7),
