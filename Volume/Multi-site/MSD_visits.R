@@ -114,7 +114,7 @@ if (pp.start > pp.end) {
 path_dict_prem <- paste0(j_drive,
                          "/SixSigma/MSHS Productivity/Productivity",
                          "/Volume - Data/MSBI Data/Union Square/",
-                         "R Code/MSUS Epic Dictionary.xlsx")
+                         "R Code/MSD Epic Dictionary - DRAFT.xlsx")
 
 dict_epic <- read_xlsx(
   path_dict_prem,
@@ -122,19 +122,13 @@ dict_epic <- read_xlsx(
   skip = 0
 )
 
+# this might be adjusted
 dict_epic_short <- dict_epic %>%
   select(`Epic Department Name`, `Volume ID`, `Cost Center`, `volume ratio`)
 
+# change this to use ID instead of Dept Name
+# and do not include Departments that have not yet been mapped to Premier
 epic_dpts <- unique(dict_epic_short$`Epic Department Name`)
-
-### rehab offsite ---------------------------------------------------------
-
-dict_rehab_docs <- read_xlsx(
-  path_dict_prem,
-  sheet = 2,
-  skip = 0
-)
-
 
 # Data Import -------------------------------------------------------------
 
@@ -143,12 +137,13 @@ con <- dbConnect(odbc(), "OAO Cloud DB Armando")
 
 data_raw <- tbl(con,
                 in_schema("VILLEA04", "AMBULATORY_ACCESS_VIEW")) %>%
-  filter(DEPARTMENT %in% epic_dpts,
+  filter(DEPARTMENT_ID %in% epic_dpts,
          APPT_DATE_YEAR >= as.Date(pp.start),
          APPT_DATE_YEAR <= as.Date(pp.end)) %>%
   select(DEPARTMENT, DEPARTMENT_ID, APPT_DATE_YEAR, APPT_STATUS, PROVIDER) %>%
   filter(APPT_STATUS %in% c("Completed", "Arrived",
                             "Checked in", "Checked out")) %>%
+  # head() %>%
   show_query() %>%
   collect()
 
@@ -168,6 +163,7 @@ data_epic <- data_raw %>%
 
 data_epic_row <- nrow(data_epic)
 data_epic <- data_epic %>%
+  # change join to be on DEPARTMENT ID instead of DEPARTMENT
   left_join(dict_epic_short, by = c("DEPARTMENT" = "Epic Department Name"))
 data_epic_row2 <- nrow(data_epic)
 
@@ -183,15 +179,20 @@ showDialog(title = "Row Increase",
 
 ## Visit counter ----------------------------------------------------------
 
+# This section should not be necessary as rehab offsite is not part of MSD.
+
+# Kept and commented out so we can reference quickly if script needs a portion
+# of this section.
+
 # rehab offsite docs that are not included docs get 0
 # all others keep their ratio
-data_epic <- data_epic %>%
-  rename(volume = `volume ratio`) %>%
-  mutate(volume = case_when(
-    DEPARTMENT %in% dict_rehab_docs$`Epic Department Name` &
-      !(PROVIDER %in% dict_rehab_docs$Provider) ~ 0,
-    TRUE ~ volume
-  ))
+# data_epic <- data_epic %>%
+#   rename(volume = `volume ratio`) %>%
+#   mutate(volume = case_when(
+#     DEPARTMENT %in% dict_rehab_docs$`Epic Department Name` &
+#       !(PROVIDER %in% dict_rehab_docs$Provider) ~ 0,
+#     TRUE ~ volume
+#   ))
 
 
 ## upload summary ---------------------------------------------------------
@@ -201,7 +202,8 @@ summary_upload <- data_epic %>%
   mutate(visits = round(visits, digits = 0)) %>%
   ungroup() %>%
   filter(!is.na(`Volume ID`)) %>%
-  filter(!(`Volume ID` %in% c("TBD", "X")))
+  filter(!(`Volume ID` %in% c("TBD", "X"))) # this should have already been removed
+                                            # because of other changes earlier in script
 
 
 ## Add rows for volume ID with 0 volume ------------------------------------
@@ -246,7 +248,7 @@ summary_upload <- rbind(summary_upload, zero_rows)
 
 upload_file <- summary_upload %>%
   mutate(entity = "729805",
-         facility = "630571",
+         facility = "630571", # will need to make sure facility matches for each department
          budget = "0") %>%
   relocate(c(entity, facility), .before = `Cost Center`)
 
@@ -254,74 +256,78 @@ upload_file <- summary_upload %>%
 # Quality Checks ----------------------------------------------------------
 
 ## Visualization -----------------------------------------------------------
-#consolidate plot groups into the MSUS Epic Dict
-#add note column to the upload file so it can bind to trend data file
-new_trend_data <- upload_file %>%
-  mutate(Note = NA) %>%
-  mutate(START.DATE = mdy(START.DATE)) %>%
-  mutate(START.DATE = as.Date(START.DATE, format = "%Y-%m-%d")) %>%
-  mutate(END.DATE = mdy(END.DATE)) %>%
-  mutate(END.DATE = as.Date(END.DATE, format = "%Y-%m-%d"))
+# commented out for initial prep of data
 
-#read in trend data file
-old_trend_data <- read_xlsx(paste0(j_drive, "/SixSigma/MSHS Productivity",
-                                   "/Productivity/Volume - Data/MSBI Data",
-                                   "/Union Square/Calculation Worksheets",
-                                   "/MSDUS_trend_data.xlsx"),
-                            sheet = 1) %>%
-  mutate(START.DATE = as.Date(START.DATE)) %>%
-  mutate(END.DATE = as.Date(END.DATE)) %>%
-  mutate(`Volume ID` = as.character(`Volume ID`))
-
-#combine new upload data with the existing trend data
-updated_trend_data <- rbind(old_trend_data, new_trend_data) %>%
-  mutate(START.DATE = as.Date(START.DATE)) %>%
-  mutate(END.DATE = as.Date(END.DATE)) %>%
-  unique()
-
-#overwrite trend data file with updated trend data
-write_xlsx(updated_trend_data, paste0(j_drive, "/SixSigma/MSHS Productivity",
-                                      "/Productivity/Volume - Data/MSBI Data",
-                                      "/Union Square/Calculation Worksheets",
-                                      "/MSDUS_trend_data.xlsx"))
-
-#format dict_epic for a left join
-trend_groups <- dict_epic %>%
-  select("Volume ID", "Plot Group", "Cost Center Name") %>%
-  mutate(`Volume ID` = as.character(`Volume ID`)) %>%
-  na.omit() %>%
-  unique()
-
-#prepare the updated trend data for visualization
-plot_trend_data <- updated_trend_data %>%
-  left_join(trend_groups,
-            by = c("Volume ID" = "Volume ID")) %>%
-  arrange(desc(START.DATE)) %>%
-  mutate(NEW.NAME = paste0(`Cost Center Name`,
-                           " - ",
-                           as.character(`Volume ID`))) %>%
-  filter(START.DATE >= today() - 180)
-
-#creating multiple-bar plots (x = volume ID, y = volume, and
-#each bar indicates the volume on a specific end date)
-#each plot is depicts sets of volume ids with similar visit counts
-for (i in c("low", "med", "high")) {
-  plot <- ggplot(data = filter(plot_trend_data, `Plot Group` == i),
-         mapping = aes(x = `NEW.NAME`, y = `visits`, fill = `END.DATE`)) +
-    geom_bar(position = "dodge2", stat = "identity") +
-    coord_flip() +
-    labs(y = "Visits per Pay Period", x = "Cost Center & Volume ID") +
-    ggtitle(paste0("MSDUS Visit Trends: ", i, " volume group"))
-  print(plot)
-}
+# #consolidate plot groups into the MSUS Epic Dict
+# #add note column to the upload file so it can bind to trend data file
+# new_trend_data <- upload_file %>%
+#   mutate(Note = NA) %>%
+#   mutate(START.DATE = mdy(START.DATE)) %>%
+#   mutate(START.DATE = as.Date(START.DATE, format = "%Y-%m-%d")) %>%
+#   mutate(END.DATE = mdy(END.DATE)) %>%
+#   mutate(END.DATE = as.Date(END.DATE, format = "%Y-%m-%d"))
+# 
+# #read in trend data file
+# old_trend_data <- read_xlsx(paste0(j_drive, "/SixSigma/MSHS Productivity",
+#                                    "/Productivity/Volume - Data/MSBI Data",
+#                                    "/Union Square/Calculation Worksheets",
+#                                    "/MSDUS_trend_data.xlsx"),
+#                             sheet = 1) %>%
+#   mutate(START.DATE = as.Date(START.DATE)) %>%
+#   mutate(END.DATE = as.Date(END.DATE)) %>%
+#   mutate(`Volume ID` = as.character(`Volume ID`))
+# 
+# #combine new upload data with the existing trend data
+# updated_trend_data <- rbind(old_trend_data, new_trend_data) %>%
+#   mutate(START.DATE = as.Date(START.DATE)) %>%
+#   mutate(END.DATE = as.Date(END.DATE)) %>%
+#   unique()
+# 
+# #overwrite trend data file with updated trend data
+# write_xlsx(updated_trend_data, paste0(j_drive, "/SixSigma/MSHS Productivity",
+#                                       "/Productivity/Volume - Data/MSBI Data",
+#                                       "/Union Square/Calculation Worksheets",
+#                                       "/MSDUS_trend_data.xlsx"))
+# 
+# #format dict_epic for a left join
+# trend_groups <- dict_epic %>%
+#   select("Volume ID", "Plot Group", "Cost Center Name") %>%
+#   mutate(`Volume ID` = as.character(`Volume ID`)) %>%
+#   na.omit() %>%
+#   unique()
+# 
+# #prepare the updated trend data for visualization
+# plot_trend_data <- updated_trend_data %>%
+#   left_join(trend_groups,
+#             by = c("Volume ID" = "Volume ID")) %>%
+#   arrange(desc(START.DATE)) %>%
+#   mutate(NEW.NAME = paste0(`Cost Center Name`,
+#                            " - ",
+#                            as.character(`Volume ID`))) %>%
+#   filter(START.DATE >= today() - 180)
+# 
+# #creating multiple-bar plots (x = volume ID, y = volume, and
+# #each bar indicates the volume on a specific end date)
+# #each plot is depicts sets of volume ids with similar visit counts
+# for (i in c("low", "med", "high")) {
+#   plot <- ggplot(data = filter(plot_trend_data, `Plot Group` == i),
+#          mapping = aes(x = `NEW.NAME`, y = `visits`, fill = `END.DATE`)) +
+#     geom_bar(position = "dodge2", stat = "identity") +
+#     coord_flip() +
+#     labs(y = "Visits per Pay Period", x = "Cost Center & Volume ID") +
+#     ggtitle(paste0("MSDUS Visit Trends: ", i, " volume group"))
+#   print(plot)
+# }
 # File Saving -------------------------------------------------------------
 
 date_min_char <- format(pp.start, "%Y-%m-%d")
 date_max_char <- format(pp.end, "%Y-%m-%d")
 
 file_name_premier <-
-  paste0("MSDUS_Department Volumes_", date_min_char, "_to_", date_max_char,
+  paste0("MSD_Department Volumes_", date_min_char, "_to_", date_max_char,
          ".csv")
+
+# change output folder path at some point
 path_folder_premier_export <- paste0(j_drive,
                                      "/SixSigma/MSHS Productivity/Productivity",
                                      "/Volume - Data/MSBI Data/Union Square",
