@@ -6,11 +6,7 @@ library(writexl)
 #push to github
 
 # Initial Set-up of Dataframe ---------------------------------------------
-if ("Presidents" %in% list.files("J://")) {
-  user_directory <- "J:/Presidents/"
-} else {
-  user_directory <- "J:/deans/Presidents/"
-}
+user_directory <- "/SharedDrive/deans/Presidents/"
 
 #choose the biomed volume data file
 biomed_data_path <- file.choose()
@@ -18,9 +14,8 @@ biomed_data_path <- file.choose()
 raw_biomed_data <- read_excel(biomed_data_path) %>%
   mutate(`Completion Date/Time` = as.Date(`Completion Date/Time`))
 
-pay_cycle_data <- read_excel(paste0(user_directory,
-                                    "SixSigma/MSHS Productivity/Productivity/Universal Data/Mapping/",
-                                    "MSHS_Pay_Cycle.xlsx"))
+oao_con <- dbConnect(odbc(), "OAO Cloud DB Production")
+pay_cycle_data <- tbl(oao_con, "LPM_MAPPING_PAYCYCLE") %>% collect()
 
 #left join biomed WO data with pay cycle to get start/end dates
 clean_data <- select(raw_biomed_data, "Building", "Completion Date/Time") %>%
@@ -121,6 +116,17 @@ latest_date <- max(pc_end_dates_vec) %>%
   format("%d%b%y") %>%
   as.character() %>%
   toupper()
+
+upload_cols <- c("Corporation Code",
+                 "Entity Code",
+                 "Cost Center Code",
+                 "Start Date",
+                 "End Date",
+                 "Volume Code",
+                 "Actual Volume",
+                 "Budget Volume")
+
+colnames(upload_df) <- upload_cols
   
 write.table(upload_df, 
             file = paste0(user_directory,
