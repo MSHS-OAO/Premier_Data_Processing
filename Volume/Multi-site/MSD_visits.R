@@ -54,8 +54,8 @@ dict_pay_cycles <- dict_pay_cycles %>%
          END.DATE = PP_END_DATE,
          PREMIER.DISTRIBUTION = PREMIER_DISTRIBUTION) %>%
   mutate(DATE = format(as.Date(DATE), "%m/%d/%Y"),
-        START.DATE = format(as.Date(START.DATE), "%m/%d/%Y"),
-        END.DATE = format(as.Date(END.DATE), "%m/%d/%Y")) %>%
+         START.DATE = format(as.Date(START.DATE), "%m/%d/%Y"),
+         END.DATE = format(as.Date(END.DATE), "%m/%d/%Y")) %>%
   select(-PREMIER.DISTRIBUTION)
 
 
@@ -122,24 +122,31 @@ dict_epic <- read_xlsx(
   skip = 0
 )
 
-# this might be adjusted
-dict_epic_short <- dict_epic %>%
-  select(`Epic Department Name`, `Volume ID`, `Cost Center`, `volume ratio`)
+# SP adjusted to pull Epic Dept ID instead Dept Name, and exclude rows with 'TBD'
+specific_text <- "TBD"
 
-# change this to use ID instead of Dept Name
-# and do not include Departments that have not yet been mapped to Premier
-epic_dpts <- unique(dict_epic_short$`Epic Department Name`)
+dict_epic_short <- dict_epic %>%
+  select(`Epic Dept ID`, `Volume ID`, `Cost Center`, `volume ratio`,`facility`)%>%
+  filter(!is.na(`Volume ID`))
+
+# SP changed to not include Departments that have not yet been mapped to Premier
+dict_epic_short <- subset(dict_epic_short, !grepl(specific_text, `Volume ID`))
+
+epic_dpts <- as.integer(unique(dict_epic_short$`Epic Dept ID`))
 
 # Data Import -------------------------------------------------------------
 
 # set up connection to schema
 con <- dbConnect(odbc(), "OAO Cloud DB Armando")
 
+pp.start.fmt <- format(pp.start, "%Y-%m-%d")
+pp.end.fmt <- format(pp.end, "%Y-%m-%d")
+
 data_raw <- tbl(con,
                 in_schema("VILLEA04", "AMBULATORY_ACCESS_VIEW")) %>%
   filter(DEPARTMENT_ID %in% epic_dpts,
-         APPT_DATE_YEAR >= as.Date(pp.start),
-         APPT_DATE_YEAR <= as.Date(pp.end)) %>%
+         APPT_DATE_YEAR >= as.Date(pp.start.fmt),
+         APPT_DATE_YEAR <= as.Date(pp.end.fmt)) %>%
   select(DEPARTMENT, DEPARTMENT_ID, APPT_DATE_YEAR, APPT_STATUS, PROVIDER) %>%
   filter(APPT_STATUS %in% c("Completed", "Arrived",
                             "Checked in", "Checked out")) %>%
@@ -163,18 +170,18 @@ data_epic <- data_raw %>%
 
 data_epic_row <- nrow(data_epic)
 data_epic <- data_epic %>%
-  # change join to be on DEPARTMENT ID instead of DEPARTMENT
-  left_join(dict_epic_short, by = c("DEPARTMENT" = "Epic Department Name"))
+  # SP changed join to be on DEPARTMENT ID instead of DEPARTMENT
+  left_join(dict_epic_short, by = c("DEPARTMENT_ID" = "Epic Dept ID"))
 data_epic_row2 <- nrow(data_epic)
 
 showDialog(title = "Row Increase",
-          message = paste0("The number of rows in data increased ",
-                           "when joining Volume IDs.  ",
-                           "This can be expected because of roll-up volumes ",
-                           "that were created for a few departments.  ",
-                           "The row increase was: ",
-                           data_epic_row2 - data_epic_row, ".  ",
-                           "Press OK to continue."))
+           message = paste0("The number of rows in data increased ",
+                            "when joining Volume IDs.  ",
+                            "This can be expected because of roll-up volumes ",
+                            "that were created for a few departments.  ",
+                            "The row increase was: ",
+                            data_epic_row2 - data_epic_row, ".  ",
+                            "Press OK to continue."))
 
 
 ## Visit counter ----------------------------------------------------------
@@ -197,13 +204,13 @@ showDialog(title = "Row Increase",
 
 ## upload summary ---------------------------------------------------------
 summary_upload <- data_epic %>%
-  group_by(`Cost Center`, START.DATE, END.DATE, `Volume ID`) %>%
-  summarize(visits = sum(volume)) %>%
+  group_by(`Cost Center`, START.DATE, END.DATE, `Volume ID`,`facility`) %>%
+  summarize(visits = sum(`volume ratio`)) %>%
   mutate(visits = round(visits, digits = 0)) %>%
   ungroup() %>%
   filter(!is.na(`Volume ID`)) %>%
   filter(!(`Volume ID` %in% c("TBD", "X"))) # this should have already been removed
-                                            # because of other changes earlier in script
+# because of other changes earlier in script
 
 
 ## Add rows for volume ID with 0 volume ------------------------------------
@@ -213,7 +220,7 @@ data_dates <- data_epic %>%
   unique()
 
 dict_epic_unique <- dict_epic %>%
-  select(`Cost Center`, `Volume ID`) %>%
+  select(`Cost Center`, `Volume ID`,`facility`) %>%
   unique()
 
 dict_and_date <- merge(data_dates, dict_epic_unique)
@@ -228,15 +235,15 @@ zero_rows <- missing_vol_id_date %>%
 zero_depts <- dict_epic_short %>%
   filter(`Volume ID` %in% zero_rows$`Volume ID`)
 
-# would be better to display Cost Center name and the volume IDs
-if (length(unique(zero_depts$`Epic Department Name`)) > 0) {
+#SP displaying Cost Center name and the volume IDs; Question: Want to display the cc or the volume ID?
+if (length(unique(zero_depts$`Volume ID`)) > 0) {
   showDialog(
     title = "Zero Depts",
     message = paste0(
-    "The following Depts had a pay period with 0 volume:  ",
-    paste(sort(unique(zero_depts$`Epic Department Name`)),
-          collapse = " | "))
-    )
+      "The following Depts had a pay period with 0 volume:  ",
+      paste(sort(unique(zero_depts$`Volume ID`)),
+            collapse = " | "))
+  )
 }
 
 
@@ -248,7 +255,7 @@ summary_upload <- rbind(summary_upload, zero_rows)
 
 upload_file <- summary_upload %>%
   mutate(entity = "729805",
-         facility = "630571", # will need to make sure facility matches for each department
+         #facility = "630571", # SP make sure facility matches for each department
          budget = "0") %>%
   relocate(c(entity, facility), .before = `Cost Center`)
 
@@ -327,11 +334,12 @@ file_name_premier <-
   paste0("MSD_Department Volumes_", date_min_char, "_to_", date_max_char,
          ".csv")
 
-# change output folder path at some point
+#SP changed output folder path 
 path_folder_premier_export <- paste0(j_drive,
-                                     "/SixSigma/MSHS Productivity/Productivity",
-                                     "/Volume - Data/MSBI Data/Union Square",
-                                     "/Calculation Worksheets")
+                                     "SixSigma",
+                                     "/MSHS Productivity/Productivity", 
+                                     "/Volume - Data/Multisite Volumes",
+                                     "/Mount Sinai Doctors (TEST)")
 
 upload_cols <- c("Corporation Code",
                  "Entity Code",
@@ -343,7 +351,7 @@ upload_cols <- c("Corporation Code",
                  "Budget Volume")
 
 colnames(upload_file) <- upload_cols
-
+#SP Having issues with the file saving 
 write.table(
   upload_file,
   file = paste0(path_folder_premier_export, "/", file_name_premier),
