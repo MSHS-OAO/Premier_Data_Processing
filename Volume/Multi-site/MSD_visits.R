@@ -127,10 +127,8 @@ specific_text <- "TBD"
 
 dict_epic_short <- dict_epic %>%
   select(`Epic Dept ID`, `Volume ID`, `Cost Center`, `volume ratio`,`facility`)%>%
-  filter(!is.na(`Volume ID`))
-
-# SP changed to not include Departments that have not yet been mapped to Premier
-dict_epic_short <- subset(dict_epic_short, !grepl(specific_text, `Volume ID`))
+  filter(!is.na(`Volume ID`)) %>%
+  filter(`Volume ID` != specific_text) # SP changed to not include Departments that have not yet been mapped to Premier
 
 epic_dpts <- as.integer(unique(dict_epic_short$`Epic Dept ID`))
 
