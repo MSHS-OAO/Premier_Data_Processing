@@ -217,7 +217,7 @@ data_dates <- data_epic %>%
   select(START.DATE, END.DATE) %>%
   unique()
 
-dict_epic_unique <- dict_epic %>%
+dict_epic_unique <- dict_epic_short %>%
   select(`Cost Center`, `Volume ID`,`facility`) %>%
   unique()
 
@@ -349,7 +349,7 @@ upload_cols <- c("Corporation Code",
                  "Budget Volume")
 
 colnames(upload_file) <- upload_cols
-#SP Having issues with the file saving 
+
 write.table(
   upload_file,
   file = paste0(path_folder_premier_export, "/", file_name_premier),
