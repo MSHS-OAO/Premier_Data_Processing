@@ -49,6 +49,10 @@ dummy_report_ids <- c("DNU_000", "DNU_MSM000", "DNU_MSW000")
 
 jc_desc_threshold <- 5
 
+# list of dept IDs where fund number should be used in place of the
+# standard department ID structure
+cc_fundnum_conv <- c(37800)
+
 ## Premier Formatting ------------------------------------------------------
 char_len_dpt <- 15
 char_len_dpt_name <- 50
@@ -325,6 +329,16 @@ bislr_payroll <- bislr_payroll %>%
       trimws(Department.Name.Home.Dept) == "" ~
         as.character(Department.ID.Home.Department),
       TRUE ~ DPT.HOME)) %>%
+  mutate(
+    DPT.WRKD = case_when(
+      WD_Department %in% cc_fundnum_conv ~ WD_Fund_number,
+      TRUE ~ DPT.WRKD)) %>%
+  # for the future after LPM team has requested that the Home Fund Number
+  # be populated in the Full.COA.for.Home string:
+  # mutate(
+  #   DPT.HOME = case_when(
+  #     HD_Department %in% cc_fundnum_conv ~ substr(Full.COA.for.Home, 25, 35),
+  #     TRUE ~ DPT.HOME)) %>%
   mutate(
     Job.Code = case_when(
       paste0(DPT.WRKD, "-", toupper(Employee.Name)) %in%
@@ -1052,6 +1066,10 @@ fte_summary <- fte_summary %>%
 
 
 ### wide summary ------------------------------------------------------------
+
+# THIS NEEDS TO BE TESTED IN MAY 2024 WITH LIVE DATA
+# -- an error was observed because the fte_summary overlaps with the 
+#    previous file that was imported
 
 # get the minimum date for each cost center
 fte_summary_cc_age <- fte_summary %>%
