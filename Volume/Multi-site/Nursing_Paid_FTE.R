@@ -42,7 +42,7 @@ msbib_agency <- read.csv(rownames(msbib_files)[which.max(msbib_files$mtime)],
                          colClasses = rep("character", 14))
 # get start and end date range from rightsourcing upload
 msbib_end <- max(mdy(msbib_agency$End.Date))
-msbib_start <- msbib_end - 55
+msbib_start <- min(mdy(msbib_agency$Start.Date))
 
 #import most recent mshq rightsourcing upload
 mshq_files <- file.info(list.files(mshq_rightsourcing_dir, full.names = T))
@@ -51,7 +51,7 @@ mshq_agency <- read.csv(rownames(mshq_files)[which.max(mshq_files$mtime)],
                         colClasses = rep("character", 14))
 # get start and end date range from rightsourcing upload
 mshq_end <- max(mdy(mshq_agency$End.Date))
-mshq_start <- mshq_end - 55
+mshq_start <- min(mdy(mshq_agency$Start.Date))
 
 # get list of nursing paid fte cost centers
 nursing_cost_centers <- paste(nursing_paid_fte_cc$COST_CENTER, 
@@ -103,7 +103,7 @@ mshs_agency <- mshs_agency %>%
 # mshs payroll
 mshs_payroll <- mshs_payroll %>%
   select(-PP_END_DATE) %>%
-  left_join(paycycle_mapping, 
+  left_join(paycycle_mapping,
             by = c("END_DATE" = "PAYCYCLE_DATE")) %>%
   left_join(nursing_paid_fte_cc, 
             by = c("WORKED_DEPARTMENT" = "COST_CENTER")) %>%
@@ -127,28 +127,21 @@ mshs_nursing_paid_FTE <- rbind(mshs_agency, mshs_payroll) %>%
 
 # Quality Checks ----------------------------------------------------------
 # check to make sure there are 4 pay periods for each site for each labor source
-# agency
+# visual check for paid FTE values
+View(mshs_nursing_paid_FTE)
+
+# check number of pay periods per site for agency paid FTE
 pp_check_agency <- mshs_agency %>%
   group_by(SITE) %>%
   summarise(PP_COUNT = n())
-if (any(pp_check_agency$PP_COUNT != 4)) {
-  pp_check_agency_error <- pp_check_agency %>%
-    filter(PP_COUNT != 4)
-  View(pp_check_agency_error)
-  message(paste(pp_check_agency_error$SITE, collapse = ", "),
-          " do not contain 4 pay periods")
-}
-# payroll
+View(pp_check_agency)
+
+# check number of pay periods per site for payroll paid FTE
 pp_check_payroll <- mshs_payroll %>%
   group_by(SITE) %>%
   summarise(PP_COUNT = n())
-if (any(pp_check_payroll$PP_COUNT != 4)) {
-  pp_check_payroll_error <- pp_check_payroll %>%
-    filter(PP_COUNT != 4)
-  View(pp_check_agency_error)
-  message(paste(pp_check_agency_error$SITE, collapse = ", "),
-          " do not contain 4 pay periods")
-}
+View(pp_check_payroll)
+
 # Data Formatting ---------------------------------------------------------
 # put data in premier upload format
 upload <- mshs_nursing_paid_FTE %>%
