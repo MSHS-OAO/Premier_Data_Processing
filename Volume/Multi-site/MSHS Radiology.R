@@ -1,19 +1,21 @@
 # Libraries  --------------------------------------------------------------
 library(tidyverse)
 library(readxl)
-library(readxl)
 library(openxlsx)
 library(lubridate)
+library(odbc)
+library(DBI)
+library(dplyr)
 
 # Directories -------------------------------------------------------------
-dir_data <- paste0("J:/deans/Presidents/SixSigma/MSHS Productivity",
+dir_data <- paste0("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity",
                    "/Productivity/Volume - Data/Multisite Volumes",
                    "/Radiology RIS CPT Data")
-dir_cdm <- paste0("J:/deans/Presidents/SixSigma/MSHS Productivity",
+dir_cdm <- paste0("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity",
                   "/Productivity/Volume - Data/CDMs")
-dir_universal <- paste0("J:/deans/Presidents/SixSigma/MSHS Productivity",
+dir_universal <- paste0("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity",
                         "/Productivity/Universal Data")
-
+oao_con <- dbConnect(odbc(), "OAO Cloud DB Production")
 # Constants ---------------------------------------------------------------
 premier_corp <- "729805"
 premier_budget <- 0
@@ -44,9 +46,8 @@ map_msbi_special <- read_xlsx(path = paste0(dir_data, "/References",
                               sheet = "MSBI Update Charge Class")
 map_paycycle <- read_xlsx(path = paste0(dir_universal,
                                         "/Mapping/MSHS_Pay_Cycle.xlsx"))
-map_report <- read_xlsx(path = paste0(dir_universal, "/Mapping",
-                                      "/MSHS_Reporting_Definition_Mapping",
-                                      ".xlsx"))
+map_report <- tbl(oao_con, "LPM_MAPPING_REPDEF") %>%
+  collect()
 map_msh_modality <- read_xlsx(path = paste0(dir_data, "/References",
                                             "/Radiology RIS Mappings.xlsx"),
                               sheet = "Modality Mapping MSH")

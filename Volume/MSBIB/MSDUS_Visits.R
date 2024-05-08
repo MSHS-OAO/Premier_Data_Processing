@@ -54,8 +54,8 @@ dict_pay_cycles <- dict_pay_cycles %>%
          END.DATE = PP_END_DATE,
          PREMIER.DISTRIBUTION = PREMIER_DISTRIBUTION) %>%
   mutate(DATE = format(as.Date(DATE), "%m/%d/%Y"),
-        START.DATE = format(as.Date(START.DATE), "%m/%d/%Y"),
-        END.DATE = format(as.Date(END.DATE), "%m/%d/%Y")) %>%
+         START.DATE = format(as.Date(START.DATE), "%m/%d/%Y"),
+         END.DATE = format(as.Date(END.DATE), "%m/%d/%Y")) %>%
   select(-PREMIER.DISTRIBUTION)
 
 
@@ -141,11 +141,14 @@ dict_rehab_docs <- read_xlsx(
 # set up connection to schema
 con <- dbConnect(odbc(), "OAO Cloud DB Armando")
 
+pp.start.fmt <- format(pp.start, "%Y-%m-%d")
+pp.end.fmt <- format(pp.end, "%Y-%m-%d")
+
 data_raw <- tbl(con,
                 in_schema("VILLEA04", "AMBULATORY_ACCESS_VIEW")) %>%
   filter(DEPARTMENT %in% epic_dpts,
-         APPT_DATE_YEAR >= as.Date(pp.start),
-         APPT_DATE_YEAR <= as.Date(pp.end)) %>%
+         APPT_DATE_YEAR >= as.Date(pp.start.fmt),
+         APPT_DATE_YEAR <= as.Date(pp.end.fmt)) %>%
   select(DEPARTMENT, DEPARTMENT_ID, APPT_DATE_YEAR, APPT_STATUS, PROVIDER) %>%
   filter(APPT_STATUS %in% c("Completed", "Arrived",
                             "Checked in", "Checked out")) %>%
@@ -172,13 +175,13 @@ data_epic <- data_epic %>%
 data_epic_row2 <- nrow(data_epic)
 
 showDialog(title = "Row Increase",
-          message = paste0("The number of rows in data increased ",
-                           "when joining Volume IDs.  ",
-                           "This can be expected because of roll-up volumes ",
-                           "that were created for a few departments.  ",
-                           "The row increase was: ",
-                           data_epic_row2 - data_epic_row, ".  ",
-                           "Press OK to continue."))
+           message = paste0("The number of rows in data increased ",
+                            "when joining Volume IDs.  ",
+                            "This can be expected because of roll-up volumes ",
+                            "that were created for a few departments.  ",
+                            "The row increase was: ",
+                            data_epic_row2 - data_epic_row, ".  ",
+                            "Press OK to continue."))
 
 
 ## Visit counter ----------------------------------------------------------
@@ -231,10 +234,10 @@ if (length(unique(zero_depts$`Epic Department Name`)) > 0) {
   showDialog(
     title = "Zero Depts",
     message = paste0(
-    "The following Depts had a pay period with 0 volume:  ",
-    paste(sort(unique(zero_depts$`Epic Department Name`)),
-          collapse = " | "))
-    )
+      "The following Depts had a pay period with 0 volume:  ",
+      paste(sort(unique(zero_depts$`Epic Department Name`)),
+            collapse = " | "))
+  )
 }
 
 
@@ -307,7 +310,7 @@ plot_trend_data <- updated_trend_data %>%
 #each plot is depicts sets of volume ids with similar visit counts
 for (i in c("low", "med", "high")) {
   plot <- ggplot(data = filter(plot_trend_data, `Plot Group` == i),
-         mapping = aes(x = `NEW.NAME`, y = `visits`, fill = `END.DATE`)) +
+                 mapping = aes(x = `NEW.NAME`, y = `visits`, fill = `END.DATE`)) +
     geom_bar(position = "dodge2", stat = "identity") +
     coord_flip() +
     labs(y = "Visits per Pay Period", x = "Cost Center & Volume ID") +

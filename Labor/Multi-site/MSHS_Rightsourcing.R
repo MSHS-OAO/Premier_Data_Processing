@@ -384,7 +384,7 @@ processed_data <- processed_data %>%
 rolled_up <- processed_data %>%
   group_by(hospital, home_dept_oracle,  wrkd_dept_oracle, Earnings.E.D,
            Worker.Name, jobcode) %>%
-  summarize(across(c(daily_hours, Day.Spend), sum, na.rm = T)) %>%
+  summarize(across(c(daily_hours, Day.Spend), \(x) sum(x, na.rm = T))) %>%
   ungroup() %>%
   rename(week_hours = daily_hours,
          week_spend = Day.Spend)
