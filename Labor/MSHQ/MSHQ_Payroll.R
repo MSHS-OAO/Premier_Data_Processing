@@ -344,7 +344,7 @@ if (nrow(overlap_date) > 0) {
               Expense = round(sum(Expense), digits = 2)) 
   
   # remove duplicate date rows from upload and combine
-  upload_no_overlap <- upload_no_overlap %>%
+  upload_no_overlap <- upload %>%
     mutate(unique_id = paste(EMPLOYEE_ID, HOME_DEPARTMENT, 
                              WORKED_DEPARTMENT, START_DATE, 
                              END_DATE, PAYCODE_PREMIER,
