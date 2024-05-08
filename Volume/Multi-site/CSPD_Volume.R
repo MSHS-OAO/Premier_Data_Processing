@@ -8,8 +8,8 @@ dir <- paste0("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity",
               "/Volume - Data/Multisite Volumes/CSPD")
 
 #User inputs start and end dates for current period
-start_date <- as.Date("2023-02-26", format = "%Y-%m-%d")
-end_date <- as.Date("2023-03-25", format = "%Y-%m-%d")
+start_date <- as.Date("2022-09-25", format = "%Y-%m-%d")
+end_date <- as.Date("2022-12-31", format = "%Y-%m-%d")
 
 # Load Data & Dictionaries -------------------------------------------------
 #Pull in mapping file
