@@ -46,6 +46,19 @@ msbib_agency <- read.csv(rownames(msbib_files)[which.max(msbib_files$mtime)],
 # get start and end date range from rightsourcing upload
 msbib_end <- max(mdy(msbib_agency$End.Date))
 msbib_start <- min(mdy(msbib_agency$Start.Date))
+if (paycycle_mapping %>% 
+    filter(PAYCYCLE_DATE == msbib_start) %>% select(PAYCYCLE_DATE) %>% pull() ==
+    paycycle_mapping %>% 
+    filter(PAYCYCLE_DATE == msbib_start) %>% select(PP_START_DATE) %>% pull()) {
+  msbib_start <- msbib_start
+} else {
+  start_dates <- paycycle_mapping %>%
+    filter(PAYCYCLE_DATE >= msbib_start) %>%
+    select(PP_START_DATE) %>%
+    distinct() %>% 
+    arrange(PP_START_DATE)
+  msbib_start <- pull(start_dates[2,])
+}
 
 # import most recent mshq rightsourcing upload
 mshq_files <- file.info(list.files(mshq_rightsourcing_dir, full.names = T))
@@ -55,6 +68,19 @@ mshq_agency <- read.csv(rownames(mshq_files)[which.max(mshq_files$mtime)],
 # get start and end date range from rightsourcing upload
 mshq_end <- max(mdy(mshq_agency$End.Date))
 mshq_start <- min(mdy(mshq_agency$Start.Date))
+if (paycycle_mapping %>% 
+    filter(PAYCYCLE_DATE == mshq_start) %>% select(PAYCYCLE_DATE) %>% pull() ==
+    paycycle_mapping %>% 
+    filter(PAYCYCLE_DATE == mshq_start) %>% select(PP_START_DATE) %>% pull()) {
+      mshq_start <- mshq_start
+    } else {
+      start_dates <- paycycle_mapping %>%
+        filter(PAYCYCLE_DATE >= mshq_start) %>%
+        select(PP_START_DATE) %>%
+        distinct() %>% 
+        arrange(PP_START_DATE)
+      mshq_start <- pull(start_dates[2,])
+    }
 
 # import most recent msw agency upload
 msw_files <- file.info(list.files(msw_agency_dir, full.names = T)) %>%
@@ -202,7 +228,7 @@ mshs_nursing_paid_FTE <- rbind(rightsourcing_agency, mshs_payroll, msmw_agency) 
 View(mshs_nursing_paid_FTE)
 
 # check number of pay periods per site for agency paid FTE
-pp_check_agency <- rightsourcing_agency %>%
+pp_check_agency <- rbind(rightsourcing_agency, msmw_agency) %>%
   group_by(SITE) %>%
   summarise(PP_COUNT = n())
 View(pp_check_agency)
@@ -219,7 +245,9 @@ upload <- mshs_nursing_paid_FTE %>%
   mutate('Corporation Code' = '729805',
          'Entity Code' = case_when(
            SITE %in% c('MSBI', 'MSB') ~ '630571',
-           SITE == 'MSH' ~ 'NY0014'),
+           SITE == 'MSH' ~ 'NY0014',
+           SITE == 'MSM' ~ 'NY2163',
+           SITE == 'MSW' ~ 'NY2162'),
          'Start Date' = paste0(substr(PP_START_DATE, 6, 7), "/",
                                substr(PP_START_DATE, 9, 10), "/",
                                substr(PP_START_DATE, 1, 4)),
@@ -229,11 +257,15 @@ upload <- mshs_nursing_paid_FTE %>%
          'Cost Center Code' = case_when(
            SITE == 'MSBI'~ '401000040410101',
            SITE == 'MSB' ~ '402000040710101',
-           SITE == 'MSH' ~ '101000010110101'),
+           SITE == 'MSH' ~ '101000010110101',
+           SITE == 'MSM' ~ '302000030210101',
+           SITE == 'MSW' ~ '301000030110101'),
          'Volume Code' = case_when(
            SITE == 'MSBI'~ '401404101011',
            SITE == 'MSB' ~ '402407101011',
-           SITE == 'MSH' ~ '101101101011'),
+           SITE == 'MSH' ~ '101101101011',
+           SITE == 'MSM' ~ '30200010101',
+           SITE == 'MSW' ~ '30100010101'),
          'Budget Volume' = '0') %>%
   rename('Actual Volume' = PAID_FTE) %>%
   ungroup() %>%
