@@ -178,6 +178,7 @@ mshs_payroll <- mshs_payroll %>%
   left_join(nursing_paid_fte_cc, 
             by = c("WORKED_DEPARTMENT" = "COST_CENTER"))
 
+## Data Aggregation -----------------------------------------------------------
 # msmw_agency
 msmw_dates <- paycycle_mapping %>%
   filter(PP_END_DATE <= msbib_end,
@@ -206,8 +207,7 @@ msmw_agency <- msmw_dates %>%
   group_by(SITE, PP_START_DATE, PP_END_DATE) %>%
   summarise(PAID_FTE = sum(daily_fte))
 
-## Data Aggregation -----------------------------------------------------------
-# agency aggregation
+# rightsourcing aggregation
 rightsourcing_agency <- rightsourcing_agency %>%
   filter(!is.na(SITE)) %>%
   group_by(SITE, PP_START_DATE, PP_END_DATE) %>%
