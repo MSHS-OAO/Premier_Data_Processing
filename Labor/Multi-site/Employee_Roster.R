@@ -2,7 +2,6 @@
 library(tidyverse)
 library(DBI)
 library(odbc)
-library(purrr)
 library(openxlsx)
 
 # Directories ---------------------------------------------------------------
@@ -21,14 +20,18 @@ end_date <- "2024-03-23"
 # user inputs the department and respective cost center(s)
 # do not include Site in the department name
 ### Example -----------------------------------------------------------------
-departments <- list(
-  OBGYN = c("101000010113121", "101000010113122"),
-  PEDS = c("101000010110260", "101000010113303", "101000010113304"),
-  IMA = c("101000010112815", "101000010112816")
-)
+# departments <- list(
+#   OBGYN = c("101000010113121", "101000010113122"),
+#   PEDS = c("101000010110260", "101000010113303", "101000010113304"),
+#   IMA = c("101000010112815", "101000010112816")
+# )
 
 departments <- list(
-  
+  LIVER = c("101000010112818", "101000010112817"),
+  GERIATRICS = c("101000010113821", "101000010112790"),
+  RHEUMATOLOGY = c("101000010112838", "101000010112839"),
+  RESPIRATORY = c("101000010121153", "101000010121152"),
+  OPTHALMOLOGY = c("101000010113155", "101000010113153")
 )
 
 # Roster Creation -----------------------------------------------------------
@@ -43,7 +46,7 @@ employee_roster <- lapply(departments, function(x) {
            INCLUDE_HOURS == 1) %>%
     group_by(WORKED_DEPARTMENT, WORKED_DEPARTMENT_NAME, EMPLOYEE_ID, 
            EMPLOYEE_NAME, POSITION_CODE_DESCRIPTION, PP_END_DATE) %>%
-    summarise(FTE = sum(WD_HOURS)/75) %>%
+    summarise(FTE = sum(WD_HOURS, na.rm = TRUE)) %>%
     arrange(PP_END_DATE) %>%
     collect()
   
@@ -89,7 +92,7 @@ for (i in 1:length(employee_roster)) {
   # apply cell styles
   addStyle(wb, sheet, header_style, rows = 1, 
            cols = 1:ncol(employee_roster[[i]]), gridExpand = TRUE, stack = TRUE)
-  addStyle(wb, sheet, body_style, rows = 1:nrow(employee_roster[[i]]),
+  addStyle(wb, sheet, body_style, rows = 1:(nrow(employee_roster[[i]]) + 1),
            cols = 1:ncol(employee_roster[[i]]), gridExpand = TRUE, stack = TRUE)
   
   
