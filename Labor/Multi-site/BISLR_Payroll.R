@@ -285,6 +285,19 @@ piv_wide_check <- raw_payroll %>%
 View(piv_wide_check)
 View(piv_wide_check_prev)
 
+## JC update in DB reminder -------------------------------------------------
+
+showDialog(
+  title = "Update JC Mapping in DB",
+  message = paste0(
+    "USER WARNING: ",
+    "Before proceeding, ",
+    "it's best to run the sftp_sync_decrypt_insert script on R Connect to",
+    "identify new JCs.",
+    "Then populate the JC info in the OAO_DEVELOPMENT Schema and run the ",
+    "sftp_sync_decrypt_insert script on R Connect again to ensure",
+    "the PROD table is updated.")
+)
 
 ## Data  --------------------------------------------------------------------
 row_count <- nrow(raw_payroll)
@@ -917,18 +930,21 @@ if (nrow(premier_missing_paycode) > 0) {
 
 ## JC with multiple Description -------------------------------------------
 
+# this should now be unneeded because of the udpate for
+# 1-to-1 JC ID to JC Description
+
 jc_desc_check <- bislr_payroll %>%
   select(Job.Code, Position.Code.Description) %>%
   distinct() %>%
   group_by(Job.Code) %>%
   summarize(freq = n()) %>%
   arrange(-freq, Job.Code) %>%
-  filter(freq > 1) %>%
+  # filter(freq > 1) %>%
   inner_join(bislr_payroll %>%
     select(Job.Code, Position.Code.Description, PROVIDER) %>%
     distinct())
 
-# 5 is selected because of the DUS_RMV jobcode
+# 5 is the selected threshold because of the DUS_RMV jobcode
 if (max(jc_desc_check$freq) > jc_desc_threshold) {
   showDialog(
     title = "Jobcode Description Check",
@@ -941,9 +957,43 @@ if (max(jc_desc_check$freq) > jc_desc_threshold) {
   View(jc_desc_check)
 }
 # pull in Premier jobcode category or other info to help?
-# seems like it will be infrequent, so it's not be worth coding for it at
+# this will be infrequent, so it's not be worth coding for it at
 # this point in time
 
+
+## cost center description changes -----------------------------------------
+
+dept_desc <- bislr_payroll %>%
+  select(Department.IdWHERE.Worked, Department.Name.Worked.Dept) %>%
+  mutate(Department.IdWHERE.Worked =
+           as.character(Department.IdWHERE.Worked)) %>%
+  distinct()
+
+dept_desc_check <- full_join(dict_premier_dpt, dept_desc,
+                             by = c("Cost.Center" =
+                                      "Department.IdWHERE.Worked")) %>%
+  # may want to include NY0014 in the future to go ahead and update, too
+  filter(Site %in% c("630571", "NY2162", "NY2163")) %>%
+  filter(!is.na(Cost.Center.Description)) %>%
+  filter(!is.na(Department.Name.Worked.Dept)) %>%
+  mutate(desc_same =
+           (Cost.Center.Description == Department.Name.Worked.Dept)) %>%
+  mutate(dict_desc_length = nchar(Cost.Center.Description)) %>%
+  filter(desc_same == FALSE) %>%
+  filter(Department.Name.Worked.Dept != "ACCRUAL COST CENTER") %>%
+  rename(Premier_Dict_Cost_Ctr_Desc = Cost.Center.Description,
+         Current_Payroll_Cost_Ctr_Desc = Department.Name.Worked.Dept)
+
+if (nrow(dept_desc_check > 0)) {
+  showDialog(
+    title = "Cost Center Description Check",
+    message = paste(
+      "There are Cost Center Descriptions ",
+      "that appear to have changed.  Review for changes in operations ",
+      "and update in Premier and DB."
+    ))
+  View(dept_desc_check)
+}
 
 ## cost center and upload FTE count -------------------------------------
 
@@ -1066,10 +1116,6 @@ fte_summary <- fte_summary %>%
 
 
 ### wide summary ------------------------------------------------------------
-
-# THIS NEEDS TO BE TESTED IN MAY 2024 WITH LIVE DATA
-# -- an error was observed because the fte_summary overlaps with the 
-#    previous file that was imported
 
 # get the minimum date for each cost center
 fte_summary_cc_age <- fte_summary %>%
