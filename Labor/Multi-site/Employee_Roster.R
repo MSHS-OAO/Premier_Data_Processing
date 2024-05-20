@@ -17,8 +17,9 @@ oao_con <- dbConnect(odbc(), "OAO Cloud DB Production")
 # date range
 start_date <- "2024-01-01"
 end_date <- "2024-03-23"
+
 # user inputs the department and respective cost center(s)
-# do not include Site in the department name
+# department acts as title for the sheet of the employee roster
 ### Example -----------------------------------------------------------------
 # departments <- list(
 #   OBGYN = c("101000010113121", "101000010113122"),
