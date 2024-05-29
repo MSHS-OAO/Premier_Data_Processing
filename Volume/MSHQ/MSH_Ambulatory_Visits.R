@@ -5,8 +5,8 @@ library(dbplyr)
 library(tidyr)
 
 # start and end dates
-start <- "2023-11-19"
-end <- "2024-03-23"
+start <- "2024-03-24"
+end <- "2024-04-20"
 
 oao_prod_dsn <- "OAO Cloud DB Production"
 oao_prod_conn <- dbConnect(odbc(),
@@ -26,6 +26,7 @@ paycycle_mapping <- tbl(oao_prod_conn, "LPM_MAPPING_PAYCYCLE") %>%
 
 # read in source data
 source_df <- tbl(oao_prod_conn, "MV_DM_PATIENT_ACCESS") %>%
+  select(DEPARTMENT_ID, APPT_DTTM, DERIVED_STATUS_DESC) %>%
   filter(APPT_DTTM >= as.Date(start),
          APPT_DTTM <= as.Date(end),
          DEPARTMENT_ID %in% epic_id,
@@ -37,7 +38,7 @@ source_df <- tbl(oao_prod_conn, "MV_DM_PATIENT_ACCESS") %>%
   left_join(epic_mapping, by = c("DEPARTMENT_ID" = "EPIC_ID")) %>%
   left_join(paycycle_mapping, by = c("DATE" = "PAYCYCLE_DATE"))
 
-export <- source_df %>%
+ export <- source_df %>%
   group_by(PP_START_DATE, PP_END_DATE, COST_CENTER, VOLUME_CODE) %>%
   summarise(VISITS = n()) %>%
   mutate(`Corporation Code` = "729805",
