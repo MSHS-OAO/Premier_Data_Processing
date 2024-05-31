@@ -13,8 +13,8 @@ raw <- function(){
   raw <- read_xlsx(file.choose(),skip = 4)
   census <- raw %>%
     #remove duplicat KP7
-    select(-KP7...40) %>%
-    rename(KP7 = KP7...50) %>%
+    select(-KP7...41) %>%
+    rename(KP7 = KP7...51) %>%
     #remove NA dates and total row
     filter(!is.na(Date),
            Date != "Total") %>%
@@ -121,7 +121,7 @@ trend <- master()
 #Upload multiple files if necessary
 
 #start and end should be start and end of what you want to upload
-start = "10/22/2023"
-end = "11/18/2023"
+start = "03/24/2024"
+end = "04/20/2024"
 census_export <- upload()
 save()

@@ -38,7 +38,7 @@ source_df <- tbl(oao_prod_conn, "MV_DM_PATIENT_ACCESS") %>%
   left_join(epic_mapping, by = c("DEPARTMENT_ID" = "EPIC_ID")) %>%
   left_join(paycycle_mapping, by = c("DATE" = "PAYCYCLE_DATE"))
 
- export <- source_df %>%
+export <- source_df %>%
   group_by(PP_START_DATE, PP_END_DATE, COST_CENTER, VOLUME_CODE) %>%
   summarise(VISITS = n()) %>%
   mutate(`Corporation Code` = "729805",
