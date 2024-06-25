@@ -1532,12 +1532,12 @@ if (exists("upload_dict_paycode")) {
   write.table(upload_dict_paycode,
               file = paste0(dir_BISLR, "/BISLR_Pay Code Dictionary_",
                             date_range, ".csv"),
-              row.names = F, col.names = T, sep = ",")
+              row.names = F, col.names = T, sep = ",", na = "")
 
   write.table(upload_map_paycode,
               file = paste0(dir_BISLR, "/BISLR_Pay Code Map_",
                             date_range, ".csv"),
-              row.names = F, col.names = T, sep = ",")
+              row.names = F, col.names = T, sep = ",", na = "")
 
 }
 
