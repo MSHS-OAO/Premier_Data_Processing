@@ -5,7 +5,7 @@ library(dbplyr)
 library(tidyr)
 
 # start and end dates
-start <- "2024-03-24"
+start <- "2024-01-01"
 end <- "2024-04-20"
 
 oao_prod_dsn <- "OAO Cloud DB Production"
@@ -25,12 +25,13 @@ paycycle_mapping <- tbl(oao_prod_conn, "LPM_MAPPING_PAYCYCLE") %>%
   collect()
 
 # read in source data
-source_df <- tbl(oao_prod_conn, "MV_DM_PATIENT_ACCESS") %>%
-  select(DEPARTMENT_ID, APPT_DTTM, DERIVED_STATUS_DESC) %>%
+source_df <- tbl(oao_prod_conn,
+             in_schema("VILLEA04", "AMBULATORY_ACCESS")) %>%
+  select(DEPARTMENT_ID, APPT_DTTM, APPT_STATUS) %>%
   filter(APPT_DTTM >= as.Date(start),
          APPT_DTTM <= as.Date(end),
          DEPARTMENT_ID %in% epic_id,
-         DERIVED_STATUS_DESC == "Arrived") %>%
+         APPT_STATUS == "Arrived") %>%
   show_query() %>%
   collect() %>%
   mutate(DEPARTMENT_ID = as.character(DEPARTMENT_ID)) %>%
