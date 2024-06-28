@@ -23,7 +23,6 @@ df <- read.csv(rownames(df)[which.max(df$mtime)], header = T, sep = "~",
 
 ## Read Mapping Files ---------------------------------------------------------
 oao_con <- dbConnect(odbc(), "OAO Cloud DB Production")
-greg_con <- dbConnect(odbc(), "OAO Cloud DB Greg")
 
 mapping_paycode <- tbl(oao_con, "LPM_MAPPING_PAYCODE") %>%
   collect()
