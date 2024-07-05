@@ -51,7 +51,7 @@ jc_desc_threshold <- 5
 
 # list of dept IDs where fund number should be used in place of the
 # standard department ID structure
-cc_fundnum_conv <- c(37800)
+cc_fundnum_conv <- c(37800, 37803)
 
 ## Premier Formatting ------------------------------------------------------
 char_len_dpt <- 15
