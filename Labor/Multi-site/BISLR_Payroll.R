@@ -1202,6 +1202,7 @@ View(fte_summary_new_dept_wrk)
 
 accrual_summary <- bislr_payroll %>%
   left_join(date_filtering) %>%
+  filter(upload_date == 1) %>%
   filter(PROVIDER == 0) %>%
   filter(DPT.WRKD %in%
            subset(report_list,
@@ -1213,7 +1214,8 @@ accrual_summary <- bislr_payroll %>%
 
 # row count check not required for joining date_filtering
 accrual_raw_detail <- accrual_raw_detail %>%
-  left_join(date_filtering)
+  left_join(date_filtering) %>%
+  filter(upload_date == 1)
 
 row_count <- nrow(accrual_raw_detail)
 accrual_raw_detail <- accrual_raw_detail %>%
