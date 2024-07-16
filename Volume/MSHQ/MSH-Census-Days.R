@@ -17,7 +17,8 @@ raw <- function(){
     rename(KP7 = KP7...51) %>%
     #remove NA dates and total row
     filter(!is.na(Date),
-           Date != "Total") %>%
+           Date != "Total",
+           !is.na(Weekday)) %>%
     #mutate dates into data format
     mutate(Date = as.numeric(Date),
            Weekday = as.numeric(Weekday)) %>%
@@ -121,7 +122,7 @@ trend <- master()
 #Upload multiple files if necessary
 
 #start and end should be start and end of what you want to upload
-start = "03/24/2024"
-end = "04/20/2024"
+start = "04/21/2024"
+end = "05/18/2024"
 census_export <- upload()
 save()

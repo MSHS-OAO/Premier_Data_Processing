@@ -51,7 +51,7 @@ jc_desc_threshold <- 5
 
 # list of dept IDs where fund number should be used in place of the
 # standard department ID structure
-cc_fundnum_conv <- c(37800)
+cc_fundnum_conv <- c(37800, 37803)
 
 ## Premier Formatting ------------------------------------------------------
 char_len_dpt <- 15
@@ -1532,12 +1532,12 @@ if (exists("upload_dict_paycode")) {
   write.table(upload_dict_paycode,
               file = paste0(dir_BISLR, "/BISLR_Pay Code Dictionary_",
                             date_range, ".csv"),
-              row.names = F, col.names = T, sep = ",")
+              row.names = F, col.names = T, sep = ",", na = "")
 
   write.table(upload_map_paycode,
               file = paste0(dir_BISLR, "/BISLR_Pay Code Map_",
                             date_range, ".csv"),
-              row.names = F, col.names = T, sep = ",")
+              row.names = F, col.names = T, sep = ",", na = "")
 
 }
 
