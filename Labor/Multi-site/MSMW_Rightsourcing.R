@@ -1,5 +1,4 @@
 # Libraries ---------------------------------------------------------------
-
 library(readxl)
 library(dplyr)
 library(lubridate)
@@ -89,8 +88,6 @@ raw_data_prev <- recent_file(path = paste0(project_path, "MSMW/Source Data"),
                              delimeter = ",",
                              desc_order = 2,
                              premier = FALSE)
-
-
 
 ## column header check ----------------------------------------------------
 
@@ -261,8 +258,8 @@ processed_data <- processed_data %>%
     TRUE ~ cost_center_info)
   ) %>%
   mutate(home_dept_oracle = case_when(
-    Facility == "MSSL- Mount Sinai St. Lukes" ~ "MSM Rightsourcing CC",
-    Facility == "MSW - Mount Sinai West" ~ "MSW Rightsourcing CC",
+    Facility == "MSSL- Mount Sinai St. Lukes" ~ "302020202020202",
+    Facility == "MSW - Mount Sinai West" ~ "301010101010101",
     TRUE ~ cost_center_info
   )) %>%
   mutate(hospital = case_when(
@@ -579,9 +576,9 @@ if (sites == "MSHS" | sites == "MSMW") {
   
   # save MSM zero file
   write.table(msm_zero_new, paste0(project_path,
-                                     "MSMW/Zero/MSM_Rightsourcing Zero_",
-                                     min(mdy(msbib_zero_new$`Start Date`)), "_",
-                                     max(mdy(msbib_zero_new$`End Date`)), ".csv"),
+                                   "MSMW/Zero/MSM_Rightsourcing Zero_",
+                                   min(mdy(msbib_zero_new$`Start Date`)), "_",
+                                   max(mdy(msbib_zero_new$`End Date`)), ".csv"),
               row.names = F, col.names = T, sep = ",")
   write.table(msw_zero_new, paste0(project_path,
                                    "MSMW/Zero/MSW_Rightsourcing Zero_",
