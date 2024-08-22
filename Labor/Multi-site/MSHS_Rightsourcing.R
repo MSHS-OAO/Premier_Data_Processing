@@ -210,6 +210,10 @@ employee_removal <- "Vistharla, Moses"
 # regular rate threshold for exempt employees
 exempt_payrate <- 1000
 
+# cost centers for MSDMG under MSW but charged as under MSBI
+
+MSDMG_MSW_cc <- c(1138007401, 1138005190)
+
 # Data Pre-processing -----------------------------------------------------
 
 ## New Zero Upload ---------------------------------------------------------
