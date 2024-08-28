@@ -17,8 +17,7 @@ raw <- function(){
     rename(KP7 = KP7...51) %>%
     #remove NA dates and total row
     filter(!is.na(Date),
-           Date != "Total",
-           !is.na(Weekday)) %>%
+           Date != "Total") %>%
     #mutate dates into data format
     mutate(Date = as.numeric(Date),
            Weekday = as.numeric(Weekday)) %>%
@@ -69,10 +68,11 @@ master <- function(){
   #pivot new master to trend by pay period
   trend <- master_new %>% 
     ungroup()%>%
-    group_by(Cost.Center, Oracle, End.Date) %>%
+    group_by(Cost.Center, Oracle, UNIT.DESCRIPTION, End.Date) %>%
     summarise(Census = sum(Census, na.rm = T)) %>%
-    pivot_wider(id_cols = c(Cost.Center, Oracle),names_from = End.Date,values_from = Census)
+    pivot_wider(id_cols = c(Cost.Center, Oracle, UNIT.DESCRIPTION),names_from = End.Date,values_from = Census)
   
+  trend <- trend[,c(1:3, (ncol(trend)-15):ncol(trend))]
   return(trend)
 }
 
@@ -122,7 +122,7 @@ trend <- master()
 #Upload multiple files if necessary
 
 #start and end should be start and end of what you want to upload
-start = "04/21/2024"
-end = "05/18/2024"
+start = "03/24/2024"
+end = "04/20/2024"
 census_export <- upload()
 save()
