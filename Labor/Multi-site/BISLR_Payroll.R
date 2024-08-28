@@ -51,7 +51,7 @@ jc_desc_threshold <- 5
 
 # list of dept IDs where fund number should be used in place of the
 # standard department ID structure
-cc_fundnum_conv <- c(37800)
+cc_fundnum_conv <- c(37800, 37803)
 
 ## Premier Formatting ------------------------------------------------------
 char_len_dpt <- 15
@@ -1202,6 +1202,7 @@ View(fte_summary_new_dept_wrk)
 
 accrual_summary <- bislr_payroll %>%
   left_join(date_filtering) %>%
+  filter(upload_date == 1) %>%
   filter(PROVIDER == 0) %>%
   filter(DPT.WRKD %in%
            subset(report_list,
@@ -1213,7 +1214,8 @@ accrual_summary <- bislr_payroll %>%
 
 # row count check not required for joining date_filtering
 accrual_raw_detail <- accrual_raw_detail %>%
-  left_join(date_filtering)
+  left_join(date_filtering) %>%
+  filter(upload_date == 1)
 
 row_count <- nrow(accrual_raw_detail)
 accrual_raw_detail <- accrual_raw_detail %>%
