@@ -76,9 +76,9 @@ master <- function(){
     mutate(`Concatenate for lookup` = paste0(substr(END,7,10),"Q",QUARTER,CPT)) %>%
     left_join(.,cpt_ref) %>%
     mutate(LABOR = case_when(
-      CPT.GROUP == "PROCEDURE" ~ QTY*`CPT Procedure Count`,
-      CPT.GROUP == "LAB" ~ QTY*`Lab Procedure Count`,
-      CPT.GROUP == "RVU" ~ QTY*`Facility Practice Expense RVU Factor`),
+      CPT.GROUP == "PROCEDURE" ~ QTY*`CPT_Count Factor`,
+      CPT.GROUP == "LAB" ~ QTY*`LABPROC_Count Factor`,
+      CPT.GROUP == "RVU" ~ QTY*`RVU Factor`),
       LABOR = as.numeric(LABOR),
       DATE = as.Date(END, format = "%m/%d/%Y")) %>%
     filter(LABOR > 0) %>%
