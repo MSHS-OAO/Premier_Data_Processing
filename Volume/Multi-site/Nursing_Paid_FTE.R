@@ -100,42 +100,6 @@ if (paycycle_mapping %>%
     arrange(PP_START_DATE)
   msmw_start <- pull(start_dates[2,])
 }
-# # import most recent msw agency upload
-# msw_files <- file.info(list.files(msw_agency_dir, full.names = T)) %>%
-#   arrange(mtime)
-# msw_agency <- rbind(read.csv(rownames(msw_files)[nrow(msw_files)], 
-#                              header = T,sep = ",", stringsAsFactors = F, 
-#                              colClasses = rep("character", 14)),
-#                     read.csv(rownames(msw_files)[nrow(msw_files) - 1], 
-#                              header = T,sep = ",", stringsAsFactors = F, 
-#                              colClasses = rep("character", 14)),
-#                     read.csv(rownames(msw_files)[nrow(msw_files) - 2], 
-#                              header = T,sep = ",", stringsAsFactors = F, 
-#                              colClasses = rep("character", 14)))
-# # get start and end date range from agency upload
-# msw_end <- max(mdy(msw_agency$End.Date))
-# msw_start <- min(mdy(msw_agency$Start.Date))
-# 
-# # import most recent msm agency upload
-# msm_files <- file.info(list.files(msm_agency_dir, full.names = T)) %>%
-#   arrange(mtime)
-# msm_agency <- rbind(read.csv(rownames(msm_files)[nrow(msm_files)], 
-#                              header = T,sep = ",", stringsAsFactors = F, 
-#                              colClasses = rep("character", 14)),
-#                     read.csv(rownames(msm_files)[nrow(msm_files) - 1], 
-#                              header = T,sep = ",", stringsAsFactors = F, 
-#                              colClasses = rep("character", 14)),
-#                     read.csv(rownames(msm_files)[nrow(msm_files) - 2], 
-#                              header = T,sep = ",", stringsAsFactors = F, 
-#                              colClasses = rep("character", 14)))
-# # get start and end date range from agency upload
-# msm_end <- max(mdy(msm_agency$End.Date))
-# msm_start <- min(mdy(msm_agency$Start.Date))
-
-# # check to make sure that MSMW dates are outside of MSBIB dates
-# if (msbib_start < msmw_start | msbib_end > msmw_end) {
-#   warning("MSMW dates need to be expanded to MSBIB date range")
-# }
 
 # get list of nursing paid fte cost centers
 nursing_cost_centers <- paste(nursing_paid_fte_cc$COST_CENTER, 
@@ -175,8 +139,6 @@ dbClearResult(mshq_db_query)
 rightsourcing_agency <- rbind(msbib_agency, mshq_agency, msmw_agency)
 # combine DB tables
 mshs_payroll <- rbind(bislr_payroll, mshq_payroll)
-# # combine msmw agency uploads
-# msmw_agency <- rbind(msm_agency, msw_agency)
 
 ## PP End Date & Site ---------------------------------------------------------
 # rightsourcing agency
@@ -196,34 +158,6 @@ mshs_payroll <- mshs_payroll %>%
             by = c("WORKED_DEPARTMENT" = "COST_CENTER"))
 
 ## Data Aggregation -----------------------------------------------------------
-# # msmw_agency
-# msmw_dates <- paycycle_mapping %>%
-#   filter(PP_END_DATE <= msbib_end,
-#          PP_START_DATE >= msbib_start) %>%
-#   mutate(row_month = month(PAYCYCLE_DATE)) 
-# 
-# msmw_dates <- rbind(
-#   msmw_dates %>% mutate(SITE = "MSM"),
-#   msmw_dates %>% mutate(SITE = "MSW")
-# )
-# 
-# msmw_agency <- msmw_agency %>%
-#   left_join(nursing_paid_fte_cc, 
-#             by = c("Worked.Cost.Center.Code" = "COST_CENTER")) %>%
-#   filter(!is.na(SITE)) %>%
-#   mutate(row_month = month(mdy(End.Date)),
-#          month_days = days_in_month(mdy(End.Date)),
-#          paid_fte = as.numeric(Hours)/75) %>%
-#   group_by(SITE, row_month, month_days) %>%
-#   summarise(paid_fte = sum(paid_fte)) %>%
-#   mutate(daily_fte = paid_fte/month_days)
-# 
-# msmw_agency <- msmw_dates %>%
-#   left_join(msmw_agency, by = c("SITE" = "SITE",
-#                                 "row_month" = "row_month")) %>%
-#   group_by(SITE, PP_START_DATE, PP_END_DATE) %>%
-#   summarise(PAID_FTE = sum(daily_fte))
-
 # rightsourcing aggregation
 rightsourcing_agency <- rightsourcing_agency %>%
   filter(!is.na(SITE)) %>%
