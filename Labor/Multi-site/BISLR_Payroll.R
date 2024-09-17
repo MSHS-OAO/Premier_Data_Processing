@@ -468,7 +468,9 @@ while (NA %in% unique(bislr_payroll$JC_in_UniversalFile) |
 
   if (nrow(new_jobcodes) > 0) {
     new_jc_path <- paste0(dir_universal, "/Mapping/BISLR payroll script")
-    write.csv(new_jobcodes,
+    write.csv(new_jobcodes %>%
+                mutate(PAYROLL = "BISLR") %>%
+                relocate(PAYROLL, .after = "Job.Code"),
               paste0(new_jc_path,
                      "/new_jc_for_Universal_File_",
                      as.character(Sys.time(), format = "%Y-%m-%d"),
@@ -477,7 +479,8 @@ while (NA %in% unique(bislr_payroll$JC_in_UniversalFile) |
                      }else{
                        paste0("_V", loop)
                      },
-                     ".csv"))
+                     ".csv"),
+              row.names = F)
   }
 
   # MM: nothing can be navigated and viewed in an R session while
