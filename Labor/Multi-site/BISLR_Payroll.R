@@ -344,13 +344,15 @@ bislr_payroll <- bislr_payroll %>%
       TRUE ~ DPT.HOME)) %>%
   mutate(
     DPT.WRKD = case_when(
-      WD_Department %in% cc_fundnum_conv ~ WD_Fund_number,
+      (WD_Department %in% cc_fundnum_conv & 
+         WD_Fund_number != "00000000000") ~ WD_Fund_number,
       TRUE ~ DPT.WRKD)) %>%
   # for the future after LPM team has requested that the Home Fund Number
   # be populated in the Full.COA.for.Home string:
   # mutate(
   #   DPT.HOME = case_when(
-  #     HD_Department %in% cc_fundnum_conv ~ substr(Full.COA.for.Home, 25, 35),
+  #     (HD_Department %in% cc_fundnum_conv & 
+  #       HD_Fund_number != "00000000000") ~ substr(Full.COA.for.Home, 25, 35),
   #     TRUE ~ DPT.HOME)) %>%
   mutate(
     Job.Code = case_when(
