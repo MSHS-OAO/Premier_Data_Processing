@@ -77,15 +77,17 @@ report_info <- read_xlsx(paste0(mapping_path,
                                 "MSHS_Reporting_Definition_Mapping.xlsx"))
 
 # user needs most recent raw data file
-raw_data <- recent_file(path = paste0(project_path, "MSMW/Source Data"),
+raw_data <- recent_file(path = paste0(project_path, "Source Data/MSMW"),
                         file_header = T,
-                        delimeter = ",",
+                        delimeter = "\t",
+                        encoding = "UTF-16LE",
                         premier = FALSE)
 
 # user needs previous raw data file to compare column headers
-raw_data_prev <- recent_file(path = paste0(project_path, "MSMW/Source Data"),
+raw_data_prev <- recent_file(path = paste0(project_path, "Source Data/MSMW"),
                              file_header = T,
-                             delimeter = ",",
+                             delimeter = "\t",
+                             encoding = "UTF-16LE",
                              desc_order = 2,
                              premier = FALSE)
 
@@ -195,7 +197,7 @@ prev_0_max_date_mshq <- max(mdy(mshq_zero_old$date.end))
 
 prev_0_max_date_msbib <- max(mdy(msbib_zero_old$date.end))
 
-prev_0_max_date_msmw <- as.POSIXct("2023-01-29", tz = "UTC")
+prev_0_max_date_msmw <- as.POSIXct("2024-06-29", tz = "UTC")
 # need threshold for weekly hour total for an employee to flag for review
 week_reg_hr_indiv_emp_qc <- 40
 week_hr_indiv_emp_qc <- 55
@@ -559,31 +561,29 @@ if (sites == "MSHS" | sites == "MSHQ") {
 }
 
 if (sites == "MSHS" | sites == "MSMW") {
-  # save MSM upload
-  write.table(filter(upload_new, `Worked Entity Code` == "NY2163"),
+  # Combine MSM and MSW upload files
+  msmw_upload <- rbind(
+    filter(upload_new, `Worked Entity Code` == "NY2163"),  # MSM upload
+    filter(upload_new, `Worked Entity Code` == "NY2162")   # MSW upload
+  )
+  
+  # Save combined upload file
+  write.table(msmw_upload,
               paste0(project_path,
-                     "MSMW/Uploads/MSM_Rightsourcing_",
-                     min(mdy(upload_new$`Start Date`)), "_",
-                     max(mdy(upload_new$`End Date`)), ".csv"),
-              row.names = F, col.names = T, sep = ",")
-  # save MSW upload
-  write.table(filter(upload_new, `Worked Entity Code` == "NY2162"),
-              paste0(project_path,
-                     "MSMW/Uploads/MSW_Rightsourcing_",
-                     min(mdy(upload_new$`Start Date`)), "_",
-                     max(mdy(upload_new$`End Date`)), ".csv"),
+                     "MSMW/Uploads/MSMW_Rightsourcing_",
+                     min(mdy(msmw_upload$`Start Date`)), "_",
+                     max(mdy(msmw_upload$`End Date`)), ".csv"),
               row.names = F, col.names = T, sep = ",")
   
-  # save MSM zero file
-  write.table(msm_zero_new, paste0(project_path,
-                                   "MSMW/Zero/MSM_Rightsourcing Zero_",
-                                   min(mdy(msbib_zero_new$`Start Date`)), "_",
-                                   max(mdy(msbib_zero_new$`End Date`)), ".csv"),
-              row.names = F, col.names = T, sep = ",")
-  write.table(msw_zero_new, paste0(project_path,
-                                   "MSMW/Zero/MSW_Rightsourcing Zero_",
-                                   min(mdy(msbib_zero_new$`Start Date`)), "_",
-                                   max(mdy(msbib_zero_new$`End Date`)), ".csv"),
+  # Combine MSM and MSW zero files
+  msmw_zero_new <- rbind(msm_zero_new, msw_zero_new)
+  
+  # Save combined zero file
+  write.table(msmw_zero,
+              paste0(project_path,
+                     "MSMW/Zero/MSMW_Rightsourcing Zero_",
+                     min(mdy(msmw_zero$`Start Date`)), "_",
+                     max(mdy(msmw_zero$`End Date`)), ".csv"),
               row.names = F, col.names = T, sep = ",")
 }
 
