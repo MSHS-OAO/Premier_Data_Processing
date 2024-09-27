@@ -59,7 +59,7 @@ export <- source_df %>%
 
 write.table(export, paste0("/SharedDrive/deans/Presidents/SixSigma/",
                            "MSHS Productivity/Productivity/Volume - Data/",
-                           "MSH Data/Ambulatory/MSH_AMBULATORY VOLUME_",
+                           "MSH Data/Ambulatory/uploads/MSH_AMBULATORY VOLUME_",
                            start, "_", end, ".csv"),
             row.names = F, sep = ",")
 
