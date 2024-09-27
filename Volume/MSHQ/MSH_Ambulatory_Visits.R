@@ -58,8 +58,8 @@ export <- source_df %>%
          `End Date`, `Volume Code`, `Actual Volume`, `Budget Volume`)
 
 write.table(export, paste0("/SharedDrive/deans/Presidents/SixSigma/",
-                           "MSHS Productivity/Productivity/Analysis/",
-                           "MSH Ambulatory/Volume Data/MSH_AMBULATORY VOLUME_",
+                           "MSHS Productivity/Productivity/Volume - Data/",
+                           "MSH Data/Ambulatory/MSH_AMBULATORY VOLUME_",
                            start, "_", end, ".csv"),
             row.names = F, sep = ",")
 
