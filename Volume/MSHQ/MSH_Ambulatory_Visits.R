@@ -5,8 +5,8 @@ library(dbplyr)
 library(tidyr)
 
 # start and end dates
-start <- "2024-01-01"
-end <- "2024-04-20"
+start <- "2024-07-28"
+end <- "2024-08-24"
 
 oao_prod_dsn <- "OAO Cloud DB Production"
 oao_prod_conn <- dbConnect(odbc(),
@@ -14,9 +14,8 @@ oao_prod_conn <- dbConnect(odbc(),
 
 # read in epic ID mapping
 epic_mapping <- read.csv(paste0("/SharedDrive/deans/Presidents/SixSigma/",
-                                "MSHS Productivity/Productivity/Analysis/",
-                                "MSH Ambulatory/Volume Data/Volume Validation/",
-                                "EpicID_Mapping.csv"), 
+                                "MSHS Productivity/Productivity/Volume - Data/",
+                                "MSH Data/Ambulatory/EpicID_Mapping.csv"),
                          colClasses = rep("character", 5))
 epic_id <- pull(epic_mapping, EPIC_ID)
 
