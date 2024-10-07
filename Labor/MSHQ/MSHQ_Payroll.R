@@ -151,7 +151,10 @@ format_df <- df %>%
                                   substr(HD_COA, 5, 7),
                                   substr(HD_COA, 12, 16))) %>%
   mutate(WD_EXPENSE = as.numeric(WD_EXPENSE),
-         WD_HOURS = as.numeric(WD_HOURS))
+         WD_HOURS = as.numeric(WD_HOURS)) %>%
+  mutate(WORKED_DEPARTMENT = case_when(
+    WD_DEPARTMENT %in% c("77061") ~ WD_FUND_NUMBER,
+    TRUE ~ WORKED_DEPARTMENT))
 
 #### Jobcode Mapping ----------------------------------------------------------
 # check if there are new combos of jc and worked department this month
