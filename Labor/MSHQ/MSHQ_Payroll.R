@@ -158,10 +158,12 @@ format_df <- df %>%
   mutate(WD_EXPENSE = as.numeric(WD_EXPENSE),
          WD_HOURS = as.numeric(WD_HOURS)) %>%
   mutate(WORKED_DEPARTMENT = case_when(
-    WD_DEPARTMENT %in% cc_fundnum_conv ~ WD_FUND_NUMBER,
+    (WD_DEPARTMENT %in% cc_fundnum_conv & 
+      WD_Fund_number != "00000000000")~ WD_FUND_NUMBER,
     TRUE ~ WORKED_DEPARTMENT)) %>%
   mutate(WORKED_DEPARTMENT = case_when(
-    WORKED_DEPARTMENT %in% wd_fundnum_conv ~ WD_FUND_NUMBER,
+    (WORKED_DEPARTMENT %in% wd_fundnum_conv & 
+      WD_Fund_number != "00000000000")~ WD_FUND_NUMBER,
     TRUE ~ WORKED_DEPARTMENT))
 
 #### Jobcode Mapping ----------------------------------------------------------
