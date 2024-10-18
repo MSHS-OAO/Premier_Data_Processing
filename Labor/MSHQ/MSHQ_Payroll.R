@@ -11,6 +11,11 @@ library(lubridate)
 data_dir <- paste0("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/",
                    "Productivity/")
 
+# list of dept IDs where fund number should be used in place of the
+# standard department ID structure
+cc_fundnum_conv <- c("77061")
+wd_fundnum_conv <- c("201210310113155", "201210345113155")
+
 ## Read Labor -----------------------------------------------------------------
 df <- file.info(list.files(paste0(data_dir, "Universal Data/Labor/Raw Data/",
                                   "MSHQ_sftp_sync/Insert/")
@@ -151,7 +156,15 @@ format_df <- df %>%
                                   substr(HD_COA, 5, 7),
                                   substr(HD_COA, 12, 16))) %>%
   mutate(WD_EXPENSE = as.numeric(WD_EXPENSE),
-         WD_HOURS = as.numeric(WD_HOURS))
+         WD_HOURS = as.numeric(WD_HOURS)) %>%
+  mutate(WORKED_DEPARTMENT = case_when(
+    (WD_DEPARTMENT %in% cc_fundnum_conv & 
+      WD_FUND_NUMBER != "00000000000")~ WD_FUND_NUMBER,
+    TRUE ~ WORKED_DEPARTMENT)) %>%
+  mutate(WORKED_DEPARTMENT = case_when(
+    (WORKED_DEPARTMENT %in% wd_fundnum_conv & 
+      WD_FUND_NUMBER != "00000000000")~ WD_FUND_NUMBER,
+    TRUE ~ WORKED_DEPARTMENT))
 
 #### Jobcode Mapping ----------------------------------------------------------
 # check if there are new combos of jc and worked department this month
