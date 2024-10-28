@@ -155,6 +155,7 @@ data_raw <- tbl(con,
 # Data Pre-processing -----------------------------------------------------
 
 ## date formatting, check, pay periods -------------------------------------
+data_raw$DEPARTMENT_ID <- as.character(data_raw$DEPARTMENT_ID)
 
 data_epic <- data_raw %>%
   left_join(dict_pay_cycles %>%
