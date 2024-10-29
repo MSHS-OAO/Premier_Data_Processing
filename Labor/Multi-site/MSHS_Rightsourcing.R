@@ -69,8 +69,6 @@ pay_period_mapping <- pay_period_mapping %>%
          END.DATE = PP_END_DATE,
          PREMIER.DISTRIBUTION = PREMIER_DISTRIBUTION)
 # code conversion mapping file to convert legacy to oracle cc
-# code_conversion <- read_xlsx(paste0(mapping_path,
-#                                     "MSHS_Code_Conversion_Mapping_no_duplicates.xlsx"))
 code_conversion <- read_xlsx(paste0(
   mapping_path, "MSHS_Code_Conversion_Mapping_no_duplicates.xlsx"))
 
@@ -139,17 +137,23 @@ rm(raw_data_prev)
 
 #user needs most recent zero and upload files
 msbib_zero_old <- recent_file(path = paste0(project_path, "MSBIB/Zero"),
-                              text_cols = rep("character", 14), file_header = T)
+                              text_cols = rep("character", 14),
+                              file_header = T)
 msbib_upload_old <- recent_file(path = paste0(project_path, "MSBIB/Uploads"),
-                                text_cols = rep("character", 14), file_header = T)
+                                text_cols = rep("character", 14),
+                                file_header = T)
 mshq_zero_old <- recent_file(path = paste0(project_path, "MSHQ/Zero"),
-                             text_cols = rep("character", 14), file_header = T)
+                             text_cols = rep("character", 14),
+                             file_header = T)
 mshq_upload_old <- recent_file(path = paste0(project_path, "MSHQ/Uploads"),
-                               text_cols = rep("character", 14), file_header = T)
+                               text_cols = rep("character", 14),
+                               file_header = T)
 msmw_zero_old <- recent_file(path = paste0(project_path, "MSMW/Zero"),
-                           text_cols = rep("character", 14), file_header = T)
+                           text_cols = rep("character", 14),
+                           file_header = T)
 msmw_upload_old <- recent_file(path = paste0(project_path, "MSMW/Uploads"),
-                              text_cols = rep("character", 14), file_header = T)
+                              text_cols = rep("character", 14),
+                              file_header = T)
 # Constants ------------------------------------------------------
 
 # user needs to select the site(s) they want to process rightsourcing for
@@ -242,7 +246,8 @@ processed_data <- raw_data %>%
   mutate(Worker.Name = gsub("\'", "", Worker.Name),
          Worker.Name = gsub("\\(Mt Sinai\\)", "", Worker.Name),
          Worker.Name = gsub(" ,", ",", Worker.Name),
-         Worker.Name = iconv(Worker.Name, from = 'UTF-8', to = 'ASCII//TRANSLIT'))
+         Worker.Name = iconv(Worker.Name, from = 'UTF-8',
+                             to = 'ASCII//TRANSLIT'))
 
 # filter raw data on date range needed for upload
 processed_data <- processed_data %>%
@@ -394,9 +399,9 @@ processed_data <- processed_data %>%
 processed_data <- processed_data %>%
   mutate(daily_hours = 
            case_when(Regular.Rate > exempt_payrate ~ 
-                       round(40 * Day.Spend/Regular.Rate, digits = 2),
+                       round(40 * Day.Spend / Regular.Rate, digits = 2),
                      daily_hours == 0 & Bill.Type == "Adjustment" ~ 
-                       round(Day.Spend/Regular.Rate, digits = 2),
+                       round(Day.Spend / Regular.Rate, digits = 2),
                      TRUE ~ daily_hours))
 
 
@@ -593,13 +598,15 @@ if (sites == "MSHS" | sites == "MSBIB") {
   write.table(msbib_zero_new, paste0(project_path,
                                      "MSBIB/Zero/MSBIB_Rightsourcing Zero_",
                                      min(mdy(msbib_zero_new$`Start Date`)), "_",
-                                     max(mdy(msbib_zero_new$`End Date`)), ".csv"),
+                                     max(mdy(msbib_zero_new$`End Date`)),
+                                     ".csv"),
               row.names = F, col.names = T, sep = ",")
 }
 
 if (sites == "MSHS" | sites == "MSMW") {
   # Save MSMW upload combined
-  write.table(filter(upload_new, `Worked Entity Code` %in% c("NY2163", "NY2162")),
+  write.table(filter(upload_new,
+                     `Worked Entity Code` %in% c("NY2163", "NY2162")),
               paste0(project_path,
                      "MSMW/Uploads/MSMW_Rightsourcing_",
                      min(mdy(msmw_upload$`Start Date`)), "_",
