@@ -72,9 +72,7 @@ pay_period_mapping <- pay_period_mapping %>%
 # code_conversion <- read_xlsx(paste0(mapping_path,
 #                                     "MSHS_Code_Conversion_Mapping_no_duplicates.xlsx"))
 code_conversion <- read_xlsx(paste0(
-  "/SharedDrive/deans/Presidents/SixSigma/",
-  "Individual Folders/Current Employees/Engineers/Matthew Miesle/LPM/Analysis from Desktop/2024-10-15 Rightsourcing MSMW merge/",
-  "MSHS_Code_Conversion_Mapping_no_duplicates - MM check for rightsourcing facility.xlsx"))
+  mapping_path, "MSHS_Code_Conversion_Mapping_no_duplicates.xlsx"))
 
 # report mapping file for QC check to identify published departments
 report_info <- read_xlsx(paste0(mapping_path,
@@ -268,23 +266,6 @@ processed_data <- processed_data %>%
                                           substr(cost_center_info, 16, 19)),
     TRUE ~ cost_center_info)
   )
-  # ) %>%
-#   mutate(home_dept_oracle = case_when(
-#     substr(wrkd_dept_leg, 1, 4) == "0130" ~ "101010101010102",
-#     substr(wrkd_dept_leg, 1, 4) == "4709" ~ "900000040790000",
-#     Facility == "MSSL- Mount Sinai St. Lukes" ~ "302020202020202",
-#     Facility == "MSW - Mount Sinai West" ~ "301010101010101",
-#     nchar(cost_center_info) == 12 ~ "101010101010101",
-#     nchar(cost_center_info) == 30 ~ "900000040490000",
-#     TRUE ~ cost_center_info
-#   )) %>%
-#   mutate(hospital = case_when(
-#     Facility == "MSSL- Mount Sinai St. Lukes" ~ "NY2163",
-#     Facility == "MSW - Mount Sinai West" ~ "NY2162",
-#     nchar(cost_center_info) == 12 ~ "NY0014",
-#     nchar(cost_center_info) == 30 ~ "630571",
-#     TRUE ~ cost_center_info
-#   )) 
 
 # join to get oracle departments
 row_count <- nrow(processed_data)
@@ -297,9 +278,10 @@ processed_data <- processed_data %>%
     substr(wrkd_dept_leg, 1, 4) == "0130" ~ "101010101010102",
     substr(wrkd_dept_leg, 1, 4) == "4709" ~ "900000040790000",
     substr(wrkd_dept_leg, 1, 6) == "110902" ~ "302020202020202",
-    substr(wrkd_dept_leg, 1, 4) == "1109" ~ "301010101010101",
+    substr(wrkd_dept_leg, 1, 2) == "11" ~ "301010101010101",
+    substr(wrkd_dept_leg, 1, 2) == "44" ~ "900000040490000",
+    substr(wrkd_dept_leg, 1, 2) == "50" ~ "900000095890000",
     nchar(cost_center_info) == 12 ~ "101010101010101",
-    nchar(cost_center_info) == 30 ~ "900000040490000",
     TRUE ~ cost_center_info
   )) %>%
   mutate(hospital = case_when(
@@ -307,9 +289,10 @@ processed_data <- processed_data %>%
     substr(wrkd_dept_leg, 1, 4) == "0130" ~ "NY0014",
     substr(wrkd_dept_leg, 1, 4) == "4709" ~ "630571",
     substr(wrkd_dept_leg, 1, 6) == "110902" ~ "NY2163",
-    substr(wrkd_dept_leg, 1, 4) == "1109" ~ "NY2162",
+    substr(wrkd_dept_leg, 1, 2) == "11" ~ "NY2162",
+    substr(wrkd_dept_leg, 1, 2) == "44" ~ "630571",
+    substr(wrkd_dept_leg, 1, 2) == "50" ~ "630571",
     nchar(cost_center_info) == 12 ~ "NY0014",
-    nchar(cost_center_info) == 30 ~ "630571",
     TRUE ~ cost_center_info
   )) %>%
   mutate(wrkd_dept_oracle = case_when(
@@ -438,7 +421,8 @@ upload_new <- rolled_up %>%
   mutate(employee_id = paste0(
     substr(trimws(sub(",.*", "", Worker.Name)), 1, 6),
     substr(gsub("\\..*", "", week_spend), 1, 3),
-    substr(wrkd_dept_oracle, 13, 15),
+    substr(wrkd_dept_oracle,
+           nchar(wrkd_dept_oracle) - 2, nchar(wrkd_dept_oracle)),
     substr(jobcode, 4, 6)),
     .before = Worker.Name) %>%
   mutate(Worker.Name = substr(Worker.Name, 1, 30)) %>%
@@ -585,14 +569,14 @@ if (sites == "MSHS" | sites == "MSHQ") {
               paste0(project_path,
                      "MSHQ/Uploads/MSHQ_Rightsourcing_",
                      min(mdy(upload_new$`Start Date`)), "_",
-                     max(mdy(upload_new$`End Date`)), "_MM_test.csv"),
+                     max(mdy(upload_new$`End Date`)), ".csv"),
               row.names = F, col.names = T, sep = ",")
   
   # save MSHQ zero file
   write.table(mshq_zero_new, paste0(project_path,
                                     "MSHQ/Zero/MSHQ_Rightsourcing Zero_",
                                     min(mdy(mshq_zero_new$`Start Date`)), "_",
-                                    max(mdy(mshq_zero_new$`End Date`)), "_MM_test.csv"),
+                                    max(mdy(mshq_zero_new$`End Date`)), ".csv"),
               row.names = F, col.names = T, sep = ",")
 }
 
@@ -602,59 +586,53 @@ if (sites == "MSHS" | sites == "MSBIB") {
               paste0(project_path,
                      "MSBIB/Uploads/MSBIB_Rightsourcing_",
                      min(mdy(upload_new$`Start Date`)), "_",
-                     max(mdy(upload_new$`End Date`)), "_MM_test.csv"),
+                     max(mdy(upload_new$`End Date`)), ".csv"),
               row.names = F, col.names = T, sep = ",")
   
   # save MSBIB zero file
   write.table(msbib_zero_new, paste0(project_path,
-                                     "MSBIB/Zero/MSBIB_Rightsourcing Zero_)",
+                                     "MSBIB/Zero/MSBIB_Rightsourcing Zero_",
                                      min(mdy(msbib_zero_new$`Start Date`)), "_",
-                                     max(mdy(msbib_zero_new$`End Date`)), "_MM_test.csv"),
+                                     max(mdy(msbib_zero_new$`End Date`)), ".csv"),
               row.names = F, col.names = T, sep = ",")
 }
 
 if (sites == "MSHS" | sites == "MSMW") {
-  # Combine MSM and MSW upload files
-  msmw_upload <- rbind(
-    filter(upload_new, `Worked Entity Code` == "NY2163"),  # MSM upload
-    filter(upload_new, `Worked Entity Code` == "NY2162")   # MSW upload
-  )
-  
-  # Save combined upload file
-  write.table(msmw_upload,
+  # Save MSMW upload combined
+  write.table(filter(upload_new, `Worked Entity Code` %in% c("NY2163", "NY2162")),
               paste0(project_path,
                      "MSMW/Uploads/MSMW_Rightsourcing_",
                      min(mdy(msmw_upload$`Start Date`)), "_",
-                     max(mdy(msmw_upload$`End Date`)), "_MM_test.csv"),
+                     max(mdy(msmw_upload$`End Date`)), ".csv"),
               row.names = F, col.names = T, sep = ",")
   
-  # Save combined zero file
+  # Save MSMW zero file combined
   write.table(msmw_zero_new,
               paste0(project_path,
                      "MSMW/Zero/MSMW_Rightsourcing Zero_",
                      min(mdy(msmw_zero_new$`Start Date`)), "_",
-                     max(mdy(msmw_zero_new$`End Date`)), "_MM_test.csv"),
+                     max(mdy(msmw_zero_new$`End Date`)), ".csv"),
               row.names = F, col.names = T, sep = ",")
 }
 
 ## Jobcode Items -----------------------------------------------------------
 
 # overwrite job code list
-write.table(jobcode_list_new, paste0(project_path, "Rightsource Job Code_MM_test.csv"),
+write.table(jobcode_list_new, paste0(project_path, "Rightsource Job Code.csv"),
             row.names = F, sep = ",")
 
 # save jobcode dictionary upload
 write.table(jc_dict_upload, paste0(project_path, "Jobcode Dictionary/",
                                    "MSHS_Jobcode Dictionary_",
                                    max(mdy(upload_new$`End Date`)),
-                                   "_MM_test.csv"),
+                                   ".csv"),
             row.names = F, col.names = T, sep = ",", na = "")
 
 # save unmapped cost center list
 write.table(cc_map_fail, paste0(project_path, "Failed Cost Center Mappings/",
                                 "MSHS_Failed Cost Center Mappings_",
                                 max(mdy(upload_new$`End Date`)),
-                                "_MM_test.csv"),
+                                ".csv"),
             row.names = F, sep = ",")
 
 # Script End --------------------------------------------------------------
