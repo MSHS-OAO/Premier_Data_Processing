@@ -287,7 +287,7 @@ processed_data <- processed_data %>%
     substr(wrkd_dept_leg, 1, 2) == "44" ~ "900000040490000",
     substr(wrkd_dept_leg, 1, 2) == "50" ~ "900000095890000",
     nchar(cost_center_info) == 12 ~ "101010101010101",
-    TRUE ~ cost_center_info
+    TRUE ~ "900000000090000"
   )) %>%
   mutate(hospital = case_when(
     !is.na(Rightsourcing.Facility) ~ Rightsourcing.Facility,
@@ -298,6 +298,13 @@ processed_data <- processed_data %>%
     substr(wrkd_dept_leg, 1, 2) == "44" ~ "630571",
     substr(wrkd_dept_leg, 1, 2) == "50" ~ "630571",
     nchar(cost_center_info) == 12 ~ "NY0014",
+    Facility == "MSH - Mount Sinai Hospital" ~ "NY0014",
+    Facility == "MSSM - ICAHN School of Medicine" ~ "NY0014",
+    Facility == "MSQ - Mount Sinai Queens" ~ "NY0014",
+    Facility == "MSSL- Mount Sinai St. Lukes" ~ "NY2163",
+    Facility == "MSW - Mount Sinai West" ~ "NY2162",
+    Facility == "MSBI - Mount Sinai Beth Israel" ~ "630571",
+    Facility == "MSB - Mount Sinai Brooklyn" ~ "630571",
     TRUE ~ cost_center_info
   )) %>%
   mutate(wrkd_dept_oracle = case_when(
