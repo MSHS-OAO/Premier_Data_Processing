@@ -73,8 +73,26 @@ code_conversion <- read_xlsx(paste0(
   mapping_path, "MSHS_Code_Conversion_Mapping_no_duplicates.xlsx"))
 
 # report mapping file for QC check to identify published departments
-report_info <- read_xlsx(paste0(mapping_path,
-                                "MSHS_Reporting_Definition_Mapping.xlsx"))
+map_uni_reports <- tbl(oao_con, "LPM_MAPPING_REPDEF") %>%
+  collect()
+map_uni_cost_ctr <- tbl(oao_con, "LPM_MAPPING_COST_CENTER") %>%
+  collect()
+map_uni_key_vol <- tbl(oao_con, "LPM_MAPPING_KEY_VOLUME") %>%
+  collect()
+report_info <- map_uni_reports %>%
+  left_join(map_uni_cost_ctr, relationship = "many-to-many") %>%
+  left_join(map_uni_key_vol, relationship = "many-to-many") %>%
+  rename(DEFINITION.CODE = DEFINITION_CODE,
+         DEFINITION.NAME = DEFINITION_NAME,
+         KEY.VOLUME = KEY_VOLUME,
+         COST.CENTER = LEGACY_COST_CENTER,
+         ORACLE.COST.CENTER = ORACLE_COST_CENTER,
+         COST.CENTER.DESCRIPTION = COST_CENTER_DESCRIPTION,
+         CORPORATE.SERVICE.LINE = CORPORATE_SERVICE_LINE,
+         SITE = SITE,
+         CLOSED = CLOSED,
+         VP = VP,
+         DEPARTMENT.BREAKDOWN = DEPARTMENT_BREAKDOWN)
 
 # user needs most recent raw data file
 raw_data <- recent_file(path = paste0(project_path, "Source Data/MSHS"),
@@ -616,8 +634,8 @@ if (sites == "MSHS" | sites == "MSMW") {
                      `Worked Entity Code` %in% c("NY2163", "NY2162")),
               paste0(project_path,
                      "MSMW/Uploads/MSMW_Rightsourcing_",
-                     min(mdy(msmw_upload$`Start Date`)), "_",
-                     max(mdy(msmw_upload$`End Date`)), ".csv"),
+                     min(mdy(upload_new$`Start Date`)), "_",
+                     max(mdy(upload_new$`End Date`)), ".csv"),
               row.names = F, col.names = T, sep = ",")
   
   # Save MSMW zero file combined
