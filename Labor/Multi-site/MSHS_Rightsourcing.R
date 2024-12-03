@@ -69,11 +69,30 @@ pay_period_mapping <- pay_period_mapping %>%
          END.DATE = PP_END_DATE,
          PREMIER.DISTRIBUTION = PREMIER_DISTRIBUTION)
 # code conversion mapping file to convert legacy to oracle cc
-code_conversion <- read_xlsx(paste0(mapping_path,
-                                    "MSHS_Code_Conversion_Mapping_no_duplicates.xlsx"))
+code_conversion <- read_xlsx(paste0(
+  mapping_path, "MSHS_Code_Conversion_Mapping_no_duplicates.xlsx"))
+
 # report mapping file for QC check to identify published departments
-report_info <- read_xlsx(paste0(mapping_path,
-                                "MSHS_Reporting_Definition_Mapping.xlsx"))
+map_uni_reports <- tbl(oao_con, "LPM_MAPPING_REPDEF") %>%
+  collect()
+map_uni_cost_ctr <- tbl(oao_con, "LPM_MAPPING_COST_CENTER") %>%
+  collect()
+map_uni_key_vol <- tbl(oao_con, "LPM_MAPPING_KEY_VOLUME") %>%
+  collect()
+report_info <- map_uni_reports %>%
+  left_join(map_uni_cost_ctr, relationship = "many-to-many") %>%
+  left_join(map_uni_key_vol, relationship = "many-to-many") %>%
+  rename(DEFINITION.CODE = DEFINITION_CODE,
+         DEFINITION.NAME = DEFINITION_NAME,
+         KEY.VOLUME = KEY_VOLUME,
+         COST.CENTER = LEGACY_COST_CENTER,
+         ORACLE.COST.CENTER = ORACLE_COST_CENTER,
+         COST.CENTER.DESCRIPTION = COST_CENTER_DESCRIPTION,
+         CORPORATE.SERVICE.LINE = CORPORATE_SERVICE_LINE,
+         SITE = SITE,
+         CLOSED = CLOSED,
+         VP = VP,
+         DEPARTMENT.BREAKDOWN = DEPARTMENT_BREAKDOWN)
 
 # user needs most recent raw data file
 raw_data <- recent_file(path = paste0(project_path, "Source Data/MSHS"),
@@ -136,17 +155,23 @@ rm(raw_data_prev)
 
 #user needs most recent zero and upload files
 msbib_zero_old <- recent_file(path = paste0(project_path, "MSBIB/Zero"),
-                              text_cols = rep("character", 14), file_header = T)
+                              text_cols = rep("character", 14),
+                              file_header = T)
 msbib_upload_old <- recent_file(path = paste0(project_path, "MSBIB/Uploads"),
-                                text_cols = rep("character", 14), file_header = T)
+                                text_cols = rep("character", 14),
+                                file_header = T)
 mshq_zero_old <- recent_file(path = paste0(project_path, "MSHQ/Zero"),
-                             text_cols = rep("character", 14), file_header = T)
+                             text_cols = rep("character", 14),
+                             file_header = T)
 mshq_upload_old <- recent_file(path = paste0(project_path, "MSHQ/Uploads"),
-                               text_cols = rep("character", 14), file_header = T)
+                               text_cols = rep("character", 14),
+                               file_header = T)
 msmw_zero_old <- recent_file(path = paste0(project_path, "MSMW/Zero"),
-                           text_cols = rep("character", 14), file_header = T)
+                           text_cols = rep("character", 14),
+                           file_header = T)
 msmw_upload_old <- recent_file(path = paste0(project_path, "MSMW/Uploads"),
-                              text_cols = rep("character", 14), file_header = T)
+                              text_cols = rep("character", 14),
+                              file_header = T)
 # Constants ------------------------------------------------------
 
 # user needs to select the site(s) they want to process rightsourcing for
@@ -239,7 +264,8 @@ processed_data <- raw_data %>%
   mutate(Worker.Name = gsub("\'", "", Worker.Name),
          Worker.Name = gsub("\\(Mt Sinai\\)", "", Worker.Name),
          Worker.Name = gsub(" ,", ",", Worker.Name),
-         Worker.Name = iconv(Worker.Name, from = 'UTF-8', to = 'ASCII//TRANSLIT'))
+         Worker.Name = iconv(Worker.Name, from = 'UTF-8',
+                             to = 'ASCII//TRANSLIT'))
 
 # filter raw data on date range needed for upload
 processed_data <- processed_data %>%
@@ -262,29 +288,43 @@ processed_data <- processed_data %>%
                                           substr(cost_center_info, 13, 14),
                                           substr(cost_center_info, 16, 19)),
     TRUE ~ cost_center_info)
-  ) %>%
-  mutate(home_dept_oracle = case_when(
-    substr(wrkd_dept_leg, 1, 4) == "0130" ~ "101010101010102",
-    substr(wrkd_dept_leg, 1, 4) == "4709" ~ "900000040790000",
-    Facility == "MSSL- Mount Sinai St. Lukes" ~ "302020202020202",
-    Facility == "MSW - Mount Sinai West" ~ "301010101010101",
-    nchar(cost_center_info) == 12 ~ "101010101010101",
-    nchar(cost_center_info) == 30 ~ "900000040490000",
-    TRUE ~ cost_center_info
-  )) %>%
-  mutate(hospital = case_when(
-    Facility == "MSSL- Mount Sinai St. Lukes" ~ "NY2163",
-    Facility == "MSW - Mount Sinai West" ~ "NY2162",
-    nchar(cost_center_info) == 12 ~ "NY0014",
-    nchar(cost_center_info) == 30 ~ "630571",
-    TRUE ~ cost_center_info
-  )) 
+  )
 
 # join to get oracle departments
 row_count <- nrow(processed_data)
 processed_data <- processed_data %>%
-  left_join(select(code_conversion, COST.CENTER.LEGACY, COST.CENTER.ORACLE),
+  left_join(select(code_conversion, COST.CENTER.LEGACY, COST.CENTER.ORACLE,
+                   Rightsourcing.Facility, Rightsourcing.Home),
             by = c("wrkd_dept_leg" = "COST.CENTER.LEGACY")) %>%
+  mutate(home_dept_oracle = case_when(
+    !is.na(Rightsourcing.Home) ~ as.character(Rightsourcing.Home),
+    substr(wrkd_dept_leg, 1, 4) == "0130" ~ "101010101010102",
+    substr(wrkd_dept_leg, 1, 4) == "4709" ~ "900000040790000",
+    substr(wrkd_dept_leg, 1, 6) == "110902" ~ "302020202020202",
+    substr(wrkd_dept_leg, 1, 2) == "11" ~ "301010101010101",
+    substr(wrkd_dept_leg, 1, 2) == "44" ~ "900000040490000",
+    substr(wrkd_dept_leg, 1, 2) == "50" ~ "900000095890000",
+    nchar(cost_center_info) == 12 ~ "101010101010101",
+    TRUE ~ "900000000090000"
+  )) %>%
+  mutate(hospital = case_when(
+    !is.na(Rightsourcing.Facility) ~ Rightsourcing.Facility,
+    substr(wrkd_dept_leg, 1, 4) == "0130" ~ "NY0014",
+    substr(wrkd_dept_leg, 1, 4) == "4709" ~ "630571",
+    substr(wrkd_dept_leg, 1, 6) == "110902" ~ "NY2163",
+    substr(wrkd_dept_leg, 1, 2) == "11" ~ "NY2162",
+    substr(wrkd_dept_leg, 1, 2) == "44" ~ "630571",
+    substr(wrkd_dept_leg, 1, 2) == "50" ~ "630571",
+    nchar(cost_center_info) == 12 ~ "NY0014",
+    Facility == "MSH - Mount Sinai Hospital" ~ "NY0014",
+    Facility == "MSSM - ICAHN School of Medicine" ~ "NY0014",
+    Facility == "MSQ - Mount Sinai Queens" ~ "NY0014",
+    Facility == "MSSL- Mount Sinai St. Lukes" ~ "NY2163",
+    Facility == "MSW - Mount Sinai West" ~ "NY2162",
+    Facility == "MSBI - Mount Sinai Beth Israel" ~ "630571",
+    Facility == "MSB - Mount Sinai Brooklyn" ~ "630571",
+    TRUE ~ cost_center_info
+  )) %>%
   mutate(wrkd_dept_oracle = case_when(
     is.na(COST.CENTER.ORACLE) ~ home_dept_oracle,
     TRUE ~ COST.CENTER.ORACLE
@@ -384,9 +424,9 @@ processed_data <- processed_data %>%
 processed_data <- processed_data %>%
   mutate(daily_hours = 
            case_when(Regular.Rate > exempt_payrate ~ 
-                       round(40 * Day.Spend/Regular.Rate, digits = 2),
+                       round(40 * Day.Spend / Regular.Rate, digits = 2),
                      daily_hours == 0 & Bill.Type == "Adjustment" ~ 
-                       round(Day.Spend/Regular.Rate, digits = 2),
+                       round(Day.Spend / Regular.Rate, digits = 2),
                      TRUE ~ daily_hours))
 
 
@@ -411,7 +451,8 @@ upload_new <- rolled_up %>%
   mutate(employee_id = paste0(
     substr(trimws(sub(",.*", "", Worker.Name)), 1, 6),
     substr(gsub("\\..*", "", week_spend), 1, 3),
-    substr(wrkd_dept_oracle, 13, 15),
+    substr(wrkd_dept_oracle,
+           nchar(wrkd_dept_oracle) - 2, nchar(wrkd_dept_oracle)),
     substr(jobcode, 4, 6)),
     .before = Worker.Name) %>%
   mutate(Worker.Name = substr(Worker.Name, 1, 30)) %>%
@@ -580,28 +621,24 @@ if (sites == "MSHS" | sites == "MSBIB") {
   
   # save MSBIB zero file
   write.table(msbib_zero_new, paste0(project_path,
-                                     "MSBIB/Zero/MSBIB_Rightsourcing Zero_)",
+                                     "MSBIB/Zero/MSBIB_Rightsourcing Zero_",
                                      min(mdy(msbib_zero_new$`Start Date`)), "_",
-                                     max(mdy(msbib_zero_new$`End Date`)), ".csv"),
+                                     max(mdy(msbib_zero_new$`End Date`)),
+                                     ".csv"),
               row.names = F, col.names = T, sep = ",")
 }
 
 if (sites == "MSHS" | sites == "MSMW") {
-  # Combine MSM and MSW upload files
-  msmw_upload <- rbind(
-    filter(upload_new, `Worked Entity Code` == "NY2163"),  # MSM upload
-    filter(upload_new, `Worked Entity Code` == "NY2162")   # MSW upload
-  )
-  
-  # Save combined upload file
-  write.table(msmw_upload,
+  # Save MSMW upload combined
+  write.table(filter(upload_new,
+                     `Worked Entity Code` %in% c("NY2163", "NY2162")),
               paste0(project_path,
                      "MSMW/Uploads/MSMW_Rightsourcing_",
-                     min(mdy(msmw_upload$`Start Date`)), "_",
-                     max(mdy(msmw_upload$`End Date`)), ".csv"),
+                     min(mdy(upload_new$`Start Date`)), "_",
+                     max(mdy(upload_new$`End Date`)), ".csv"),
               row.names = F, col.names = T, sep = ",")
   
-  # Save combined zero file
+  # Save MSMW zero file combined
   write.table(msmw_zero_new,
               paste0(project_path,
                      "MSMW/Zero/MSMW_Rightsourcing Zero_",
@@ -613,7 +650,7 @@ if (sites == "MSHS" | sites == "MSMW") {
 ## Jobcode Items -----------------------------------------------------------
 
 # overwrite job code list
-write.table(jobcode_list_new, paste0(project_path, "Rightsource Job Code Test.csv"),
+write.table(jobcode_list_new, paste0(project_path, "Rightsource Job Code.csv"),
             row.names = F, sep = ",")
 
 # save jobcode dictionary upload
