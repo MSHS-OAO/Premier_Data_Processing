@@ -1,4 +1,5 @@
 # Libraries ---------------------------------------------------------------
+
 library(readxl)
 library(dplyr)
 library(lubridate)
@@ -172,6 +173,7 @@ msmw_zero_old <- recent_file(path = paste0(project_path, "MSMW/Zero"),
 msmw_upload_old <- recent_file(path = paste0(project_path, "MSMW/Uploads"),
                               text_cols = rep("character", 14),
                               file_header = T)
+
 # Constants ------------------------------------------------------
 
 # user needs to select the site(s) they want to process rightsourcing for
@@ -223,6 +225,7 @@ prev_0_max_date_mshq <- max(mdy(mshq_zero_old$date.end))
 
 prev_0_max_date_msbib <- max(mdy(msbib_zero_old$date.end))
 
+
 prev_0_max_date_msmw <- max(mdy(msmw_zero_old$date.end))
 
 # need threshold for weekly hour total for an employee to flag for review
@@ -256,6 +259,7 @@ msmw_zero_new <- msmw_upload_old %>%
   filter(mdy(date.start) > prev_0_max_date_msmw) %>%
   mutate(hours = "0",
          spend = "0")
+
 ## New Upload Preprocessing --------------------------------------------------
 
 # apply employee removal filter
@@ -591,6 +595,7 @@ colnames(upload_new) <- upload_payroll_cols
 colnames(mshq_zero_new) <- upload_payroll_cols
 colnames(msbib_zero_new) <- upload_payroll_cols
 colnames(msmw_zero_new) <- upload_payroll_cols
+
 ## Upload Files -----------------------------------------------------------
 
 if (sites == "MSHS" | sites == "MSHQ") {

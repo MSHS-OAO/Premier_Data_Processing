@@ -42,7 +42,7 @@ Art28 <- function(YYYYMM){
   #output each department with its associated volume
   volume <<- cbind(cc,vol)
   colnames(volume) <- c("cc",YYYYMM)
-  setwd("J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Art 28 Visits/Calculation Worksheet")
+  setwd("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Art 28 Visits/Calculation Worksheet")
   #Read Master Art28 file
   master <- read.csv("Art28_Master.csv",check.names=F)
   #append master file and save it back
@@ -52,5 +52,5 @@ Art28 <- function(YYYYMM){
 
 #enter year and month in YYYYMM format
 #for example 201802 would represent February 2018
-Art28("202203")
+Art28("202311")
 

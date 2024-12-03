@@ -4,20 +4,40 @@ library(tidyverse)
 library(readxl)
 library(xlsx)
 library(rstudioapi)
-library(stringr)
+# library(stringr) This is in tidyverse
 library(stringi)
+library(DBI)
+library(odbc)
+
+# conflicted::conflicts_prefer(dplyr::filter)
 
 # clear memory of all objects including those hidden
 rm(list = ls(all.names = TRUE))
 
 # Directories -------------------------------------------------------------
-dir <- "J:/deans/Presidents/SixSigma/MSHS Productivity/Productivity"
+dir <- "/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity"
 dir_BISLR <- paste0(dir, "/Labor - Data/Multi-site/BISLR")
 dir_universal <- paste0(dir, "/Universal Data")
 
+oao_con <- dbConnect(odbc(), "OAO Cloud DB Production")
+# oao_con_dev <- dbConnect(odbc(), "OAO Cloud DB Development")
+
+# User Warnings -----------------------------------------------------------
+
+showDialog(
+  title = "Updated Premier Dictionary Mapping Files",
+  message = paste0(
+    "USER WARNING: ",
+    "Before proceeding, ",
+    "be sure that all the latest Premier Dictionary and Mapping Exports ",
+    "have been saved in the folder listed below.  ",
+    "    Issues can arise if the files are not the latest version.     ",
+    dir, "/Universal Data/Premier")
+  )
+
 # Constants ---------------------------------------------------------------
 new_dpt_map <- 10095
-map_effective_date_dpt <- as.Date("2010-01-01")
+map_effective_date_dpt <- as.Date("2016-01-01")
 corp_code <- 729805
 jc_alloc_pct <- 100
 
@@ -28,6 +48,10 @@ true_accrual_cc_desc <- c("ACCRUAL COST CENTER", "SPECIAL FUNDS ACCOUNTING",
 dummy_report_ids <- c("DNU_000", "DNU_MSM000", "DNU_MSW000")
 
 jc_desc_threshold <- 5
+
+# list of dept IDs where fund number should be used in place of the
+# standard department ID structure
+cc_fundnum_conv <- c(37800, 37803)
 
 ## Premier Formatting ------------------------------------------------------
 char_len_dpt <- 15
@@ -78,69 +102,76 @@ import_recent_file <- function(folder.path, place) {
 raw_payroll <- import_recent_file(paste0(dir_BISLR, "/Source Data"), 1)
 
 # Import References -------------------------------------------------------
-pay_cycles_uploaded <- read.xlsx(paste0(dir_BISLR, "/Reference",
+pay_cycles_uploaded <- read_xlsx(paste0(dir_BISLR, "/Reference",
                                         "/Pay cycles uploaded_Tracker.xlsx"),
-                                 sheetIndex = 1)
+                                 sheet = 1)
+pay_cycles_uploaded_raw <- pay_cycles_uploaded
 msus_removal_list <- read_xlsx(paste0(dir_BISLR,
                                       "/Reference/MSUS_removal_list.xlsx"),
                                sheet = 1)
 ## Universal Reference Files -----------------------------------------------
-map_uni_paycodes <- read_xlsx(paste0(dir_universal,
-                                     "/Mapping/MSHS_Paycode_Mapping.xlsx"),
-                              sheet = 1)
-map_uni_jobcodes <- read_xlsx(paste0(dir_universal,
-                                     "/Mapping/MSHS_Jobcode_Mapping.xlsx"),
-                              sheet = 1)
-map_uni_reports <- read_xlsx(paste0(dir_universal,
-                                    "/Mapping",
-                                    "/MSHS_Reporting_Definition_Mapping.xlsx"),
-                             sheet = 1)
-map_uni_paycycles <- read_xlsx(paste0(dir_universal,
-                                      "/Mapping/MSHS_Pay_Cycle.xlsx"),
-                               sheet = 1)
+map_uni_paycodes <- tbl(oao_con, "LPM_MAPPING_PAYCODE") %>%
+  collect()
+map_uni_jobcodes <- tbl(oao_con, "LPM_MAPPING_JOBCODE") %>%
+  collect()
+map_uni_reports <- tbl(oao_con, "LPM_MAPPING_REPDEF") %>%
+  collect()
+map_uni_cost_ctr <- tbl(oao_con, "LPM_MAPPING_COST_CENTER") %>%
+  collect()
+map_uni_key_vol <- tbl(oao_con, "LPM_MAPPING_KEY_VOLUME") %>%
+  collect()
+map_uni_paycycles <- tbl(oao_con, "LPM_MAPPING_PAYCYCLE") %>%
+  collect()
+
 
 ## Premier Reference Files -------------------------------------------------
 dict_premier_dpt <- read.csv(paste0(dir_universal,
-                                    "/Premier/Dictionary Exports",
-                                    "/DepartmentDictionary.csv"),
+                                    "/Premier/2.0 Dictionary Exports",
+                                    "/MSTCC.csv"),
                              col.names = c("Corporation.Code", "Site",
                                            "Cost.Center",
                                            "Cost.Center.Description"),
                              sep = ",")
-map_premier_dpt <- read.csv(paste0(dir_universal, "/Premier/Mapping Exports",
-                                   "/DepartmentMapping.csv"),
-                            col.names = c("Effective.Date", "Corporation.Code",
-                                          "Site", "Cost.Center",
-                                          "Cost.Center.Map"),
-                            sep = ",")
 dict_premier_jobcode <- read.csv(paste0(dir_universal,
-                                        "/Premier/Dictionary Exports",
-                                        "/DeptJobCodeDictionary.csv"),
+                                        "/Premier/2.0 Dictionary Exports",
+                                        "/MSTJOBCODE.csv"),
                                  col.names = c("Corporation.Code", "Site",
-                                               "Cost.Center", "Job.Code",
-                                               "Job.Code.Description"),
+                                               "Job.Code",
+                                               "Job.Code.Description",
+                                               "Default.Agency.Hourly.Rate",
+                                               "Effective Start Date",
+                                               "Expiration Date"),
                                  sep = ",")
 dict_premier_report <- read.csv(paste0(dir_universal,
-                                       "/Premier/Dictionary Exports",
-                                       "/DepartmentDef.csv"),
+                                       "/Premier/2.0 Dictionary Exports",
+                                       "/MDDCCREL.csv"),
                                 col.names = c("Corporation.Code", "Site",
-                                              "Report.Name", "Report.ID",
-                                              "Cost.Center", "Report.Type",
-                                              "Threshold.Type", "Target.Type",
-                                              "Exclude.Report.Rollup",
-                                              "Effective.Date", "Paycycle.Type",
-                                              "Exclude.Admin.Rollup",
-                                              "Exclude.Action.Plan",
-                                              "blank14", "blank15",
-                                              "blank16", "blank17"),
-                                sep = ",", fill = T)
+                                              "Report.ID", "Cost.Center", 
+                                              "Effective.Date", 
+                                              "Expiration Date",
+                                              "Delete Cost Center Association"),
+                                sep = ",")
 
 dict_premier_paycode <- read.csv(paste0(dir_universal,
-                                        "/Premier/Dictionary Exports",
-                                        "/PayCodeDictionaryExport.csv"),
-                                 header = TRUE,
+                                        "/Premier/2.0 Dictionary Exports",
+                                        "/MSTPAYCODE.csv"),
+                                 col.names = c("Partner.or.Health.System.ID",
+                                               "Facility.or.Hospital.ID",
+                                               "Pay.Code", "Pay.Code.Name"),
                                  sep = ",")
-
+map_premier_jobcode <- read.csv(paste0(dir_universal,
+                                       "/Premier/2.0 Mapping Exports",
+                                       "/MAPJOBCODE.csv"),
+                                col.names = c("Effective.Start.Date",
+                                              "Expiration.Date",
+                                              "Corporation.Code", "Site",
+                                              "Job.Code",
+                                              "Cost.Center.Code",
+                                              "Premier.Standard.Dept.Code",
+                                              "Premier.Standard.Job.Code",
+                                              "Allocation.Percentage",
+                                              "Job.Code.Name"),
+                                sep = ",")
 
 ## Quality - piv_wide_check ------------------------------------------------
 
@@ -152,9 +183,22 @@ piv_wide_check_prev <- read.csv(paste0(dir_BISLR, "/Quality Checks",
 
 ## References --------------------------------------------------------------
 map_uni_jobcodes <- map_uni_jobcodes %>%
+  rename(J.C = JOBCODE,
+         PAYROLL = PAYROLL,
+         J.C.DESCRIPTION = JOBCODE_DESCRIPTION,
+         PROVIDER = PROVIDER,
+         PREMIER.J.C = JOBCODE_PREMIER,
+         PREMIER.J.C.DESCRIPTION = JOBCODE_PREMIER_DESCRIPTION) %>%
   mutate(J.C = str_trim(J.C)) %>%
   mutate(JC_in_UniversalFile = 1)
 map_uni_paycodes <- map_uni_paycodes %>%
+  rename(RAW.PAY.CODE = PAYCODE_RAW,
+         PAY.CODE = PAYCODE_PREMIER,
+         PAY.CODE.NAME = PAYCODE_DESCRIPTION,
+         PAY.CODE.CATEGORY = PAYCODE_CATEGORY,
+         INCLUDE.HOURS = INCLUDE_HOURS,
+         INCLUDE.EXPENSES = INCLUDE_EXPENSES,
+         WORKED.PAY.CODE = WORKED_PAYCODE) %>%
   mutate(Paycode_in_Universal = 1)
 pay_cycles_uploaded <- pay_cycles_uploaded %>%
   select(-capture_time) %>%
@@ -162,32 +206,44 @@ pay_cycles_uploaded <- pay_cycles_uploaded %>%
 dict_premier_dpt <- dict_premier_dpt %>%
   mutate(Cost.Center = as.character(Cost.Center), Dpt_in_Dict = 1)
 dict_premier_jobcode <- dict_premier_jobcode %>%
+  select(1:4) %>%
+  mutate(JC_in_Dicty = 1)
+map_premier_jobcode <- map_premier_jobcode %>%
+  filter(Premier.Standard.Job.Code != "9999") %>%
+  select(Corporation.Code, Site, Job.Code, Cost.Center.Code) %>%
   mutate(JC_in_Dict = 1)
 
-reports_dept <- str_split(dict_premier_report$Cost.Center,
-  pattern = ":", simplify = T) %>%
-  as.data.frame()
-report_list <- lapply(
-  seq_len(nrow(reports_dept)),
-  function(x) {
-    pivot_longer(reports_dept[x, ],
-                 cols = everything())
-  }
-)
-report_list <- lapply(seq_len(length(report_list)),
-                      function(x) subset(report_list[[x]], value != ""))
-report_list <- lapply(
-  seq_len(length(report_list)),
-  function(x) {
-    mutate(report_list[[x]],
-      Site = dict_premier_report$Site[x],
-      Report.ID = dict_premier_report$Report.ID[x],
-      Effective.Date = dict_premier_report$Effective.Date[x])
-  }
-)
-report_list <- do.call(rbind, report_list) %>%
-  rename(Cost.Center = value) %>%
-  select(-name)
+report_list <- dict_premier_report %>%
+  filter(Report.ID != "--UCCD--") %>%
+  select(Cost.Center, Site, Report.ID) %>%
+  distinct()
+# In the future, there's potential for a cost center to show up in multiple
+# reports if we begin moving cost centers across reports.
+
+
+# modifying column names in order to not have to recode the rest of the script
+map_uni_paycycles <- map_uni_paycycles %>%
+  rename(DATE = PAYCYCLE_DATE,
+         START.DATE = PP_START_DATE,
+         END.DATE = PP_END_DATE,
+         PREMIER.DISTRIBUTION = PREMIER_DISTRIBUTION)
+
+map_uni_reports_orig <- map_uni_reports
+map_uni_reports <- map_uni_reports %>%
+  left_join(map_uni_cost_ctr, relationship = "many-to-many") %>%
+  left_join(map_uni_key_vol, relationship = "many-to-many") %>%
+  rename(DEFINITION.CODE = DEFINITION_CODE,
+         DEFINITION.NAME = DEFINITION_NAME,
+         KEY.VOLUME = KEY_VOLUME,
+         COST.CENTER = LEGACY_COST_CENTER,
+         ORACLE.COST.CENTER = ORACLE_COST_CENTER,
+         COST.CENTER.DESCRIPTION = COST_CENTER_DESCRIPTION,
+         CORPORATE.SERVICE.LINE = CORPORATE_SERVICE_LINE,
+         SITE = SITE,
+         CLOSED = CLOSED,
+         VP = VP,
+         DEPARTMENT.BREAKDOWN = DEPARTMENT_BREAKDOWN)
+  
 
 dist_dates <- map_uni_paycycles %>%
   select(END.DATE, PREMIER.DISTRIBUTION) %>%
@@ -229,11 +285,31 @@ piv_wide_check <- raw_payroll %>%
 View(piv_wide_check)
 View(piv_wide_check_prev)
 
+## JC update in DB reminder -------------------------------------------------
+
+showDialog(
+  title = "Update JC Mapping in DB",
+  message = paste0(
+    "USER WARNING: ",
+    "Before proceeding, ",
+    "it's best to run the sftp_sync_decrypt_insert script on R Connect to",
+    "identify new JCs.",
+    "Then populate the JC info in the OAO_DEVELOPMENT Schema and run the ",
+    "sftp_sync_decrypt_insert script on R Connect again to ensure",
+    "the PROD table is updated.")
+)
 
 ## Data  --------------------------------------------------------------------
 row_count <- nrow(raw_payroll)
 
-bislr_payroll <- raw_payroll %>%
+if ("Job.Code.Description" %in% colnames(raw_payroll)) {
+  bislr_payroll <- raw_payroll %>%
+    rename(Position.Code.Description = Job.Code.Description)
+} else {
+  bislr_payroll <- raw_payroll
+}
+
+bislr_payroll <- bislr_payroll %>%
   mutate(DPT.WRKD = paste0(substr(Full.COA.for.Worked, 1, 3),
                            substr(Full.COA.for.Worked, 41, 44),
                            substr(Full.COA.for.Worked, 5, 7),
@@ -250,7 +326,9 @@ bislr_payroll <- raw_payroll %>%
                                   substr(Reverse.Map.for.Home, 16, 19)),
          Start.Date = as.Date(Start.Date, format = "%m/%d/%Y"),
          End.Date = as.Date(End.Date, format = "%m/%d/%Y"),
-         Employee.Name = substr(Employee.Name, 1, 30),
+         Employee.Name = iconv(substr(Employee.Name, 1, 30),
+                               from = "UTF-8",
+                               to = "ASCII//TRANSLIT"),
          Approved.Hours.per.Pay.Period = round(Approved.Hours.per.Pay.Period,
                                                digits = 0),
          Job.Code = str_trim(Job.Code),
@@ -264,6 +342,16 @@ bislr_payroll <- raw_payroll %>%
       trimws(Department.Name.Home.Dept) == "" ~
         as.character(Department.ID.Home.Department),
       TRUE ~ DPT.HOME)) %>%
+  mutate(
+    DPT.WRKD = case_when(
+      WD_Department %in% cc_fundnum_conv ~ WD_Fund_number,
+      TRUE ~ DPT.WRKD)) %>%
+  # for the future after LPM team has requested that the Home Fund Number
+  # be populated in the Full.COA.for.Home string:
+  # mutate(
+  #   DPT.HOME = case_when(
+  #     HD_Department %in% cc_fundnum_conv ~ substr(Full.COA.for.Home, 25, 35),
+  #     TRUE ~ DPT.HOME)) %>%
   mutate(
     Job.Code = case_when(
       paste0(DPT.WRKD, "-", toupper(Employee.Name)) %in%
@@ -295,16 +383,20 @@ bislr_payroll <- raw_payroll %>%
               rename(Facility.Hospital.Id_Worked = Site,
                      DPT.WRKD = Cost.Center,
                      WRKDpt_in_Dict = Dpt_in_Dict)) %>%
-  left_join(dict_premier_jobcode %>%
-              select(Site, Cost.Center, Job.Code, JC_in_Dict) %>%
+  left_join(map_premier_jobcode %>%
+              select(Site, Job.Code, Cost.Center.Code, JC_in_Dict) %>%
               rename(Home.FacilityOR.Hospital.ID = Site,
-                     DPT.HOME = Cost.Center,
-                     HOMEJC_in_Dict = JC_in_Dict)) %>%
-  left_join(dict_premier_jobcode %>%
-              select(Site, Cost.Center, Job.Code, JC_in_Dict) %>%
+                     HOMEJC_in_Dict = JC_in_Dict),
+            by = c("Home.FacilityOR.Hospital.ID" = "Home.FacilityOR.Hospital.ID",
+                   "Job.Code" = "Job.Code",
+                   "DPT.HOME" = "Cost.Center.Code")) %>%
+  left_join(map_premier_jobcode %>%
+              select(Site, Job.Code, Cost.Center.Code, JC_in_Dict) %>%
               rename(Facility.Hospital.Id_Worked = Site,
-                     DPT.WRKD = Cost.Center,
-                     WRKJC_in_Dict = JC_in_Dict)) %>%
+                     WRKJC_in_Dict = JC_in_Dict),
+            by = c("Facility.Hospital.Id_Worked" = "Facility.Hospital.Id_Worked",
+                   "Job.Code" = "Job.Code",
+                   "DPT.WRKD" = "Cost.Center.Code")) %>%
   mutate(Job.Code_up = substr(Job.Code, 1, 10),
          Approved.Hours.per.Pay.Period = case_when(
            is.na(Approved.Hours.per.Pay.Period) ~ 0,
@@ -403,10 +495,10 @@ while (NA %in% unique(bislr_payroll$JC_in_UniversalFile) |
                        paste0("There are still new job codes and/or \n",
                               "PROVIDER values of NA.\n")
                      },
-                     "Update Universal Job Code File before continuing. \n",
+                     "Update Universal Job Code DB Table before continuing. \n",
                      "\nIf there are new Job Codes they were written to a ",
                      "file in this directory:\n'", new_jc_path, "'\n\n",
-                     "\n Has the mapping file been completely updated?",
+                     "\n Has the mapping Production DB Table been completely updated?",
                      "\n \n If you want to quit running the code select NO \n",
                      " then click the stop code button in the console"),
                  ok = "YES", cancel = "NO")
@@ -418,10 +510,21 @@ while (NA %in% unique(bislr_payroll$JC_in_UniversalFile) |
   # MM: I believe Anjelica and I discussed nesting many of these statements
   # within an if() statement based on an "ok" user input from the previous
   # prompt, but there's probably a simpler solution
-  map_uni_jobcodes <- read_xlsx(paste0(dir_universal,
-                                       "/Mapping/MSHS_Jobcode_Mapping.xlsx"),
-                                sheet = 1)
+  
+  # in order to make udpates you must:
+  # 1. add info to the Development Table
+  # 2. run the the sftp_sync_descrypt_insert Document on RStudio Connect
+  #    (by using the refresh icon on the Document page)
+  #    to get updates on the Dev Table into the Production table
+  map_uni_jobcodes <- tbl(oao_con, "LPM_MAPPING_JOBCODE") %>%
+    collect()
   map_uni_jobcodes <- map_uni_jobcodes %>%
+    rename(J.C = JOBCODE,
+           PAYROLL = PAYROLL,
+           J.C.DESCRIPTION = JOBCODE_DESCRIPTION,
+           PROVIDER = PROVIDER,
+           PREMIER.J.C = JOBCODE_PREMIER,
+           PREMIER.J.C.DESCRIPTION = JOBCODE_PREMIER_DESCRIPTION) %>%
     mutate(J.C = str_trim(J.C)) %>%
     mutate(JC_in_UniversalFile = 1)
 
@@ -461,7 +564,7 @@ while (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
                      paste0("_V", loop)
                    },
                    ".csv"))
-  
+
   warn_new_pc <-
     showQuestion(
       title = "Warning",
@@ -483,7 +586,7 @@ while (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
                    "limit.\n")
           }
         },
-        "Update Universal Pay Code File before continuing. \n",
+        "Update Universal Pay Code DB Table before continuing. \n",
         "\n Have new pay codes been added?",
         "\n \n If you want to quit running the code select No \n",
         " then click the stop code button in the console"),
@@ -493,10 +596,21 @@ while (NA %in% unique(bislr_payroll$Paycode_in_Universal)) {
     Sys.sleep(15)
   }
 
-  map_uni_paycodes <- read_xlsx(paste0(dir_universal,
-                                       "/Mapping/MSHS_Paycode_Mapping.xlsx"),
-                                sheet = 1)
+  # in order to make udpates you must:
+  # 1. add info to the Development Table
+  # 2. run the the sftp_sync_descrypt_insert Document on RStudio Connect
+  #    (by using the refresh icon on the Document page)
+  #    to get updates on the Dev Table into the Production table
+  map_uni_paycodes <- tbl(oao_con, "LPM_MAPPING_PAYCODE") %>%
+    collect()
   map_uni_paycodes <- map_uni_paycodes %>%
+    rename(RAW.PAY.CODE = PAYCODE_RAW,
+           PAY.CODE = PAYCODE_PREMIER,
+           PAY.CODE.NAME = PAYCODE_DESCRIPTION,
+           PAY.CODE.CATEGORY = PAYCODE_CATEGORY,
+           INCLUDE.HOURS = INCLUDE_HOURS,
+           INCLUDE.EXPENSES = INCLUDE_EXPENSES,
+           WORKED.PAY.CODE = WORKED_PAYCODE) %>%
     mutate(Paycode_in_Universal = 1)
 
   row_count <- nrow(bislr_payroll)
@@ -541,11 +655,16 @@ filter_dates <- bislr_payroll %>%
 
 # Updating pay cycles filter dates dictionary
 if (nrow(filter_dates) > 0) {
-  pay_cycles_uploaded <- rbind(pay_cycles_uploaded,
-                               rename(filter_dates,
-                                      Pay_Cycle_Uploaded = upload_date)) %>%
-    select(-Pay_Cycle_Uploaded) %>%
+  filter_dates_refresh <- filter_dates %>%
+    select(-upload_date) %>%
     mutate(capture_time = as.character(Sys.time()))
+  
+  pay_cycles_uploaded_raw <- pay_cycles_uploaded_raw %>%
+    mutate(Start.Date = as.Date(Start.Date),
+           End.Date = as.Date(End.Date))
+  
+  pay_cycles_upload_refresh <- rbind(pay_cycles_uploaded_raw,
+                                     filter_dates_refresh)
   date_filtering <- filter_dates
 }else{
   showDialog(
@@ -554,7 +673,9 @@ if (nrow(filter_dates) > 0) {
                     "that has already been prepared for Premier upload",
                     "at some point in the past.  Be careful not to",
                     "overwrite data files by mistake."))
-  date_filtering <- paycycles_data
+  date_filtering <- paycycles_data %>%
+    mutate(upload_date = 1) %>%
+    arrange(Start.Date, End.Date)
 }
 
 ## JC ID check ----------------------------------------------------
@@ -631,8 +752,8 @@ upload_payroll <- upload_payroll %>%
     Facility.Hospital.Id_Worked, DPT.WRKD, Start.Date, End.Date,
     Employee.ID, Employee.Name, Approved.Hours.per.Pay.Period,
     Job.Code_up, Pay.Code) %>%
-  summarize(Hours = sum(Hours, na.rm = TRUE),
-            Expense = sum(Expense, na.rm = TRUE)) %>%
+  summarize(Hours = round(sum(Hours, na.rm = TRUE), 4),
+            Expense = round(sum(Expense, na.rm = TRUE), 2)) %>%
   ungroup()
 
 # upload_payroll will be split into BIB and SLW in the Exporting section
@@ -701,15 +822,15 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
     bislr_payroll %>%
       filter(is.na(WRKJC_in_Dict), PROVIDER == 0) %>%
       select(PartnerOR.Health.System.ID, Facility.Hospital.Id_Worked,
-             DPT.WRKD, Job.Code_up, Position.Code.Description) %>%
-      setNames(colnames(dict_premier_jobcode %>%
-                          select(-JC_in_Dict))),
+             Job.Code_up, Position.Code.Description, DPT.WRKD) %>%
+      setNames(c(colnames(dict_premier_jobcode %>%
+                          select(-JC_in_Dicty)), "Cost.Center")),
     bislr_payroll %>%
       filter(is.na(HOMEJC_in_Dict), PROVIDER == 0) %>%
       select(PartnerOR.Health.System.ID, Home.FacilityOR.Hospital.ID,
-             DPT.HOME, Job.Code_up, Position.Code.Description) %>%
-      setNames(colnames(dict_premier_jobcode %>%
-                          select(-JC_in_Dict)))) %>%
+             Job.Code_up, Position.Code.Description, DPT.HOME) %>%
+      setNames(c(colnames(dict_premier_jobcode %>%
+                            select(-JC_in_Dicty)), "Cost.Center"))) %>%
     # for the future, we might look out for handling descriptions
     # that have special characters, such as & (ampersand)
     # mutate(Job.Code.Description = case_when(
@@ -725,14 +846,6 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
   row_count <- nrow(upload_dict_dpt_jc)
   upload_map_dpt_jc <- upload_dict_dpt_jc %>%
     select(-Job.Code.Description) %>%
-    # the map_premier_dpt Cost.Center column is character type
-    mutate(Cost.Center = as.character(Cost.Center)) %>%
-    left_join(map_premier_dpt %>%
-                select(-Effective.Date)) %>%
-    mutate(Cost.Center.Map = as.double(Cost.Center.Map)) %>%
-    mutate(Cost.Center.Map = case_when(
-      is.na(Cost.Center.Map) ~ new_dpt_map,
-      TRUE ~ Cost.Center.Map)) %>%
     left_join(map_uni_jobcodes %>%
                 filter(PAYROLL == "BISLR") %>%
                 select(J.C, PREMIER.J.C) %>%
@@ -812,70 +925,13 @@ if (nrow(premier_missing_paycode) > 0) {
 }
 
 
-### Dummy Report Dict ------------------------------------------------------
-
-# These reports are those that have the Cost Center mapped when the
-# Home Cost Center is not in an existing report.  If the home cost center
-# is not in an existing report, the Premier Employee Level Detail report
-# will not display the employee's hour detail.
-
-
-upload_report_dict <- bislr_payroll %>%
-  # Home Facility is used because we're mainly interested in the
-  # Home Department for the dummy reports that are being updated
-  select(Home.FacilityOR.Hospital.ID, DPT.HOME, DPT.WRKD) %>%
-  left_join(report_list %>%
-              filter(Report.ID %in% dummy_report_ids) %>%
-              select(Site, Cost.Center) %>%
-              rename(Facility.Hospital.Id_Worked = Site,
-                     DPT.WRKD = Cost.Center) %>%
-              mutate(WRKD.DPT.in.Report = 1)) %>%
-  left_join(report_list %>%
-              filter(Report.ID %in% dummy_report_ids) %>%
-              select(Site, Cost.Center) %>%
-              rename(Home.FacilityOR.Hospital.ID = Site,
-                     DPT.HOME = Cost.Center) %>%
-              mutate(HOME.DPT.in.Report = 1)) %>%
-  filter(WRKD.DPT.in.Report == 1, is.na(HOME.DPT.in.Report)) %>%
-  select(-DPT.WRKD, -Facility.Hospital.Id_Worked, -WRKD.DPT.in.Report,
-         -HOME.DPT.in.Report) %>%
-  rename(Site = Home.FacilityOR.Hospital.ID, Cost.Center = DPT.HOME) %>%
-  rbind(report_list %>%
-          filter(Report.ID %in% dummy_report_ids) %>%
-          select(Site, Cost.Center)) %>%
-  unique()
-
-upload_report_dict_qc <- upload_report_dict %>%
-  group_by(Site) %>%
-  summarize(Cost.Center = paste(Cost.Center, collapse = "; ")) %>%
-  mutate(num_char = nchar(Cost.Center))
-
-if (max(upload_report_dict_qc$num_char >= 3000)) {
-  showDialog(
-    title = "Dummy Report Cost Centers Overflow",
-    message = paste0("There are too many characters in the Dummy Report ",
-                     "Cost Center list.  If you upload this file and try ",
-                     "to publish, the publishing job will stall and break ",
-                     "Premier.  PLEASE PLEASE PLEASE reduce the number of ",
-                     "Cost Centers included in the report before Publishing ",
-                     "Premier data.")
-    )
-}
-
-upload_report_dict <- upload_report_dict %>%
-  group_by(Site) %>%
-  summarize(Cost.Center = paste(Cost.Center, collapse = ":")) %>%
-  left_join(dict_premier_report %>%
-    filter(Report.ID %in% dummy_report_ids) %>%
-    select(-contains("blank"), -Cost.Center) %>%
-    distinct_at(vars(Site), .keep_all = T)) %>%
-  relocate(Site, .after = Corporation.Code) %>%
-  relocate(Cost.Center, .after = Report.ID)
-
 # Quality Checks -------------------------------------------------------
 
 
 ## JC with multiple Description -------------------------------------------
+
+# this should now be unneeded because of the udpate for
+# 1-to-1 JC ID to JC Description
 
 jc_desc_check <- bislr_payroll %>%
   select(Job.Code, Position.Code.Description) %>%
@@ -883,12 +939,12 @@ jc_desc_check <- bislr_payroll %>%
   group_by(Job.Code) %>%
   summarize(freq = n()) %>%
   arrange(-freq, Job.Code) %>%
-  filter(freq > 1) %>%
+  # filter(freq > 1) %>%
   inner_join(bislr_payroll %>%
     select(Job.Code, Position.Code.Description, PROVIDER) %>%
     distinct())
 
-# 5 is selected because of the DUS_RMV jobcode
+# 5 is the selected threshold because of the DUS_RMV jobcode
 if (max(jc_desc_check$freq) > jc_desc_threshold) {
   showDialog(
     title = "Jobcode Description Check",
@@ -901,13 +957,49 @@ if (max(jc_desc_check$freq) > jc_desc_threshold) {
   View(jc_desc_check)
 }
 # pull in Premier jobcode category or other info to help?
-# seems like it will be infrequent, so it's not be worth coding for it at
+# this will be infrequent, so it's not be worth coding for it at
 # this point in time
 
+
+## cost center description changes -----------------------------------------
+
+dept_desc <- bislr_payroll %>%
+  select(Department.IdWHERE.Worked, Department.Name.Worked.Dept) %>%
+  mutate(Department.IdWHERE.Worked =
+           as.character(Department.IdWHERE.Worked)) %>%
+  distinct()
+
+dept_desc_check <- full_join(dict_premier_dpt, dept_desc,
+                             by = c("Cost.Center" =
+                                      "Department.IdWHERE.Worked")) %>%
+  # may want to include NY0014 in the future to go ahead and update, too
+  filter(Site %in% c("630571", "NY2162", "NY2163")) %>%
+  filter(!is.na(Cost.Center.Description)) %>%
+  filter(!is.na(Department.Name.Worked.Dept)) %>%
+  mutate(desc_same =
+           (Cost.Center.Description == Department.Name.Worked.Dept)) %>%
+  mutate(dict_desc_length = nchar(Cost.Center.Description)) %>%
+  filter(desc_same == FALSE) %>%
+  filter(Department.Name.Worked.Dept != "ACCRUAL COST CENTER") %>%
+  rename(Premier_Dict_Cost_Ctr_Desc = Cost.Center.Description,
+         Current_Payroll_Cost_Ctr_Desc = Department.Name.Worked.Dept)
+
+if (nrow(dept_desc_check > 0)) {
+  showDialog(
+    title = "Cost Center Description Check",
+    message = paste(
+      "There are Cost Center Descriptions ",
+      "that appear to have changed.  Review for changes in operations ",
+      "and update in Premier and DB."
+    ))
+  View(dept_desc_check)
+}
 
 ## cost center and upload FTE count -------------------------------------
 
 # average FTEs since previous distribution
+
+## FYI: this is based on the upload file, so it only includes providers
 
 # need Pay Code info to get appropriate hours
 row_count <- nrow(upload_payroll)
@@ -935,6 +1027,8 @@ fte_summary <- fte_summary %>%
       round(sum(Hours, na.rm = TRUE) /
               (37.5 * (as.numeric(distribution_date - dist_prev) / 7)), 1)) %>%
   ungroup() %>%
+  # removing the formatting of this date could eliminate some need
+  # for all the date processing within this coding section
   mutate(dist_date = format(distribution_date, "%m/%d/%Y")) %>%
   relocate(dist_date, .before = Avg_FTEs_worked) %>%
   mutate(capture_time = as.character(Sys.time())) %>%
@@ -945,18 +1039,18 @@ fte_summary <- fte_summary %>%
     Site == "NY2163" ~ "MSM",
     TRUE ~ "Other"))
 
-fte_summary_path <- paste0("//researchsan02b/shr2/deans/Presidents/",
+fte_summary_path <- paste0("/SharedDrive/deans/Presidents/",
                            "SixSigma/MSHS Productivity/Productivity/",
                            "Labor - Data/Multi-site/BISLR/Quality Checks/",
                            "Source Data/")
 
 fte_summary <- rbind(fte_summary,
-                     read.xlsx2(file = paste0(fte_summary_path,
+                     read_xlsx(path = paste0(fte_summary_path,
                                               "fte_summary.xlsx"),
-                                colClasses = c(rep("character", 9),
+                                col_types = c(rep("text", 8),
                                                rep("numeric", 2),
-                                               "character"),
-                                sheetName = "fte_summary") %>%
+                                               "text"),
+                                sheet = "fte_summary") %>%
                        select(Site, Department, dist_date,
                               Avg_FTEs_worked, Avg_FTEs_paid,
                               capture_time))
@@ -976,9 +1070,13 @@ if (fte_summary %>% select(dist_date) %>% distinct() %>% nrow() !=
 row_count <- nrow(fte_summary)
 fte_summary <- fte_summary %>%
   left_join(map_uni_reports %>%
-              filter(is.na(CLOSED) & DEPARTMENT.BREAKDOWN == 1) %>%
+              # try this without limiting to Dept Breakdown so other
+              # Rep Def can be indicated in the fte_summary even
+              # if a report has been turned off or isn't included in
+              # the Dept Breakdown (e.g. Small Dept Def)
+              filter(is.na(CLOSED)) %>% # & DEPARTMENT.BREAKDOWN == 1) %>%
               select(DEFINITION.CODE, DEFINITION.NAME, ORACLE.COST.CENTER,
-                     SERVICE.LINE, CORPORATE.SERVICE.LINE, VP) %>%
+                     CORPORATE.SERVICE.LINE, VP) %>%
               distinct(),
             by = c("Department" = "ORACLE.COST.CENTER")) %>%
   left_join(rbind(
@@ -989,24 +1087,122 @@ fte_summary <- fte_summary %>%
         Site == "NY2162" ~ "MSW",
         Site == "NY2163" ~ "MSM",
         TRUE ~ "Other")),
-    upload_dict_dpt) %>%
+    upload_dict_dpt %>% # need to consider when there's no new depts to upload
+      mutate(Site = case_when(
+        Site == "630571" ~ "MSBIB",
+        Site == "NY2162" ~ "MSW",
+        Site == "NY2163" ~ "MSM",
+        TRUE ~ "Other"))) %>%
       select(-Corporation.Code),
     by = c("Site" = "Site", "Department" = "Cost.Center")) %>%
   select(Site, Department, Cost.Center.Description,
-         DEFINITION.CODE, DEFINITION.NAME, SERVICE.LINE,
+         DEFINITION.CODE, DEFINITION.NAME,
          CORPORATE.SERVICE.LINE, VP, dist_date,
          Avg_FTEs_worked, Avg_FTEs_paid, capture_time)
 
+# some Cost.Center.Description values are showing as NA
+# - this is minimal and doesn't look worth pursuing at this time
+  
 if (nrow(fte_summary) != row_count) {
   showDialog(title = "Join error",
              message = paste("Row count failed at", "fte_summary"))
   stop(paste("Row count failed at", "fte_summary"))
 }
 
+# filtering so only the trailing year is included
+fte_summary <- fte_summary %>%
+  filter(as.numeric(as.Date(distribution_date) -
+                      as.Date(dist_date, "%m/%d/%Y")) < 390)
+
+
+### wide summary ------------------------------------------------------------
+
+# get the minimum date for each cost center
+fte_summary_cc_age <- fte_summary %>%
+  select(Site, Department, dist_date) %>%
+  mutate(dist_date = as.Date(dist_date, "%m/%d/%Y")) %>%
+  arrange(dist_date, Site, Department) %>%
+  distinct(across(-dist_date), .keep_all = TRUE) %>%
+  rename(oldest_date = dist_date)
+
+# PAID
+
+fte_summary_wide_paid <- fte_summary %>%
+  mutate(dist_date = as.Date(dist_date, "%m/%d/%Y")) %>%
+  arrange(dist_date, Site, Department) %>%
+  select(-Avg_FTEs_worked, -capture_time) %>%
+  pivot_wider(names_from = dist_date, values_from = Avg_FTEs_paid,
+              values_fill = 0)
+
+fte_summary_wide_paid$current_change_raw <-
+  pull(select(fte_summary_wide_paid,
+              contains(format(distribution_date, "%Y-%m-%d")))) -
+  pull(select(fte_summary_wide_paid,
+              contains(format(dist_prev, "%Y-%m-%d"))))
+
+fte_summary_wide_paid$current_change_pct <-
+  formattable::percent(
+    fte_summary_wide_paid$current_change_raw /
+      pull(select(fte_summary_wide_paid,
+                  contains(format(dist_prev, "%Y-%m-%d")))), digits = 1)
+
+fte_summary_wide_paid <- fte_summary_wide_paid %>%
+  left_join(fte_summary_cc_age) %>%
+  arrange(oldest_date)
+
+fte_summary_extreme_change_pd <- fte_summary_wide_paid %>%
+  filter(current_change_raw >= 3 | current_change_raw <= -3) %>%
+  arrange(-current_change_raw)
+
+View(fte_summary_extreme_change_pd)
+
+fte_summary_new_dept_pd <- fte_summary_wide_paid %>%
+  filter(oldest_date == distribution_date)
+
+View(fte_summary_new_dept_pd)
+
+# WORKED
+
+fte_summary_wide_worked <- fte_summary %>%
+  mutate(dist_date = as.Date(dist_date, "%m/%d/%Y")) %>%
+  arrange(dist_date, Site, Department) %>%
+  select(-Avg_FTEs_paid, -capture_time) %>%
+  pivot_wider(names_from = dist_date, values_from = Avg_FTEs_worked,
+              values_fill = 0)
+
+fte_summary_wide_worked$current_change_raw <-
+  pull(select(fte_summary_wide_worked,
+              contains(format(distribution_date, "%Y-%m-%d")))) -
+  pull(select(fte_summary_wide_worked,
+              contains(format(dist_prev, "%Y-%m-%d"))))
+
+fte_summary_wide_worked$current_change_pct <-
+  formattable::percent(
+    fte_summary_wide_worked$current_change_raw /
+      pull(select(fte_summary_wide_worked,
+                  contains(format(dist_prev, "%Y-%m-%d")))), digits = 1)
+
+fte_summary_wide_worked <- fte_summary_wide_worked %>%
+  left_join(fte_summary_cc_age) %>%
+  arrange(oldest_date)
+
+fte_summary_extreme_change_wrk <- fte_summary_wide_worked %>%
+  filter(current_change_raw >= 3 | current_change_raw <= -3) %>%
+  arrange(-current_change_raw)
+
+View(fte_summary_extreme_change_wrk)
+
+fte_summary_new_dept_wrk <- fte_summary_wide_worked %>%
+  filter(oldest_date == distribution_date)
+
+View(fte_summary_new_dept_wrk)
+
+
 ## 8600 Accrual Site Summary --------------------------------------------
 
 accrual_summary <- bislr_payroll %>%
   left_join(date_filtering) %>%
+  filter(upload_date == 1) %>%
   filter(PROVIDER == 0) %>%
   filter(DPT.WRKD %in%
            subset(report_list,
@@ -1018,7 +1214,8 @@ accrual_summary <- bislr_payroll %>%
 
 # row count check not required for joining date_filtering
 accrual_raw_detail <- accrual_raw_detail %>%
-  left_join(date_filtering)
+  left_join(date_filtering) %>%
+  filter(upload_date == 1)
 
 row_count <- nrow(accrual_raw_detail)
 accrual_raw_detail <- accrual_raw_detail %>%
@@ -1060,6 +1257,120 @@ if (nrow(accrual_raw_detail) != row_count) {
 View(accrual_raw_summary)
 
 
+## Employee Excessive Hours -----------------------------------------------
+
+### Regular Hours ---------------------------------------------------------
+
+employee_reg_hours_qc <- bislr_payroll %>%
+  left_join(map_uni_paycodes %>%
+              select(RAW.PAY.CODE, INCLUDE.HOURS, WORKED.PAY.CODE,
+                     PAY.CODE.CATEGORY) %>%
+              distinct(),
+            by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
+  left_join(date_filtering) %>%
+  filter(PROVIDER == 0,
+         PAY.CODE.CATEGORY == "REGULAR",
+         INCLUDE.HOURS == "1") %>%
+  filter(!is.na(upload_date)) %>%
+  group_by(Employee.ID, Employee.Name, Start.Date, End.Date) %>%
+  summarize(hours_reg_pp = sum(Hours, na.rm = T)) %>%
+  ungroup() %>%
+  mutate(pp_days = as.numeric(End.Date - Start.Date) + 1) %>%
+  mutate(pp_thresh = case_when(
+    pp_days == 7 ~ 40,
+    pp_days == 14 ~ 80)) %>%
+  mutate(pp_overage_coeff = hours_reg_pp / pp_thresh) %>%
+  filter(hours_reg_pp > pp_thresh) %>%
+  arrange(-pp_overage_coeff, Employee.Name, End.Date, Start.Date)
+
+View(employee_reg_hours_qc)
+
+# create detailed view of all entries for employees with high regular hours
+employee_reg_hours_qc_detail <- bislr_payroll %>%
+  left_join(map_uni_paycodes %>%
+              select(RAW.PAY.CODE, INCLUDE.HOURS, WORKED.PAY.CODE,
+                     PAY.CODE.CATEGORY) %>%
+              distinct(),
+            by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
+  left_join(filter(select(map_uni_reports, DEFINITION.CODE, DEFINITION.NAME,
+                          ORACLE.COST.CENTER, DEPARTMENT.BREAKDOWN, CLOSED),
+                   is.na(CLOSED),
+                   DEPARTMENT.BREAKDOWN == 1),
+                   c("DPT.WRKD" = "ORACLE.COST.CENTER")) %>%
+  inner_join(employee_reg_hours_qc) %>%
+  arrange(-pp_overage_coeff, Employee.Name, End.Date, Start.Date,
+          DPT.WRKD, Pay.Code)
+
+View(employee_reg_hours_qc_detail)
+
+### Total Hours ----------------------------------------------------------
+
+employee_tot_hours_qc <- bislr_payroll %>%
+  left_join(date_filtering) %>%
+  left_join(map_uni_paycodes %>%
+              select(RAW.PAY.CODE, INCLUDE.HOURS, WORKED.PAY.CODE,
+                     PAY.CODE.CATEGORY) %>%
+              distinct(),
+            by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
+  filter(PROVIDER == 0,
+         WORKED.PAY.CODE == 1,
+         INCLUDE.HOURS == "1") %>%
+  filter(!is.na(upload_date)) %>%
+  group_by(Employee.ID, Employee.Name, Start.Date, End.Date) %>%
+  summarize(hours_tot_pp = sum(Hours, na.rm = T)) %>%
+  ungroup() %>%
+  mutate(pp_days = as.numeric(End.Date - Start.Date) + 1) %>%
+  mutate(pp_thresh = case_when(
+    pp_days == 7 ~ 55,
+    pp_days == 14 ~ 110)) %>%
+  mutate(pp_overage_coeff = hours_tot_pp / pp_thresh) %>%
+  filter(hours_tot_pp > pp_thresh) %>%
+  arrange(-pp_overage_coeff, Employee.Name, End.Date, Start.Date)
+
+View(employee_tot_hours_qc)
+
+# create detailed view of all entries for employees with high total hours
+employee_tot_hours_qc_detail <- bislr_payroll %>%
+  left_join(map_uni_paycodes %>%
+              select(RAW.PAY.CODE, INCLUDE.HOURS, WORKED.PAY.CODE,
+                     PAY.CODE.CATEGORY) %>%
+              distinct(),
+            by = c("Pay.Code" = "RAW.PAY.CODE")) %>%
+  left_join(filter(select(map_uni_reports, DEFINITION.CODE, DEFINITION.NAME,
+                          ORACLE.COST.CENTER, DEPARTMENT.BREAKDOWN, CLOSED),
+                   is.na(CLOSED),
+                   DEPARTMENT.BREAKDOWN == 1),
+            c("DPT.WRKD" = "ORACLE.COST.CENTER")) %>%
+  inner_join(employee_tot_hours_qc) %>%
+  arrange(-pp_overage_coeff, Employee.Name, End.Date, Start.Date,
+          DPT.WRKD, Pay.Code)
+
+View(employee_tot_hours_qc_detail)
+
+### Table with Percent of Employees in Excess ------------------------------
+
+# Get total employees by home facility
+# Identify percent of employees that are on the
+# reg hours qc and total hours qc lists
+
+### Premier reports with excess --------------------------------------------
+
+employee_hr_qc_rpt_potential <- employee_tot_hours_qc_detail %>%
+  filter(DEPARTMENT.BREAKDOWN == 1) %>%
+  filter(INCLUDE.HOURS == 1,
+         WORKED.PAY.CODE == 1) %>%
+  group_by(DEFINITION.CODE, DEFINITION.NAME, Start.Date, End.Date) %>%
+  summarize(Hours = sum(Hours, na.rm = TRUE)) %>%
+  ungroup() %>%
+  mutate(pp_days = as.numeric(End.Date - Start.Date) + 1) %>%
+  mutate(FTEs_under_review = case_when(pp_days == 7 ~ round(Hours / 37.5, 2),
+                                       pp_days == 14 ~ round(Hours / 75, 2))
+  ) %>%
+  select(-Hours) %>%
+  arrange(-FTEs_under_review)
+
+View(employee_hr_qc_rpt_potential)
+
 # Exporting Data ----------------------------------------------------------
 
 date_range <- paste0(
@@ -1068,52 +1379,172 @@ date_range <- paste0(
   format(distribution_date, "%Y-%m-%d")
 )
 
+## Premier 2.0 output format updates --------------------------------------
+
+### department dict & map -------------------------------------------------
+
+upload_dict_dpt_cols <- c("Corporation Code",
+                          "Entity Code",
+                          "Cost Center Code",
+                          "Cost Center Name")
+
+colnames(upload_dict_dpt) <- upload_dict_dpt_cols
+
+upload_map_dpt <- upload_map_dpt %>%
+  mutate(expiration_date = NA) %>%
+  relocate(expiration_date, .after = effective_date)
+
+upload_map_dpt_cols <- c("Effective Start Date",
+                         "Expiration Date",
+                         "Corporation Code",
+                         "Entity Code",
+                         "Cost Center Code",
+                         "Premier Standard Dept Code")
+
+colnames(upload_map_dpt) <- upload_map_dpt_cols
+
+
+### jobcode dict & map ----------------------------------------------------
+
+upload_dict_jc <- upload_dict_dpt_jc %>%
+  mutate(Cost.Center = NULL) %>%
+  distinct() %>%
+  mutate(dahr = NA,
+         esd = NA,
+         exp_date = NA)
+
+# there could be another step inserted here to remove any jobcodes
+# that have already been defined in the JC dictionary or universal file.
+# This part of code is based on the legacy system that is looking for
+# department-jobcode combinations that were not previously defined
+
+upload_dict_jc_cols <- c("Corporation Code",
+                         "Entity Code",
+                         "Job Code",
+                         "Job Code Name",
+                         "Default Agency Hourly Rate",
+                         "Effective Start Date",
+                         "Expiration Date")
+  
+colnames(upload_dict_jc) <- upload_dict_jc_cols
+
+
+upload_map_dpt_jc <- upload_map_dpt_jc %>%
+  mutate(exp_date = NA,
+         prem_std_dpt = NA) %>% # it's OK for this to be NA instead of an actual
+                                # value.  all JC mappings have blank for the
+                                # Premier Std Dept
+  relocate(exp_date, .after = effective_date) %>%
+  relocate(Job.Code, .before = Cost.Center) %>%
+  relocate(prem_std_dpt, .after = Cost.Center)
+
+upload_map_dpt_jc_cols <- c("Effective Start Date",
+                            "Expiration Date",
+                            "Corporation Code",
+                            "Entity Code",
+                            "Entity Job Code",
+                            "Cost Center Code",
+                            "Premier Standard Dept Code",
+                            "Premier Standard Job Code",
+                            "Allocation Percentage")
+
+colnames(upload_map_dpt_jc) <- upload_map_dpt_jc_cols
+
+### paycode dict & map ----------------------------------------------------
+
+if (exists("upload_dict_paycode")) {
+  
+  upload_dict_paycode_cols <- c("Corporation Code",
+                                "Entity Code",
+                                "Pay Code",
+                                "Pay Code Name")
+  
+  colnames(upload_dict_paycode) <- upload_dict_paycode_cols
+  
+  upload_map_paycode <- upload_map_paycode %>%
+    mutate(exp_date = NA) %>%
+    relocate(exp_date, .after = eff_date)
+  
+  upload_map_paycode_cols <- c("Effective Start Date",
+                               "Expiration Date",
+                               "Corporation Code",
+                               "Entity Code",
+                               "Entity Pay Code",
+                               "Premier Standard Pay Code",
+                               "Include Hours",
+                               "Include Expenses",
+                               "Allocation Percentage")
+  
+  colnames(upload_map_paycode) <- upload_map_paycode_cols
+  
+}
+
+
+### payroll ---------------------------------------------------------------
+
+upload_payroll_cols <- c("Corporation Code",
+                         "Home Entity Code",
+                         "Home Cost Center Code",
+                         "Worked Entity Code",
+                         "Worked Cost Center Code",
+                         "Start Date",
+                         "End Date",
+                         "Employee Code",
+                         "Employee Name",
+                         "Approved Hours per Pay Period",
+                         "Job Code",
+                         "Pay Code",
+                         "Hours",
+                         "Expense")
+
+colnames(upload_payroll) <- upload_payroll_cols
+
 ## Reference Files --------------------------------------------------------
+
+
 
 write.table(upload_dict_dpt,
             file = paste0(dir_BISLR, "/BISLR_Department Dictionary_",
                           date_range, ".csv"),
-            row.names = F, col.names = F, sep = ",")
+            row.names = F, col.names = T, sep = ",")
 
 
-write.table(upload_map_dpt,
-            file = paste0(dir_BISLR, "/BISLR_Department Map_",
+# Dept Mapping is not required in 2.0 and creates an error when uploading
+# Keeping command available in script in case this comes back online
+# in the future.
+# write.table(upload_map_dpt,
+#             file = paste0(dir_BISLR, "/BISLR_Department Map_",
+#                           date_range, ".csv"),
+#             row.names = F, col.names = T, sep = ",", na = "")
+
+
+write.table(upload_dict_jc,
+            file = paste0(dir_BISLR, "/BISLR_Job Code Dictionary_",
                           date_range, ".csv"),
-            row.names = F, col.names = F, sep = ",")
-
-
-write.table(upload_dict_dpt_jc,
-            file = paste0(dir_BISLR, "/BISLR_Department Job Code Dictionary_",
-                          date_range, ".csv"),
-            row.names = F, col.names = F, sep = ",")
+            row.names = F, col.names = T, sep = ",", na = "")
 
 
 write.table(upload_map_dpt_jc,
             file = paste0(dir_BISLR, "/BISLR_Department Job Code Map_",
                           date_range, ".csv"),
-            row.names = F, col.names = F, sep = ",")
+            row.names = F, col.names = T, sep = ",", na = "")
 
 
-if (exists("new_paycodes")) {
+if (exists("upload_dict_paycode")) {
   write.table(upload_dict_paycode,
               file = paste0(dir_BISLR, "/BISLR_Pay Code Dictionary_",
                             date_range, ".csv"),
-              row.names = F, col.names = F, sep = ",")
+              row.names = F, col.names = T, sep = ",", na = "")
 
   write.table(upload_map_paycode,
               file = paste0(dir_BISLR, "/BISLR_Pay Code Map_",
                             date_range, ".csv"),
-              row.names = F, col.names = F, sep = ",")
+              row.names = F, col.names = T, sep = ",", na = "")
 
 }
 
-write.table(upload_report_dict,
-            file = paste0(dir_BISLR, "/BISLR_Dummy Report Dictionary_",
-                          date_range, ".csv"),
-            row.names = F, col.names = F, sep = ",")
-
 if (nrow(filter_dates) > 0) {
-  write.xlsx(pay_cycles_uploaded,
+  write.xlsx(as.data.frame(pay_cycles_upload_refresh),
              file = paste0(dir_BISLR, "/Reference",
                            "/Pay cycles uploaded_Tracker", ".xlsx"),
              row.names = F)
@@ -1125,16 +1556,16 @@ if (nrow(filter_dates) > 0) {
 # or should this simply be muted so the NULL return is not printed in
 # the console?
 sapply(
-  seq_len(length(unique(upload_payroll$Facility.Hospital.Id_Worked))),
+  seq_len(length(unique(upload_payroll$`Worked Entity Code`))),
   function(x) {
     write.table(
       filter(upload_payroll,
-             Facility.Hospital.Id_Worked ==
-               unique(upload_payroll$Facility.Hospital.Id_Worked)[x]),
+             `Worked Entity Code` ==
+               unique(upload_payroll$`Worked Entity Code`)[x]),
       file = paste0(dir_BISLR, "/",
-                    unique(upload_payroll$Facility.Hospital.Id_Worked)[x],
+                    unique(upload_payroll$`Worked Entity Code`)[x],
                     "_Payroll_", date_range, ".csv"),
-      row.names = F, col.names = F, sep = ",")
+      row.names = F, col.names = T, sep = ",")
   }
 )
 
@@ -1160,6 +1591,32 @@ write.xlsx2(as.data.frame(fte_summary),
             sheetName = "fte_summary",
             append = FALSE)
 
+# backup the previous fte_summary_wide
+file.rename(from = paste0(fte_summary_path, "fte_summary_wide.xlsx"),
+            to = paste0(fte_summary_path,
+                        "fte_summary_wide_BU_",
+                        as.character(Sys.time(), format = "%Y-%m-%d_%H-%M-%S"),
+                        ".xlsx"))
+
+fte_summary_wide_list <- list(
+  "new_dept_PD_FTEs" = fte_summary_new_dept_pd,
+  "new_dept_WRK_FTEs" = fte_summary_new_dept_wrk,
+  "extremes_PD_FTEs" = fte_summary_extreme_change_pd,
+  "extremes_WRK_FTEs" = fte_summary_extreme_change_wrk,
+  "PAID_FTEs" = fte_summary_wide_paid,
+  "WORKED_FTEs" = fte_summary_wide_worked)
+
+openxlsx::write.xlsx(fte_summary_wide_list,
+                     file = paste0(fte_summary_path, "fte_summary_wide.xlsx"),
+                     firstActiveRow = 2,
+                     firstActiveCol = 6,
+                     headerStyle =
+                       openxlsx::createStyle(halign = "center",
+                                             fgFill = "#ADD8E6",
+                                             border = "TopBottomLeftRight"),
+                     colWidths = "auto",
+                     zoom = 70)
+
 # rename previous piv_wide_check
 file.rename(from = paste0(dir_BISLR, "/Quality Checks",
                           "/piv_wide_check", ".csv"),
@@ -1172,5 +1629,26 @@ write.csv(piv_wide_check,
           file = paste0(dir_BISLR, "/Quality Checks",
                         "/piv_wide_check", ".csv"),
           row.names = FALSE)
+
+emp_excess_hr_qc_list <- list(
+  "rpt_impact_excess_hr" = employee_hr_qc_rpt_potential,
+  "emp_reg_hr" = employee_reg_hours_qc,
+  "emp_reg_hr_det" = employee_reg_hours_qc_detail,
+  "emp_tot_hr" = employee_tot_hours_qc,
+  "emp_tot_hr_det" = employee_tot_hours_qc_detail)
+
+openxlsx::write.xlsx(emp_excess_hr_qc_list,
+                     file = paste0(dir_BISLR, "/Quality Checks",
+                                   "/employee_excess_hours_",
+                                   as.character(Sys.time(),
+                                                format = "%Y-%m-%d"),
+                                   ".xlsx"),
+                     firstActiveRow = 2,
+                     headerStyle =
+                       openxlsx::createStyle(halign = "center",
+                                             fgFill = "#ADD8E6",
+                                             border = "TopBottomLeftRight"),
+                     colWidths = "auto",
+                     zoom = 70)
 
 # End of Script -----------------------------------------------------------
