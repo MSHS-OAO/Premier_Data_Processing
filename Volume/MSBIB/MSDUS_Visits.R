@@ -139,13 +139,12 @@ dict_rehab_docs <- read_xlsx(
 # Data Import -------------------------------------------------------------
 
 # set up connection to schema
-con <- dbConnect(odbc(), "OAO Cloud DB Armando")
+con <- dbConnect(odbc(), "OAO Cloud DB Production")
 
 pp.start.fmt <- format(pp.start, "%Y-%m-%d")
 pp.end.fmt <- format(pp.end, "%Y-%m-%d")
 
-data_raw <- tbl(con,
-                in_schema("VILLEA04", "AMBULATORY_ACCESS_VIEW")) %>%
+data_raw <- tbl(con,"AMBULATORY_ACCESS") %>%
   filter(DEPARTMENT %in% epic_dpts,
          APPT_DATE_YEAR >= as.Date(pp.start.fmt),
          APPT_DATE_YEAR <= as.Date(pp.end.fmt)) %>%

@@ -24,8 +24,7 @@ paycycle_mapping <- tbl(oao_prod_conn, "LPM_MAPPING_PAYCYCLE") %>%
   collect()
 
 # read in source data
-source_df <- tbl(oao_prod_conn,
-             in_schema("VILLEA04", "AMBULATORY_ACCESS")) %>%
+source_df <- tbl(oao_prod_conn, "AMBULATORY_ACCESS") %>%
   select(DEPARTMENT_ID, APPT_DTTM, APPT_STATUS) %>%
   filter(APPT_DTTM >= as.Date(start),
          APPT_DTTM <= as.Date(end),
