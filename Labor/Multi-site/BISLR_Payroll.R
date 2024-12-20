@@ -344,13 +344,15 @@ bislr_payroll <- bislr_payroll %>%
       TRUE ~ DPT.HOME)) %>%
   mutate(
     DPT.WRKD = case_when(
-      WD_Department %in% cc_fundnum_conv ~ WD_Fund_number,
+      (WD_Department %in% cc_fundnum_conv & 
+         WD_Fund_number != "00000000000") ~ WD_Fund_number,
       TRUE ~ DPT.WRKD)) %>%
   # for the future after LPM team has requested that the Home Fund Number
   # be populated in the Full.COA.for.Home string:
   # mutate(
   #   DPT.HOME = case_when(
-  #     HD_Department %in% cc_fundnum_conv ~ substr(Full.COA.for.Home, 25, 35),
+  #     (HD_Department %in% cc_fundnum_conv & 
+  #       HD_Fund_number != "00000000000") ~ substr(Full.COA.for.Home, 25, 35),
   #     TRUE ~ DPT.HOME)) %>%
   mutate(
     Job.Code = case_when(
@@ -468,7 +470,9 @@ while (NA %in% unique(bislr_payroll$JC_in_UniversalFile) |
 
   if (nrow(new_jobcodes) > 0) {
     new_jc_path <- paste0(dir_universal, "/Mapping/BISLR payroll script")
-    write.csv(new_jobcodes,
+    write.csv(new_jobcodes %>%
+                mutate(PAYROLL = "BISLR") %>%
+                relocate(PAYROLL, .after = "Job.Code"),
               paste0(new_jc_path,
                      "/new_jc_for_Universal_File_",
                      as.character(Sys.time(), format = "%Y-%m-%d"),
@@ -477,7 +481,8 @@ while (NA %in% unique(bislr_payroll$JC_in_UniversalFile) |
                      }else{
                        paste0("_V", loop)
                      },
-                     ".csv"))
+                     ".csv"),
+              row.names = F)
   }
 
   # MM: nothing can be navigated and viewed in an R session while
