@@ -71,7 +71,8 @@ pay_period_mapping <- pay_period_mapping %>%
          PREMIER.DISTRIBUTION = PREMIER_DISTRIBUTION)
 # code conversion mapping file to convert legacy to oracle cc
 code_conversion <- read_xlsx(paste0(
-  mapping_path, "MSHS_Code_Conversion_Mapping_no_duplicates.xlsx"))
+  mapping_path, "MSHS_Code_Conversion_Mapping_no_duplicates.xlsx"),
+  col_types = "text")
 
 # report mapping file for QC check to identify published departments
 map_uni_reports <- tbl(oao_con, "LPM_MAPPING_REPDEF") %>%

@@ -27,7 +27,7 @@ con_prod <- dbConnect(odbc(), "OAO Cloud DB Production")
 
 # Data References -------------------------------------------------------------
 nursing_paid_fte_cc <- read.csv(paste0(nursing_paid_fte_dir, 
-                                       "mapping/nursing_paid_fte_costcenters.csv"),
+                                       "mapping/nursing_paid_fte_costcenters2.csv"),
                                 colClasses = rep("character", 3))
 
 paycycle_mapping <- tbl(con_prod, "LPM_MAPPING_PAYCYCLE") %>%
