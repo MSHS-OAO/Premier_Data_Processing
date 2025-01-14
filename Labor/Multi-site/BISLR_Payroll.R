@@ -767,13 +767,14 @@ upload_payroll <- upload_payroll %>%
 # check for employees wth multiple home cost centers during same time period
 overlap_cc <- upload_payroll %>%
   group_by(Employee.ID, Start.Date) %>%
-  # need to add home facility into consideration???
+  # may need to add home facility into consideration since BISLR data
+  # includes multiple facilities
   summarize(home_cost_centers = n_distinct(DPT.HOME)) %>%
   right_join(upload_payroll,
              by = c("Employee.ID" = "Employee.ID",
                     "Start.Date" = "Start.Date")) %>%
   filter(home_cost_centers > 1) %>%
-  mutate(unique_id = paste(Employee.ID, Home.FacilityOR.Hospital.ID,
+  mutate(unique_id = paste(Employee.ID,
                            DPT.HOME, DPT.WRKD,
                            Start.Date, End.Date,
                            Pay.Code,
@@ -786,18 +787,21 @@ if (nrow(overlap_cc) > 0) {
                                "home_cc_overlap/overlap_cc_",
                                Sys.Date(), ".csv"),
             row.names = FALSE)
-
-  # replace home cc with most common used home cc for each emp and start date combo
+  
+  # replace home cc with most common used home cc for each emp and
+  # start date combo
   cost_center_replacement <- overlap_cc %>%
     group_by(Employee.ID, DPT.HOME, Start.Date) %>%
-    # need to consider home facility?
-    # if home facility is not considered, then home cost center is used
-    # at wrong facility
+    # There's potential that Premier accepts an employee having different
+    # home cost centers at different entities at the same time.
+    # The current setup has potential for a home cost center replacement
+    # to not match the entity and the dept dictionary for that entity will
+    # need to have the cost center added
+    # If Premier checks that a home cost center only exists in one facility
+    # then there may be another error that arises
     summarize(cost_center_count = n()) %>%
     group_by(Employee.ID, Start.Date) %>%
     filter(cost_center_count == max(cost_center_count)) %>%
-    # can hours be used instead of row entries?
-    # how does code respond in the case of a tie???
     rename(common_cc = DPT.HOME) %>%
     distinct(Employee.ID, Start.Date, cost_center_count,
              .keep_all = TRUE) %>%
@@ -811,23 +815,26 @@ if (nrow(overlap_cc) > 0) {
            Start.Date, End.Date,
            Employee.ID, Employee.Name,
            Approved.Hours.per.Pay.Period, Job.Code_up, Pay.Code,
-           Hours, Expense)
-
+           Hours, Expense) %>%
+    ungroup()
+  
   # remove employees original data from the upload df
   upload_no_overlap <- upload_payroll %>%
-    mutate(unique_id = paste(Employee.ID, DPT.HOME, DPT.WRKD,
-                             Start.Date, End.Date, Pay.Code,
+    mutate(unique_id = paste(Employee.ID,
+                             DPT.HOME, DPT.WRKD,
+                             Start.Date, End.Date,
+                             Pay.Code,
                              sep = "_")) %>%
     filter(!(unique_id %in% overlap_cc$unique_id)) %>%
-    rbind(cost_center_replacement) %>%
     select(-unique_id) %>%
+    rbind(cost_center_replacement) %>%
     group_by(PartnerOR.Health.System.ID,
              Home.FacilityOR.Hospital.ID, DPT.HOME,
              Facility.Hospital.Id_Worked, DPT.WRKD,
              Start.Date, End.Date,
              Employee.ID, Employee.Name,
              Approved.Hours.per.Pay.Period, Job.Code_up, Pay.Code) %>%
-    summarize(Hours = round(sum(Hours), digits = 2),
+    summarize(Hours = round(sum(Hours), digits = 4),
               Expense = round(sum(Expense), digits = 2))
 }
 
