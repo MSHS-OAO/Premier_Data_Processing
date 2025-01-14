@@ -845,56 +845,66 @@ if (exists("upload_no_overlap")) {
 }
 
 ### Date Overlap Correction ---------------------------------------------------
-# overlap_date <- upload_payroll %>%
-#   ungroup() %>%
-#   group_by(PARTNER, HOME_FACILITY, HOME_DEPARTMENT, WORKED_FACILITY,
-#            WORKED_DEPARTMENT, START_DATE, EMPLOYEE_ID, EMPLOYEE_NAME,
-#            APPROVED_HOURS, JOBCODE, PAYCODE_PREMIER) %>%
-#   mutate(dupe = n() > 1) %>%
-#   filter(dupe == TRUE) %>%
-#   select(-dupe) %>%
-#   mutate(unique_id = paste(EMPLOYEE_ID, HOME_DEPARTMENT, 
-#                            WORKED_DEPARTMENT, START_DATE, 
-#                            END_DATE, PAYCODE_PREMIER,
-#                            sep = "_"))
-# 
-# if (nrow(overlap_date) > 0) {
-#   write.csv(overlap_date, paste0(data_dir, "Labor - Data/MSH/Payroll",
-#                                  "/MSH Labor/2.0/processed_files/",
-#                                  "date_overlap/overlap_date_",
-#                                  Sys.Date(), ".csv"),
-#             row.names = FALSE)
-#   
-#   # edit dates so data can be summarized to a single row
-#   date_replacement <- overlap_date %>%
-#     select(-unique_id) %>%
-#     group_by(PARTNER, HOME_FACILITY, HOME_DEPARTMENT, WORKED_FACILITY,
-#              WORKED_DEPARTMENT, EMPLOYEE_ID, EMPLOYEE_NAME,
-#              APPROVED_HOURS, JOBCODE, PAYCODE_PREMIER) %>%
-#     mutate(START_DATE = min(START_DATE),
-#            END_DATE = max(END_DATE)) %>%
-#     group_by(PARTNER, HOME_FACILITY, HOME_DEPARTMENT, WORKED_FACILITY,
-#              WORKED_DEPARTMENT, START_DATE, END_DATE, EMPLOYEE_ID, EMPLOYEE_NAME,
-#              APPROVED_HOURS, JOBCODE, PAYCODE_PREMIER) %>%
-#     summarise(Hours = round(sum(Hours), digits = 2),
-#               Expense = round(sum(Expense), digits = 2)) 
-#   
-#   # remove duplicate date rows from upload and combine
-#   upload_no_overlap <- upload %>%
-#     mutate(unique_id = paste(EMPLOYEE_ID, HOME_DEPARTMENT, 
-#                              WORKED_DEPARTMENT, START_DATE, 
-#                              END_DATE, PAYCODE_PREMIER,
-#                              sep = "_")) %>%
-#     filter(!(unique_id %in% overlap_date$unique_id)) %>%
-#     select(-unique_id) %>%
-#     rbind(date_replacement) 
-# }
-# 
-# # restore upload object if it was edited for cost center overlaps
-# if (exists("upload_no_overlap")) {
-#   upload <- upload_no_overlap
-#   rm(upload_no_overlap)
-# }
+overlap_date <- upload_payroll %>%
+  ungroup() %>%
+  group_by(PartnerOR.Health.System.ID,
+           Home.FacilityOR.Hospital.ID, DPT.HOME,
+           Facility.Hospital.Id_Worked, DPT.WRKD,
+           Start.Date,
+           Employee.ID, Employee.Name,
+           Approved.Hours.per.Pay.Period, Job.Code_up, Pay.Code) %>%
+  mutate(dupe = n() > 1) %>%
+  filter(dupe == TRUE) %>%
+  select(-dupe) %>%
+  mutate(unique_id = paste(Employee.ID,
+                           DPT.HOME, DPT.WRKD,
+                           Start.Date, End.Date,
+                           Pay.Code,
+                           sep = "_"))
+
+if (nrow(overlap_date) > 0) {
+  write.csv(overlap_date, paste0(dir, "/Labor - Data/",
+                                 "Multi-site/BISLR/Quality Checks/",
+                                 "date_overlap/overlap_date_",
+                                 Sys.Date(), ".csv"),
+            row.names = FALSE)
+  
+  # edit dates so data can be summarized to a single row
+  date_replacement <- overlap_date %>%
+    select(-unique_id) %>%
+    group_by(PartnerOR.Health.System.ID,
+             Home.FacilityOR.Hospital.ID, DPT.HOME,
+             Facility.Hospital.Id_Worked, DPT.WRKD,
+             Employee.ID, Employee.Name,
+             Approved.Hours.per.Pay.Period, Job.Code_up, Pay.Code) %>%
+    mutate(Start.Date = min(Start.Date),
+           End.Date = max(End.Date)) %>%
+    group_by(PartnerOR.Health.System.ID,
+             Home.FacilityOR.Hospital.ID, DPT.HOME,
+             Facility.Hospital.Id_Worked, DPT.WRKD,
+             Start.Date, End.Date,
+             Employee.ID, Employee.Name,
+             Approved.Hours.per.Pay.Period, Job.Code_up, Pay.Code) %>%
+    summarize(Hours = round(sum(Hours), digits = 4),
+              Expense = round(sum(Expense), digits = 2))
+  
+  # remove duplicate date rows from upload and combine
+  upload_no_overlap <- upload %>%
+    mutate(unique_id = paste(Employee.ID,
+                             DPT.HOME, DPT.WRKD,
+                             Start.Date, End.Date,
+                             Pay.Code,
+                             sep = "_")) %>%
+    filter(!(unique_id %in% overlap_date$unique_id)) %>%
+    select(-unique_id) %>%
+    rbind(date_replacement)
+}
+
+# restore upload object if it was edited for cost center overlaps
+if (exists("upload_no_overlap")) {
+  upload <- upload_no_overlap
+  rm(upload_no_overlap)
+}
 
 ## Premier Reference Files -------------------------------------------------
 
