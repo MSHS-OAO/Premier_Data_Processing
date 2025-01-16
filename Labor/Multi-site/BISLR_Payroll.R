@@ -347,13 +347,12 @@ bislr_payroll <- bislr_payroll %>%
       (WD_Department %in% cc_fundnum_conv & 
          WD_Fund_number != "00000000000") ~ WD_Fund_number,
       TRUE ~ DPT.WRKD)) %>%
-  # for the future after LPM team has requested that the Home Fund Number
-  # be populated in the Full.COA.for.Home string:
-  # mutate(
-  #   DPT.HOME = case_when(
-  #     (HD_Department %in% cc_fundnum_conv & 
-  #       HD_Fund_number != "00000000000") ~ substr(Full.COA.for.Home, 25, 35),
-  #     TRUE ~ DPT.HOME)) %>%
+  mutate(
+    DPT.HOME = case_when(
+      (HD_Department %in% cc_fundnum_conv &
+         substr(Full.COA.for.Home, 25, 35) != "00000000000")
+            ~ substr(Full.COA.for.Home, 25, 35),
+      TRUE ~ DPT.HOME)) %>%
   mutate(
     Job.Code = case_when(
       paste0(DPT.WRKD, "-", toupper(Employee.Name)) %in%
@@ -889,7 +888,7 @@ if (nrow(overlap_date) > 0) {
               Expense = round(sum(Expense), digits = 2))
   
   # remove duplicate date rows from upload and combine
-  upload_no_overlap <- upload %>%
+  upload_no_overlap <- upload_payroll %>%
     mutate(unique_id = paste(Employee.ID,
                              DPT.HOME, DPT.WRKD,
                              Start.Date, End.Date,
@@ -902,7 +901,7 @@ if (nrow(overlap_date) > 0) {
 
 # restore upload object if it was edited for cost center overlaps
 if (exists("upload_no_overlap")) {
-  upload <- upload_no_overlap
+  upload_payroll <- upload_no_overlap
   rm(upload_no_overlap)
 }
 
@@ -1119,7 +1118,8 @@ dept_desc <- bislr_payroll %>%
 
 dept_desc_check <- full_join(dict_premier_dpt, dept_desc,
                              by = c("Cost.Center" =
-                                      "Department.IdWHERE.Worked")) %>%
+                                      "Department.IdWHERE.Worked"),
+                             relationship = "many-to-many") %>%
   # may want to include NY0014 in the future to go ahead and update, too
   filter(Site %in% c("630571", "NY2162", "NY2163")) %>%
   filter(!is.na(Cost.Center.Description)) %>%
@@ -1138,7 +1138,8 @@ if (nrow(dept_desc_check > 0)) {
     message = paste(
       "There are Cost Center Descriptions ",
       "that appear to have changed.  Review for changes in operations ",
-      "and update in Premier and DB."
+      "and update in Premier and DB. Note that descriptions that are ",
+      "truncated to the 50 character limit will be included in the list."
     ))
   View(dept_desc_check)
 }
