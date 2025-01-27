@@ -172,7 +172,7 @@ format_df <- df %>%
   mutate(HOME_DEPARTMENT = case_when(
     (HOME_DEPARTMENT %in% wd_fundnum_conv & 
        substr(HD_COA, 25, 35) != "00000000000") ~ substr(HD_COA, 25, 35),
-    TRUE ~ WORKED_DEPARTMENT))
+    TRUE ~ HOME_DEPARTMENT))
   
 #### Jobcode Mapping ----------------------------------------------------------
 # check if there are new combos of jc and worked department this month
