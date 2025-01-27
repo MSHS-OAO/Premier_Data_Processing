@@ -313,8 +313,8 @@ if (nrow(overlap_cc) > 0) {
                              END_DATE, PAYCODE_PREMIER,
                              sep = "_")) %>%
     filter(!(unique_id %in% overlap_cc$unique_id)) %>%
-    rbind(cost_center_replacement) %>%
     select(-unique_id) %>%
+    rbind(cost_center_replacement) %>%
     group_by(PARTNER, HOME_FACILITY, HOME_DEPARTMENT, WORKED_FACILITY,
              WORKED_DEPARTMENT, START_DATE, END_DATE, EMPLOYEE_ID, 
              EMPLOYEE_NAME, APPROVED_HOURS, JOBCODE, PAYCODE_PREMIER) %>%
