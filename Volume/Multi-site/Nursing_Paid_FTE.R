@@ -196,7 +196,7 @@ upload <- mshs_nursing_paid_FTE %>%
   mutate('Corporation Code' = '729805',
          'Entity Code' = case_when(
            SITE %in% c('MSBI', 'MSB') ~ '630571',
-           SITE == 'MSH' ~ 'NY0014',
+           SITE %in% c('MSH', 'MSQ') ~ 'NY0014',
            SITE == 'MSM' ~ 'NY2163',
            SITE == 'MSW' ~ 'NY2162'),
          'Start Date' = paste0(substr(PP_START_DATE, 6, 7), "/",
@@ -210,13 +210,15 @@ upload <- mshs_nursing_paid_FTE %>%
            SITE == 'MSB' ~ '402000040710101',
            SITE == 'MSH' ~ '101000010110101',
            SITE == 'MSM' ~ '302000030210101',
-           SITE == 'MSW' ~ '301000030110101'),
+           SITE == 'MSW' ~ '301000030110101',
+           SITE == 'MSQ' ~ '102000010714101'),
          'Volume Code' = case_when(
            SITE == 'MSBI'~ '401404101011',
            SITE == 'MSB' ~ '402407101011',
            SITE == 'MSH' ~ '101101101011',
            SITE == 'MSM' ~ '302000101011',
-           SITE == 'MSW' ~ '301000101011'),
+           SITE == 'MSW' ~ '301000101011',
+           SITE == 'MSQ' ~ '102107140111'),
          'Budget Volume' = '0') %>%
   rename('Actual Volume' = PAID_FTE) %>%
   ungroup() %>%

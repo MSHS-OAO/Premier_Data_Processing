@@ -159,13 +159,21 @@ format_df <- df %>%
          WD_HOURS = as.numeric(WD_HOURS)) %>%
   mutate(WORKED_DEPARTMENT = case_when(
     (WD_DEPARTMENT %in% cc_fundnum_conv & 
-      WD_FUND_NUMBER != "00000000000")~ WD_FUND_NUMBER,
+      WD_FUND_NUMBER != "00000000000") ~ WD_FUND_NUMBER,
     TRUE ~ WORKED_DEPARTMENT)) %>%
   mutate(WORKED_DEPARTMENT = case_when(
     (WORKED_DEPARTMENT %in% wd_fundnum_conv & 
-      WD_FUND_NUMBER != "00000000000")~ WD_FUND_NUMBER,
-    TRUE ~ WORKED_DEPARTMENT))
-
+      WD_FUND_NUMBER != "00000000000") ~ WD_FUND_NUMBER,
+    TRUE ~ WORKED_DEPARTMENT)) %>%
+  mutate(HOME_DEPARTMENT = case_when(
+    (HD_DEPARTMENT %in% cc_fundnum_conv & 
+       substr(HD_COA, 25, 35) != "00000000000") ~ substr(HD_COA, 25, 35),
+    TRUE ~ HOME_DEPARTMENT)) %>%
+  mutate(HOME_DEPARTMENT = case_when(
+    (HOME_DEPARTMENT %in% wd_fundnum_conv & 
+       substr(HD_COA, 25, 35) != "00000000000") ~ substr(HD_COA, 25, 35),
+    TRUE ~ HOME_DEPARTMENT))
+  
 #### Jobcode Mapping ----------------------------------------------------------
 # check if there are new combos of jc and worked department this month
 if (nrow(format_df %>%
@@ -305,8 +313,8 @@ if (nrow(overlap_cc) > 0) {
                              END_DATE, PAYCODE_PREMIER,
                              sep = "_")) %>%
     filter(!(unique_id %in% overlap_cc$unique_id)) %>%
-    rbind(cost_center_replacement) %>%
     select(-unique_id) %>%
+    rbind(cost_center_replacement) %>%
     group_by(PARTNER, HOME_FACILITY, HOME_DEPARTMENT, WORKED_FACILITY,
              WORKED_DEPARTMENT, START_DATE, END_DATE, EMPLOYEE_ID, 
              EMPLOYEE_NAME, APPROVED_HOURS, JOBCODE, PAYCODE_PREMIER) %>%
