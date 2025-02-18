@@ -347,13 +347,12 @@ bislr_payroll <- bislr_payroll %>%
       (WD_Department %in% cc_fundnum_conv & 
          WD_Fund_number != "00000000000") ~ WD_Fund_number,
       TRUE ~ DPT.WRKD)) %>%
-  # for the future after LPM team has requested that the Home Fund Number
-  # be populated in the Full.COA.for.Home string:
-  # mutate(
-  #   DPT.HOME = case_when(
-  #     (HD_Department %in% cc_fundnum_conv & 
-  #       HD_Fund_number != "00000000000") ~ substr(Full.COA.for.Home, 25, 35),
-  #     TRUE ~ DPT.HOME)) %>%
+  mutate(
+    DPT.HOME = case_when(
+      (HD_Department %in% cc_fundnum_conv &
+         substr(Full.COA.for.Home, 25, 35) != "00000000000")
+            ~ substr(Full.COA.for.Home, 25, 35),
+      TRUE ~ DPT.HOME)) %>%
   mutate(
     Job.Code = case_when(
       paste0(DPT.WRKD, "-", toupper(Employee.Name)) %in%
@@ -763,6 +762,149 @@ upload_payroll <- upload_payroll %>%
 
 # upload_payroll will be split into BIB and SLW in the Exporting section
 
+### Home Cost Center Correction--------------------------------------------------
+# check for employees wth multiple home cost centers during same time period
+overlap_cc <- upload_payroll %>%
+  group_by(Employee.ID, Start.Date) %>%
+  # may need to add home facility into consideration since BISLR data
+  # includes multiple facilities
+  summarize(home_cost_centers = n_distinct(DPT.HOME)) %>%
+  right_join(upload_payroll,
+             by = c("Employee.ID" = "Employee.ID",
+                    "Start.Date" = "Start.Date")) %>%
+  filter(home_cost_centers > 1) %>%
+  mutate(unique_id = paste(Employee.ID,
+                           DPT.HOME, DPT.WRKD,
+                           Start.Date, End.Date,
+                           Pay.Code,
+                           sep = "_"))
+
+# if there are overlaps, save original for archival
+if (nrow(overlap_cc) > 0) {
+  write.csv(overlap_cc, paste0(dir, "/Labor - Data/",
+                               "Multi-site/BISLR/Quality Checks/",
+                               "home_cc_overlap/overlap_cc_",
+                               Sys.Date(), ".csv"),
+            row.names = FALSE)
+  
+  # replace home cc with most common used home cc for each emp and
+  # start date combo
+  cost_center_replacement <- overlap_cc %>%
+    group_by(Employee.ID, DPT.HOME, Start.Date) %>%
+    # There's potential that Premier accepts an employee having different
+    # home cost centers at different entities at the same time.
+    # The current setup has potential for a home cost center replacement
+    # to not match the entity and the dept dictionary for that entity will
+    # need to have the cost center added
+    # If Premier checks that a home cost center only exists in one facility
+    # then there may be another error that arises
+    summarize(cost_center_count = n()) %>%
+    group_by(Employee.ID, Start.Date) %>%
+    filter(cost_center_count == max(cost_center_count)) %>%
+    rename(common_cc = DPT.HOME) %>%
+    distinct(Employee.ID, Start.Date, cost_center_count,
+             .keep_all = TRUE) %>%
+    left_join(upload_payroll,
+              by = c("Employee.ID" = "Employee.ID",
+                     "Start.Date" = "Start.Date")) %>%
+    mutate(DPT.HOME = common_cc) %>%
+    select(PartnerOR.Health.System.ID,
+           Home.FacilityOR.Hospital.ID, DPT.HOME,
+           Facility.Hospital.Id_Worked, DPT.WRKD,
+           Start.Date, End.Date,
+           Employee.ID, Employee.Name,
+           Approved.Hours.per.Pay.Period, Job.Code_up, Pay.Code,
+           Hours, Expense) %>%
+    ungroup()
+  
+  # remove employees original data from the upload df
+  upload_no_overlap <- upload_payroll %>%
+    mutate(unique_id = paste(Employee.ID,
+                             DPT.HOME, DPT.WRKD,
+                             Start.Date, End.Date,
+                             Pay.Code,
+                             sep = "_")) %>%
+    filter(!(unique_id %in% overlap_cc$unique_id)) %>%
+    select(-unique_id) %>%
+    rbind(cost_center_replacement) %>%
+    group_by(PartnerOR.Health.System.ID,
+             Home.FacilityOR.Hospital.ID, DPT.HOME,
+             Facility.Hospital.Id_Worked, DPT.WRKD,
+             Start.Date, End.Date,
+             Employee.ID, Employee.Name,
+             Approved.Hours.per.Pay.Period, Job.Code_up, Pay.Code) %>%
+    summarize(Hours = round(sum(Hours), digits = 4),
+              Expense = round(sum(Expense), digits = 2))
+}
+
+# restore upload object if it was edited for cost center overlaps
+if (exists("upload_no_overlap")) {
+  upload_payroll <- upload_no_overlap
+  rm(upload_no_overlap)
+}
+
+### Date Overlap Correction ---------------------------------------------------
+overlap_date <- upload_payroll %>%
+  ungroup() %>%
+  group_by(PartnerOR.Health.System.ID,
+           Home.FacilityOR.Hospital.ID, DPT.HOME,
+           Facility.Hospital.Id_Worked, DPT.WRKD,
+           Start.Date,
+           Employee.ID, Employee.Name,
+           Approved.Hours.per.Pay.Period, Job.Code_up, Pay.Code) %>%
+  mutate(dupe = n() > 1) %>%
+  filter(dupe == TRUE) %>%
+  select(-dupe) %>%
+  mutate(unique_id = paste(Employee.ID,
+                           DPT.HOME, DPT.WRKD,
+                           Start.Date, End.Date,
+                           Pay.Code,
+                           sep = "_"))
+
+if (nrow(overlap_date) > 0) {
+  write.csv(overlap_date, paste0(dir, "/Labor - Data/",
+                                 "Multi-site/BISLR/Quality Checks/",
+                                 "date_overlap/overlap_date_",
+                                 Sys.Date(), ".csv"),
+            row.names = FALSE)
+  
+  # edit dates so data can be summarized to a single row
+  date_replacement <- overlap_date %>%
+    select(-unique_id) %>%
+    group_by(PartnerOR.Health.System.ID,
+             Home.FacilityOR.Hospital.ID, DPT.HOME,
+             Facility.Hospital.Id_Worked, DPT.WRKD,
+             Employee.ID, Employee.Name,
+             Approved.Hours.per.Pay.Period, Job.Code_up, Pay.Code) %>%
+    mutate(Start.Date = min(Start.Date),
+           End.Date = max(End.Date)) %>%
+    group_by(PartnerOR.Health.System.ID,
+             Home.FacilityOR.Hospital.ID, DPT.HOME,
+             Facility.Hospital.Id_Worked, DPT.WRKD,
+             Start.Date, End.Date,
+             Employee.ID, Employee.Name,
+             Approved.Hours.per.Pay.Period, Job.Code_up, Pay.Code) %>%
+    summarize(Hours = round(sum(Hours), digits = 4),
+              Expense = round(sum(Expense), digits = 2))
+  
+  # remove duplicate date rows from upload and combine
+  upload_no_overlap <- upload_payroll %>%
+    mutate(unique_id = paste(Employee.ID,
+                             DPT.HOME, DPT.WRKD,
+                             Start.Date, End.Date,
+                             Pay.Code,
+                             sep = "_")) %>%
+    filter(!(unique_id %in% overlap_date$unique_id)) %>%
+    select(-unique_id) %>%
+    rbind(date_replacement)
+}
+
+# restore upload object if it was edited for cost center overlaps
+if (exists("upload_no_overlap")) {
+  upload_payroll <- upload_no_overlap
+  rm(upload_no_overlap)
+}
+
 ## Premier Reference Files -------------------------------------------------
 
 ### Dpt Dict and Map -------------------------------------------------------
@@ -976,7 +1118,8 @@ dept_desc <- bislr_payroll %>%
 
 dept_desc_check <- full_join(dict_premier_dpt, dept_desc,
                              by = c("Cost.Center" =
-                                      "Department.IdWHERE.Worked")) %>%
+                                      "Department.IdWHERE.Worked"),
+                             relationship = "many-to-many") %>%
   # may want to include NY0014 in the future to go ahead and update, too
   filter(Site %in% c("630571", "NY2162", "NY2163")) %>%
   filter(!is.na(Cost.Center.Description)) %>%
@@ -995,7 +1138,8 @@ if (nrow(dept_desc_check > 0)) {
     message = paste(
       "There are Cost Center Descriptions ",
       "that appear to have changed.  Review for changes in operations ",
-      "and update in Premier and DB."
+      "and update in Premier and DB. Note that descriptions that are ",
+      "truncated to the 50 character limit will be included in the list."
     ))
   View(dept_desc_check)
 }
