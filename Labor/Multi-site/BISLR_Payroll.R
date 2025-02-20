@@ -791,13 +791,6 @@ if (nrow(overlap_cc) > 0) {
   # start date combo
   cost_center_replacement <- overlap_cc %>%
     group_by(Employee.ID, DPT.HOME, Start.Date) %>%
-    # There's potential that Premier accepts an employee having different
-    # home cost centers at different entities at the same time.
-    # The current setup has potential for a home cost center replacement
-    # to not match the entity and the dept dictionary for that entity will
-    # need to have the cost center added
-    # If Premier checks that a home cost center only exists in one facility
-    # then there may be another error that arises
     summarize(cost_center_count = n()) %>%
     group_by(Employee.ID, Start.Date) %>%
     filter(cost_center_count == max(cost_center_count)) %>%
@@ -909,8 +902,36 @@ if (exists("upload_no_overlap")) {
 
 ### Dpt Dict and Map -------------------------------------------------------
 
+cc_replacement_cross_site <- dict_premier_dpt %>%
+  select(-Dpt_in_Dict) %>%
+  filter(is.na(Site))
+
+# get depts in cost_center_replacement that are not in new site
+if (nrow(cost_center_replacement) > 0) {
+  
+  cc_replacement_cross_site <- cost_center_replacement %>%
+    select(PartnerOR.Health.System.ID, Home.FacilityOR.Hospital.ID,
+           DPT.HOME) %>%
+    distinct() %>%
+    left_join(dict_premier_dpt %>%
+                select(Site, Cost.Center,
+                       Dpt_in_Dict) %>%
+                rename(Home.FacilityOR.Hospital.ID = Site,
+                       DPT.HOME = Cost.Center,
+                       HomeDpt_in_Dict = Dpt_in_Dict)) %>%
+    filter(is.na(HomeDpt_in_Dict)) %>%
+    left_join(dict_premier_dpt %>%
+                select(Cost.Center, Cost.Center.Description) %>%
+                rename(DPT.HOME = Cost.Center) %>%
+                distinct()) %>%
+    select(-HomeDpt_in_Dict) %>%
+    setNames(colnames(dict_premier_dpt %>%
+                        select(-Dpt_in_Dict)))
+}
+
 if (NA %in% bislr_payroll$HomeDpt_in_Dict |
-    NA %in% bislr_payroll$WRKDpt_in_Dict) {
+    NA %in% bislr_payroll$WRKDpt_in_Dict |
+    nrow(cost_center_replacement) > 0) {
 
   # update dpt dict
   upload_dict_dpt <- rbind(
@@ -925,7 +946,8 @@ if (NA %in% bislr_payroll$HomeDpt_in_Dict |
       select(PartnerOR.Health.System.ID, Facility.Hospital.Id_Worked,
              DPT.WRKD, Department.Name.Worked.Dept) %>%
       setNames(colnames(dict_premier_dpt %>%
-                          select(-Dpt_in_Dict)))) %>%
+                          select(-Dpt_in_Dict))),
+    cc_replacement_cross_site) %>%
     # check for special characters in name (e.g. ampersand &)
     # mutate(Cost.Center.Description = case_when(
     #   str_detect(Cost.Center.Description, "&") ~
