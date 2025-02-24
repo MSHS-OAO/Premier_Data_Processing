@@ -15,8 +15,8 @@ oao_con <- dbConnect(odbc(), "OAO Cloud DB Production")
 
 # User Input---------------------------------------------------------------
 # date range
-start_date <- "2024-10-20"
-end_date <- "2024-11-30"
+start_date <- "2024-12-29"
+end_date <- "2025-01-25"
 
 # Data References ---------------------------------------------------------
 
@@ -75,7 +75,7 @@ rpt_live_wrk_hr <- summary_wrk_hr %>%
 rpt_pct_miss <- rpt_wrk_hr %>%
   left_join(rpt_live_wrk_hr) %>%
   mutate(potential_pct_missing =
-           round(100 * (tot_WRK_FTE - max_WRK_FTE) / tot_WRK_FTE, 1),
+           round((tot_WRK_FTE - max_WRK_FTE) / tot_WRK_FTE, 3),
          tot_WRK_FTE = NULL,
          max_WRK_FTE = NULL)
 
@@ -114,6 +114,7 @@ writeDataTable(wb,
 header_style <- createStyle(fgFill = "grey", halign = "left", valign = "top",
                             textDecoration = "bold", fontColour = "#010101")
 body_style <- createStyle(border = "TopBottomLeftRight")
+pct_style <- createStyle(numFmt = "0.0%")
 
 # apply cell styles
 addStyle(wb, sheet, header_style, rows = 1,
@@ -121,6 +122,9 @@ addStyle(wb, sheet, header_style, rows = 1,
          stack = TRUE)
 setRowHeights(wb, sheet, 1, heights = 43.5)
 
+addStyle(wb, sheet, pct_style, rows = 2:(nrow(summary_wrk_hr_qc_view) + 1),
+         cols = ncol(summary_wrk_hr_qc_view), gridExpand = TRUE,
+         stack = TRUE)
 addStyle(wb, sheet, body_style, rows = 1:(nrow(summary_wrk_hr_qc_view) + 1),
          cols = seq_len(ncol(summary_wrk_hr_qc_view)), gridExpand = TRUE,
          stack = TRUE)
