@@ -132,6 +132,20 @@ dict_epic_short <- dict_epic %>%
 
 epic_dpts <- as.integer(unique(dict_epic_short$`Epic Dept ID`))
 
+### Sessional ---------------------------------------------------------
+
+dict_sessional_docs <- read_xlsx(
+  path_dict_prem,
+  sheet = 2,
+  skip = 0
+)
+
+dict_sessional_docs_short <- dict_sessional_docs %>%
+  select(`Epic Dept ID`, PROVIDER, `Volume ID`, `Cost Center`, `volume ratio`,`facility`)%>%
+  filter(!is.na(`Volume ID`)) %>%
+  filter(`Cost Center` != specific_text) %>%
+  mutate(`Epic Dept ID` = as.character(`Epic Dept ID`))
+
 # Data Import -------------------------------------------------------------
 
 # set up connection to schema
@@ -167,37 +181,37 @@ data_epic <- data_raw %>%
 ## Join Dept & Vol ID -----------------------------------------------------
 
 data_epic_row <- nrow(data_epic)
-data_epic <- data_epic %>%
+
+data_epic_sessional <- data_epic %>%
+  filter(DEPARTMENT_ID %in% dict_sessional_docs_short$`Epic Dept ID` &
+           PROVIDER %in% dict_sessional_docs_short$PROVIDER)
+
+
+data_epic_nonsess <- data_epic %>%
+  filter(!(DEPARTMENT_ID %in% dict_sessional_docs_short$`Epic Dept ID` &
+           PROVIDER %in% dict_sessional_docs_short$PROVIDER))
+
+data_epic_sessional <- data_epic_sessional %>%
+  left_join(dict_sessional_docs_short, c("PROVIDER" = "PROVIDER",
+                                         "DEPARTMENT_ID" = "Epic Dept ID"))
+  
+data_epic_nonsess <- data_epic_nonsess %>%
   # SP changed join to be on DEPARTMENT ID instead of DEPARTMENT
   left_join(dict_epic_short, by = c("DEPARTMENT_ID" = "Epic Dept ID"))
+
+data_epic <- rbind(data_epic_sessional, data_epic_nonsess)
+  
 data_epic_row2 <- nrow(data_epic)
 
-showDialog(title = "Row Increase",
-           message = paste0("The number of rows in data increased ",
-                            "when joining Volume IDs.  ",
-                            "This can be expected because of roll-up volumes ",
-                            "that were created for a few departments.  ",
-                            "The row increase was: ",
-                            data_epic_row2 - data_epic_row, ".  ",
-                            "Press OK to continue."))
 
-
-## Visit counter ----------------------------------------------------------
-
-# This section should not be necessary as rehab offsite is not part of MSD.
-
-# Kept and commented out so we can reference quickly if script needs a portion
-# of this section.
-
-# rehab offsite docs that are not included docs get 0
-# all others keep their ratio
-# data_epic <- data_epic %>%
-#   rename(volume = `volume ratio`) %>%
-#   mutate(volume = case_when(
-#     DEPARTMENT %in% dict_rehab_docs$`Epic Department Name` &
-#       !(PROVIDER %in% dict_rehab_docs$Provider) ~ 0,
-#     TRUE ~ volume
-#   ))
+if (data_epic_row2 != data_epic_row) {
+  showDialog(title = "Row Increase Warning",
+             message = paste0("The number of rows in data changed ",
+                              "when joining Volume IDs.  ",
+                              "The change in number of rows was: ",
+                              data_epic_row2 - data_epic_row, ".  ",
+                              "Press OK to continue."))
+}
 
 
 ## upload summary ---------------------------------------------------------
