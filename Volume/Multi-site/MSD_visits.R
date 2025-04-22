@@ -128,7 +128,10 @@ specific_text <- "TBD"
 dict_epic_short <- dict_epic %>%
   select(`Epic Dept ID`, `Volume ID`, `Cost Center`, `volume ratio`,`facility`)%>%
   filter(!is.na(`Volume ID`)) %>%
-  filter(`Volume ID` != specific_text) # SP changed to not include Departments that have not yet been mapped to Premier
+  filter(`Volume ID` != specific_text) %>%
+  mutate(`Epic Dept ID` = as.character(`Epic Dept ID`))
+  
+  # SP changed to not include Departments that have not yet been mapped to Premier
 
 epic_dpts <- as.integer(unique(dict_epic_short$`Epic Dept ID`))
 
@@ -176,6 +179,7 @@ data_epic <- data_raw %>%
                 DATE = as.Date(DATE, format = "%m/%d/%Y")
               ),
             by = c("APPT_DATE_YEAR" = "DATE"))
+  
 
 
 ## Join Dept & Vol ID -----------------------------------------------------
