@@ -122,7 +122,6 @@ dict_epic <- read_xlsx(
   skip = 0
 )
 
-# SP adjusted to pull Epic Dept ID instead Dept Name, and exclude rows with 'TBD'
 specific_text <- "TBD"
 
 dict_epic_short <- dict_epic %>%
@@ -130,8 +129,6 @@ dict_epic_short <- dict_epic %>%
   filter(!is.na(`Volume ID`)) %>%
   filter(`Volume ID` != specific_text) %>%
   mutate(`Epic Dept ID` = as.character(`Epic Dept ID`))
-  
-  # SP changed to not include Departments that have not yet been mapped to Premier
 
 epic_dpts <- as.integer(unique(dict_epic_short$`Epic Dept ID`))
 
@@ -200,7 +197,6 @@ data_epic_sessional <- data_epic_sessional %>%
                                          "DEPARTMENT_ID" = "Epic Dept ID"))
   
 data_epic_nonsess <- data_epic_nonsess %>%
-  # SP changed join to be on DEPARTMENT ID instead of DEPARTMENT
   left_join(dict_epic_short, by = c("DEPARTMENT_ID" = "Epic Dept ID"))
 
 data_epic <- rbind(data_epic_sessional, data_epic_nonsess)
@@ -251,7 +247,6 @@ zero_rows <- missing_vol_id_date %>%
 zero_depts <- dict_epic_short %>%
   filter(`Volume ID` %in% zero_rows$`Volume ID`)
 
-#SP displaying Cost Center name and the volume IDs; Question: Want to display the cc or the volume ID?
 if (length(unique(zero_depts$`Volume ID`)) > 0) {
   showDialog(
     title = "Zero Depts",
@@ -350,7 +345,6 @@ file_name_premier <-
   paste0("MSD_Department Volumes_", date_min_char, "_to_", date_max_char,
          ".csv")
 
-#SP changed output folder path 
 path_folder_premier_export <- paste0(j_drive,
                                      "SixSigma",
                                      "/MSHS Productivity/Productivity", 
