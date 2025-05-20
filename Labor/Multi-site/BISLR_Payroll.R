@@ -827,7 +827,8 @@ if (nrow(overlap_cc) > 0) {
              Employee.ID, Employee.Name,
              Approved.Hours.per.Pay.Period, Job.Code_up, Pay.Code) %>%
     summarize(Hours = round(sum(Hours), digits = 4),
-              Expense = round(sum(Expense), digits = 2))
+              Expense = round(sum(Expense), digits = 2)) %>%
+    ungroup()
 }
 
 # restore upload object if it was edited for cost center overlaps
@@ -878,7 +879,8 @@ if (nrow(overlap_date) > 0) {
              Employee.ID, Employee.Name,
              Approved.Hours.per.Pay.Period, Job.Code_up, Pay.Code) %>%
     summarize(Hours = round(sum(Hours), digits = 4),
-              Expense = round(sum(Expense), digits = 2))
+              Expense = round(sum(Expense), digits = 2)) %>%
+    ungroup()
   
   # remove duplicate date rows from upload and combine
   upload_no_overlap <- upload_payroll %>%
@@ -1044,6 +1046,7 @@ if (NA %in% bislr_payroll$WRKJC_in_Dict |
 
 
 premier_missing_paycode <- anti_join(upload_payroll %>%
+                                       ungroup() %>%
                                        select(Pay.Code) %>%
                                        distinct(),
                                      dict_premier_paycode %>%
