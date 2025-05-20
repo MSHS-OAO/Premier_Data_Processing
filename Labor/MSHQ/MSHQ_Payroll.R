@@ -144,11 +144,13 @@ if (nrow(new_jobcodes_premier) > 0) {
 
 #### Format Data --------------------------------------------------------------
 format_df <- df %>%
-  left_join(mapping_jobcode, by = c("JOBCODE" = "JOBCODE")) %>%
-  filter(PROVIDER == 0) %>%
+  #left_join(mapping_jobcode, by = c("JOBCODE" = "JOBCODE")) %>%
+  #filter(PROVIDER == 0) %>%
   mutate(JOBCODE = substr(JOBCODE, 1, 10),
          POSITION_CODE_DESCRIPTION = substr(POSITION_CODE_DESCRIPTION, 1, 50),
          EMPLOYEE_NAME = substr(EMPLOYEE_NAME, 1, 30),
+         EMPLOYEE_NAME = gsub("’", "'", EMPLOYEE_NAME),
+         EMPLOYEE_NAME = gsub("è", "e", EMPLOYEE_NAME),
          WORKED_DEPARTMENT_NAME = substr(WORKED_DEPARTMENT_NAME, 1, 50),
          HOME_DEPARTMENT_NAME = substr(HOME_DEPARTMENT_NAME, 1, 50),
          HOME_DEPARTMENT = paste0(substr(HD_COA, 1, 3),
