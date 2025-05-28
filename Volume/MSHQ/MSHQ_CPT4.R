@@ -12,21 +12,21 @@ rev_map <- read_excel("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/
 #Bring in CPT reference table
 #For months: January,April,July,October there is a new cpt_ref to download
 # https://communities.premierinc.com/display/OUG/Data+Management%3A+Productivity+%28Legacy%29+Topics
-cpt_ref <- read_excel("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/RIS/Mapping/CPT_Ref.xlsx") %>%
-  select(1,2,3,6,11,12)
+# cpt_ref <- read_excel("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Charges/CPT Reference/CPT_Ref.xlsx") %>%
+#   select(1,2,3,6,11,12)
 
 #Prepares file for master
 charges <- function(MSH,MSQ){
   #colnames for the charge details
   chargenames <- c("SINAI.CODE","REV.DEP","DESCRIPTION","CPT","QTY","MONTH")
-  colnames(MSH) <- chargenames
+  # colnames(MSH) <- chargenames
   colnames(MSQ) <- chargenames
-  MSH <- MSH %>% 
-    filter(!is.na(SINAI.CODE))
+  # MSH <- MSH %>% 
+  #   filter(!is.na(SINAI.CODE))
   MSQ <- MSQ %>% 
     filter(!is.na(SINAI.CODE))
   #combine MSH and MSQ charge details
-  MSHQ <- rbind(MSH,MSQ) %>%
+  MSHQ <- MSQ %>%
     mutate(REV.DEP = as.character(REV.DEP))
   #remove blank CPT lines
   MSHQ <- filter(MSHQ,!is.na(CPT))
@@ -62,7 +62,7 @@ charges <- function(MSH,MSQ){
   return(MSHQ)
 }
 #Creates master repository and master trend
-master <- function(){
+# master <- function(){
   #read in master cpt file
   master <- readRDS("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Charges/Master/master.RDS")
   #Check that new charge detail does not overlap with master
@@ -92,9 +92,9 @@ master <- function(){
 }
 #Saves master files and upload
 upload_master <- function(){
-  saveRDS(master,"/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Charges/Master/master.rds")
-  write.xlsx(as.data.frame(master_trend),"/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Charges/Master/master_trend.xlsx",
-             row.names = F)
+  # saveRDS(master,"/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Charges/Master/master.rds")
+  # write.xlsx(as.data.frame(master_trend),"/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Charges/Master/master_trend.xlsx",
+  #            row.names = F)
   upload <- MSHQ %>% ungroup() %>% select(c(1:8))
   colnames(upload) <- c("Corporation Code", "Entity Code", "Cost Center Code",
                         "Start Date", "End Date", "CPT Code", "Actual Volume", 
@@ -113,11 +113,11 @@ names(mylist) <- sheetnames
 names(mylist)
 
 #Enter Year of data
-Year <- "2024"
-# tell charges function which sheet is MSH and which is MSQ
-MSHQ <- charges(MSH = mylist[[2]],MSQ = mylist[[1]])
+Year <- "2025"
+# tell charges function which sheet is MSQ
+MSHQ <- charges(MSQ = mylist[[1]])
 #Create master and master trend
-master()
+# master()
 #Review master trend
 
 #Create upload and save both master files and upload
