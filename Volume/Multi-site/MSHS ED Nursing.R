@@ -86,15 +86,15 @@ dict_pay_cycles <- dict_pay_cycles %>%
 #Joining paycycles with raw boarder data and mapping and converting boarder hours to additional visits
 ED_boarder_data <- ED_boarder_data_raw %>%
   left_join(dict_pay_cycles, by = c("Arrival.Date" = "DATE")) %>%
-  left_join(mapping, by = c("Arrv.Dept..group." = "Site")) %>%
+  left_join(mapping, by = c("ARRV.DEPT..group." = "Site")) %>%
   filter(Admits == 1) %>%
-  mutate(Boarder_Hours = Admit.to.Depart..All. / 60) %>%
+  mutate(Boarder_Hours = Admit.Decision.to.Depart.Admits...Boarder. / 60) %>%
   mutate(Required_Care_Hours = Boarder_Hours / 6) %>%
   mutate(Additional_Visits = Required_Care_Hours / WHPU)
 
 #Gets a count of the boarder visits
 ED_boarder_counts <- ED_boarder_data %>%
-  group_by(Arrv.Dept..group., END.DATE) %>%
+  group_by(ARRV.DEPT..group., END.DATE) %>%
   summarize(total_additional_visits = sum(Additional_Visits, na.rm = TRUE)) %>%
   mutate(END.DATE = as.Date(END.DATE, format = "%m/%d/%Y")) %>%
   filter(END.DATE > previous_distribution & END.DATE <= distribution)
@@ -102,25 +102,25 @@ ED_boarder_counts <- ED_boarder_data %>%
 #Joining paycycles with raw ED data and mapping
 ED_visit_data <- ED_visit_data_raw %>%
   left_join(dict_pay_cycles, by = c("Arrival.Date" = "DATE")) %>%
-  left_join(mapping, by = c("Arrv.Dept..group." = "Site"))
+  left_join(mapping, by = c("ARRV.DEPT..group." = "Site"))
 
 #Gets a count of the ED visits
 ED_visit_counts <- ED_visit_data %>%
-  group_by(Arrv.Dept..group., END.DATE) %>%
+  group_by(ARRV.DEPT..group., END.DATE) %>%
   summarize(arrival_count = n()) %>%
   mutate(END.DATE = as.Date(END.DATE, format = "%m/%d/%Y")) %>%
   filter(END.DATE > previous_distribution & END.DATE <= distribution)
 
 #Creates a new dataframe that sums the ED visits and boarders counts to get a total
 combined_df <- ED_boarder_counts %>%
-  full_join(ED_visit_counts, by = c("Arrv.Dept..group.", "END.DATE")) %>%
+  full_join(ED_visit_counts, by = c("ARRV.DEPT..group.", "END.DATE")) %>%
   mutate(total_count = total_additional_visits + arrival_count) %>%
-  select(Arrv.Dept..group., END.DATE, total_additional_visits, arrival_count, total_count)
+  select(ARRV.DEPT..group., END.DATE, total_additional_visits, arrival_count, total_count)
 
 
 # Data Formatting ---------------------------------------------------------
 upload <- combined_df %>%
-  left_join(mapping, by = c("Arrv.Dept..group." = "Site")) %>%
+  left_join(mapping, by = c("ARRV.DEPT..group." = "Site")) %>%
   mutate(`Corporation Code` = "729805",
          START.DATE = as.Date(END.DATE) - 13,
          `Budget Volume` = "0") %>%
@@ -148,19 +148,19 @@ new_data <- combined_df
 #Appends new data to existing trend
 MSHS_ED_trend_data <- read_excel(paste0(dir, "/Trend/MSHS ED Trend.xlsx")) %>%
   rbind(new_data) %>%
-  arrange(END.DATE, Arrv.Dept..group.) %>%
-  distinct(END.DATE, Arrv.Dept..group., .keep_all = TRUE)
+  arrange(END.DATE, ARRV.DEPT..group.) %>%
+  distinct(END.DATE, ARRV.DEPT..group., .keep_all = TRUE)
 
 #Save new data to trend file
 write.xlsx(MSHS_ED_trend_data, file = paste0(dir, "/Trend/MSHS ED Trend.xlsx"))
 
 # Plotting
-quality_check <- ggplot(MSHS_ED_trend_data, aes(x = END.DATE, y = total_count, color = Arrv.Dept..group.)) +
+quality_check <- ggplot(MSHS_ED_trend_data, aes(x = END.DATE, y = total_count, color = ARRV.DEPT..group.)) +
   geom_line() +
   labs(title = "Quality Check Graph",
        x = "Date",
        y = "Total Count",
-       color = "Arrv.Dept..group.") +
+       color = "ARRV.DEPT..group.") +
   theme_minimal()
 
 # Print the graph
