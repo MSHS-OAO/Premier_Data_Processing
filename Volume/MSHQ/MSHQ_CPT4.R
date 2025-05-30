@@ -9,23 +9,14 @@ library(xlsx)
 rev_map <- read_excel("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Charges/MSHQ REV CROSSWALK.xlsx") %>%
   select(c(1,5:8)) %>%
   distinct()
-#Bring in CPT reference table
-#For months: January,April,July,October there is a new cpt_ref to download
-# https://communities.premierinc.com/display/OUG/Data+Management%3A+Productivity+%28Legacy%29+Topics
-# cpt_ref <- read_excel("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Charges/CPT Reference/CPT_Ref.xlsx") %>%
-#   select(1,2,3,6,11,12)
 
 #Prepares file for master
-charges <- function(MSH,MSQ){
+charges <- function(MSQ){
   #colnames for the charge details
   chargenames <- c("SINAI.CODE","REV.DEP","DESCRIPTION","CPT","QTY","MONTH")
-  # colnames(MSH) <- chargenames
   colnames(MSQ) <- chargenames
-  # MSH <- MSH %>% 
-  #   filter(!is.na(SINAI.CODE))
   MSQ <- MSQ %>% 
     filter(!is.na(SINAI.CODE))
-  #combine MSH and MSQ charge details
   MSHQ <- MSQ %>%
     mutate(REV.DEP = as.character(REV.DEP))
   #remove blank CPT lines
@@ -62,7 +53,7 @@ charges <- function(MSH,MSQ){
   return(MSHQ)
 }
 #Creates master repository and master trend
-# master <- function(){
+master <- function(){
   #read in master cpt file
   master <- readRDS("/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Charges/Master/master.RDS")
   #Check that new charge detail does not overlap with master
@@ -73,28 +64,19 @@ charges <- function(MSH,MSQ){
   }
   #trend out the master file by month to validate data
   master_trend <- master %>%
-    mutate(`Concatenate for lookup` = paste0(substr(END,7,10),"Q",QUARTER,CPT)) %>%
-    left_join(.,cpt_ref) %>%
-    mutate(LABOR = case_when(
-      CPT.GROUP == "PROCEDURE" ~ QTY*`CPT_Count Factor`,
-      CPT.GROUP == "LAB" ~ QTY*`LABPROC_Count Factor`,
-      CPT.GROUP == "RVU" ~ QTY*`RVU Factor`),
-      LABOR = as.numeric(LABOR),
-      DATE = as.Date(END, format = "%m/%d/%Y")) %>%
-    filter(LABOR > 0) %>%
-    group_by(REP.DEFINITION,CPT.GROUP,END,DATE)%>%
-    summarise(LABOR = sum(LABOR,na.rm = T)) %>%
-    arrange(DATE) %>%
-    pivot_wider(id_cols = c(REP.DEFINITION,CPT.GROUP),names_from = END,values_from = LABOR)
+    group_by(REP.DEFINITION,END)%>%
+    summarise(CHARGES = sum(QTY)) %>%
+    arrange(END) %>%
+    pivot_wider(id_cols = c(REP.DEFINITION),names_from = END,values_from = CHARGES)
   #save master and trend to global environment
   master <<- master
   master_trend <<- master_trend
 }
 #Saves master files and upload
 upload_master <- function(){
-  # saveRDS(master,"/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Charges/Master/master.rds")
-  # write.xlsx(as.data.frame(master_trend),"/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Charges/Master/master_trend.xlsx",
-  #            row.names = F)
+  saveRDS(master,"/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Charges/Master/master.rds")
+  write.xlsx(as.data.frame(master_trend),"/SharedDrive/deans/Presidents/SixSigma/MSHS Productivity/Productivity/Volume - Data/MSH Data/Charges/Master/master_trend.xlsx",
+             row.names = F)
   upload <- MSHQ %>% ungroup() %>% select(c(1:8))
   colnames(upload) <- c("Corporation Code", "Entity Code", "Cost Center Code",
                         "Start Date", "End Date", "CPT Code", "Actual Volume", 
@@ -117,7 +99,7 @@ Year <- "2025"
 # tell charges function which sheet is MSQ
 MSHQ <- charges(MSQ = mylist[[1]])
 #Create master and master trend
-# master()
+master()
 #Review master trend
 
 #Create upload and save both master files and upload
