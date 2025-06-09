@@ -267,6 +267,7 @@ msmw_zero_new <- msmw_upload_old %>%
 processed_data <- raw_data %>%
   filter(!Worker.Name %in% employee_removal) %>%
   mutate(Worker.Name = gsub("\'", "", Worker.Name),
+         Worker.Name = gsub("’", "", Worker.Name),
          Worker.Name = gsub("\\(Mt Sinai\\)", "", Worker.Name),
          Worker.Name = gsub(" ,", ",", Worker.Name),
          Worker.Name = iconv(Worker.Name, from = 'UTF-8',
