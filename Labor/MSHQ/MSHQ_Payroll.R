@@ -144,8 +144,8 @@ if (nrow(new_jobcodes_premier) > 0) {
 
 #### Format Data --------------------------------------------------------------
 format_df <- df %>%
-  #left_join(mapping_jobcode, by = c("JOBCODE" = "JOBCODE")) %>%
-  #filter(PROVIDER == 0) %>%
+  left_join(mapping_jobcode, by = c("JOBCODE" = "JOBCODE")) %>%
+  filter(PROVIDER == 0) %>%
   mutate(JOBCODE = substr(JOBCODE, 1, 10),
          POSITION_CODE_DESCRIPTION = substr(POSITION_CODE_DESCRIPTION, 1, 50),
          EMPLOYEE_NAME = substr(EMPLOYEE_NAME, 1, 30),
