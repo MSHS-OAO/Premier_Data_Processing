@@ -288,13 +288,16 @@ processed_data <- processed_data %>%
   mutate(cost_center_info =
            str_sub(cost_center_info, 1,
                    str_locate(cost_center_info, "\\*")[, 1] - 1)) %>%
+  mutate(cost_center_info = case_when(
+    is.na(cost_center_info) ~ str_sub(Department.Billed,
+                                      nchar("Department:") + 1, -1),
+    TRUE ~ cost_center_info)) %>%
   mutate(wrkd_dept_leg = case_when(
     nchar(cost_center_info) == 12 ~ substr(cost_center_info, 1, 8),
     nchar(cost_center_info) == 30 ~ str_c(substr(cost_center_info, 1, 4),
                                           substr(cost_center_info, 13, 14),
                                           substr(cost_center_info, 16, 19)),
-    TRUE ~ cost_center_info)
-  )
+    TRUE ~ cost_center_info))
 
 # join to get oracle departments
 row_count <- nrow(processed_data)
