@@ -283,14 +283,21 @@ processed_data <- processed_data %>%
 # process department.billed to get oracle home and legacy worked department
 processed_data <- processed_data %>%
   filter(Department.Billed != "") %>%
-  mutate(cost_center_info =
-           str_sub(Department.Billed, nchar("Department:") + 1, -1)) %>%
+  mutate(cost_center_info = case_when(
+    str_sub(Department.Billed, 1, nchar("Department")) == "Department" ~
+      str_sub(Department.Billed, nchar("Department:") + 1, -1),
+    str_sub(Department.Billed, 1, nchar("Cost Center")) == "Cost Center" ~
+      str_sub(Department.Billed, nchar("Cost Center:") + 1, -1))) %>%
   mutate(cost_center_info =
            str_sub(cost_center_info, 1,
                    str_locate(cost_center_info, "\\*")[, 1] - 1)) %>%
   mutate(cost_center_info = case_when(
-    is.na(cost_center_info) ~ str_sub(Department.Billed,
-                                      nchar("Department:") + 1, -1),
+    is.na(cost_center_info) &
+      str_sub(Department.Billed, 1, nchar("Department")) == "Department" ~
+        str_sub(Department.Billed, nchar("Department:") + 1, -1),
+    is.na(cost_center_info) &
+      str_sub(Department.Billed, 1, nchar("Cost Center")) == "Cost Center" ~
+      str_sub(Department.Billed, nchar("Cost Center:") + 1, -1),
     TRUE ~ cost_center_info)) %>%
   mutate(wrkd_dept_leg = case_when(
     nchar(cost_center_info) == 12 ~ substr(cost_center_info, 1, 8),
@@ -357,7 +364,8 @@ cc_map_fail <- processed_data %>%
   distinct() %>%
   mutate(Department.Billed =
            str_sub(Department.Billed,
-                   str_locate(Department.Billed, "\\*")[, 1] + 1, -1))
+                   str_locate(Department.Billed, "\\*")[, 1] + 1, -1)) %>%
+  distinct()
 
 View(cc_map_fail)
 
