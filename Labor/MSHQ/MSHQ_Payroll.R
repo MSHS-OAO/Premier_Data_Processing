@@ -150,7 +150,7 @@ format_df <- df %>%
          POSITION_CODE_DESCRIPTION = substr(POSITION_CODE_DESCRIPTION, 1, 50),
          EMPLOYEE_NAME = substr(EMPLOYEE_NAME, 1, 30),
          EMPLOYEE_NAME = gsub("’", "'", EMPLOYEE_NAME),
-         EMPLOYEE_NAME = iconv(`Employee Name`,
+         EMPLOYEE_NAME = iconv(EMPLOYEE_NAME,
                                from = "UTF-8",
                                to = "ASCII//TRANSLIT"),
          WORKED_DEPARTMENT_NAME = substr(WORKED_DEPARTMENT_NAME, 1, 50),
