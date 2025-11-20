@@ -304,6 +304,10 @@ processed_data <- processed_data %>%
     nchar(cost_center_info) == 30 ~ str_c(substr(cost_center_info, 1, 4),
                                           substr(cost_center_info, 13, 14),
                                           substr(cost_center_info, 16, 19)),
+    nchar(cost_center_info) == 48 ~ str_c(substr(cost_center_info, 1, 3),
+                                          substr(cost_center_info, 41, 44),
+                                          substr(cost_center_info, 5, 7),
+                                          substr(cost_center_info, 12, 16)),
     TRUE ~ cost_center_info))
 
 # join to get oracle departments
@@ -312,26 +316,67 @@ processed_data <- processed_data %>%
   left_join(select(code_conversion, COST.CENTER.LEGACY, COST.CENTER.ORACLE,
                    Rightsourcing.Facility, Rightsourcing.Home),
             by = c("wrkd_dept_leg" = "COST.CENTER.LEGACY")) %>%
+  mutate(COST.CENTER.ORACLE = case_when(
+    is.na(COST.CENTER.ORACLE) ~ wrkd_dept_leg,
+    TRUE ~ COST.CENTER.ORACLE)) %>%
   mutate(home_dept_oracle = case_when(
     !is.na(Rightsourcing.Home) ~ as.character(Rightsourcing.Home),
-    substr(wrkd_dept_leg, 1, 4) == "0130" ~ "101010101010102",
-    substr(wrkd_dept_leg, 1, 4) == "4709" ~ "900000040790000",
-    substr(wrkd_dept_leg, 1, 6) == "110902" ~ "302020202020202",
-    substr(wrkd_dept_leg, 1, 2) == "11" ~ "301010101010101",
-    substr(wrkd_dept_leg, 1, 2) == "44" ~ "900000040490000",
-    substr(wrkd_dept_leg, 1, 2) == "50" ~ "900000095890000",
-    nchar(cost_center_info) == 12 ~ "101010101010101",
+    (nchar(wrkd_dept_leg) == 8 &
+       substr(wrkd_dept_leg, 1, 4) == "0130") ~ "101010101010102",
+    (nchar(wrkd_dept_leg) == 10 &
+       substr(wrkd_dept_leg, 1, 4) == "4709") ~ "900000040790000",
+    (nchar(wrkd_dept_leg) == 10 &
+       substr(wrkd_dept_leg, 1, 6) == "110902") ~ "302020202020202",
+    (nchar(wrkd_dept_leg) == 10 &
+       substr(wrkd_dept_leg, 1, 2) == "11") ~ "301010101010101",
+    (nchar(wrkd_dept_leg) == 10 &
+       substr(wrkd_dept_leg, 1, 2) == "44") ~ "900000040490000",
+    (nchar(wrkd_dept_leg) == 10 &
+       substr(wrkd_dept_leg, 1, 2) == "50") ~ "900000095890000",
+    nchar(cost_center_info) == 8 ~ "101010101010101",
+    (nchar(wrkd_dept_leg) == 15 &
+       substr(wrkd_dept_leg, 1, 3) == "102") ~ "101010101010102",
+    (nchar(wrkd_dept_leg) == 15 &
+       substr(wrkd_dept_leg, 1, 3) == "402") ~ "900000040790000",
+    (nchar(wrkd_dept_leg) == 15 &
+       substr(wrkd_dept_leg, 1, 3) == "302") ~ "302020202020202",
+    (nchar(wrkd_dept_leg) == 15 &
+       substr(wrkd_dept_leg, 1, 3) == "301") ~ "301010101010101",
+    (nchar(wrkd_dept_leg) == 15 &
+       substr(wrkd_dept_leg, 1, 3) == "401") ~ "900000040490000",
+    (nchar(wrkd_dept_leg) == 15 &
+       substr(wrkd_dept_leg, 1, 3) == "408") ~ "900000095890000",
+    nchar(cost_center_info) == 15 ~ "101010101010101",
     TRUE ~ "900000000090000"
   )) %>%
   mutate(hospital = case_when(
     !is.na(Rightsourcing.Facility) ~ Rightsourcing.Facility,
-    substr(wrkd_dept_leg, 1, 4) == "0130" ~ "NY0014",
-    substr(wrkd_dept_leg, 1, 4) == "4709" ~ "630571",
-    substr(wrkd_dept_leg, 1, 6) == "110902" ~ "NY2163",
-    substr(wrkd_dept_leg, 1, 2) == "11" ~ "NY2162",
-    substr(wrkd_dept_leg, 1, 2) == "44" ~ "630571",
-    substr(wrkd_dept_leg, 1, 2) == "50" ~ "630571",
-    nchar(cost_center_info) == 12 ~ "NY0014",
+    (nchar(wrkd_dept_leg) == 8 &
+       substr(wrkd_dept_leg, 1, 4) == "0130") ~ "NY0014",
+    (nchar(wrkd_dept_leg) == 10 &
+       substr(wrkd_dept_leg, 1, 4) == "4709") ~ "630571",
+    (nchar(wrkd_dept_leg) == 10 &
+       substr(wrkd_dept_leg, 1, 6) == "110902") ~ "NY2163",
+    (nchar(wrkd_dept_leg) == 10 &
+       substr(wrkd_dept_leg, 1, 2) == "11") ~ "NY2162",
+    (nchar(wrkd_dept_leg) == 10 &
+       substr(wrkd_dept_leg, 1, 2) == "44") ~ "630571",
+    (nchar(wrkd_dept_leg) == 10 &
+       substr(wrkd_dept_leg, 1, 2) == "50") ~ "630571",
+    nchar(cost_center_info) == 8 ~ "NY0014",
+    (nchar(wrkd_dept_leg) == 15 &
+       substr(wrkd_dept_leg, 1, 3) == "102") ~ "NY0014",
+    (nchar(wrkd_dept_leg) == 15 &
+       substr(wrkd_dept_leg, 1, 3) == "402") ~ "630571",
+    (nchar(wrkd_dept_leg) == 15 &
+       substr(wrkd_dept_leg, 1, 3) == "302") ~ "NY2163",
+    (nchar(wrkd_dept_leg) == 15 &
+       substr(wrkd_dept_leg, 1, 3) == "301") ~ "NY2162",
+    (nchar(wrkd_dept_leg) == 15 &
+       substr(wrkd_dept_leg, 1, 3) == "401") ~ "630571",
+    (nchar(wrkd_dept_leg) == 15 &
+       substr(wrkd_dept_leg, 1, 3) == "408") ~ "630571",
+    nchar(cost_center_info) == 15 ~ "NY0014",
     Facility == "MSH - Mount Sinai Hospital" ~ "NY0014",
     Facility == "MSSM - ICAHN School of Medicine" ~ "NY0014",
     Facility == "MSQ - Mount Sinai Queens" ~ "NY0014",
@@ -360,7 +405,10 @@ if (row_count != nrow(processed_data)) {
 # get list of legacy cost centers that are not in code conversion
 cc_map_fail <- processed_data %>%
   select(wrkd_dept_leg, Department.Billed) %>%
-  filter(!(wrkd_dept_leg %in% code_conversion$COST.CENTER.LEGACY)) %>%
+  filter(!(wrkd_dept_leg %in% code_conversion$COST.CENTER.LEGACY) 
+         # uncomment next line if want to exclude the Oracle Cost Centers  
+         # & nchar(wrkd_dept_leg) != 15
+           ) %>%
   distinct() %>%
   mutate(Department.Billed =
            str_sub(Department.Billed,
