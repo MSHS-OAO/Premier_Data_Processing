@@ -270,6 +270,7 @@ processed_data <- raw_data %>%
          Worker.Name = gsub("’", "", Worker.Name),
          Worker.Name = gsub("\\(Mt Sinai\\)", "", Worker.Name),
          Worker.Name = gsub(" ,", ",", Worker.Name),
+         Worker.Name = gsub("�", "", Worker.Name),
          Worker.Name = iconv(Worker.Name, from = 'UTF-8',
                              to = 'ASCII//TRANSLIT'))
 
@@ -333,7 +334,7 @@ processed_data <- processed_data %>%
        substr(wrkd_dept_leg, 1, 2) == "44") ~ "900000040490000",
     (nchar(wrkd_dept_leg) == 10 &
        substr(wrkd_dept_leg, 1, 2) == "50") ~ "900000095890000",
-    nchar(cost_center_info) == 8 ~ "101010101010101",
+    nchar(wrkd_dept_leg) == 8 ~ "101010101010101",
     (nchar(wrkd_dept_leg) == 15 &
        substr(wrkd_dept_leg, 1, 3) == "102") ~ "101010101010102",
     (nchar(wrkd_dept_leg) == 15 &
@@ -346,7 +347,17 @@ processed_data <- processed_data %>%
        substr(wrkd_dept_leg, 1, 3) == "401") ~ "900000040490000",
     (nchar(wrkd_dept_leg) == 15 &
        substr(wrkd_dept_leg, 1, 3) == "408") ~ "900000095890000",
-    nchar(cost_center_info) == 15 ~ "101010101010101",
+    (nchar(wrkd_dept_leg) == 15 &
+       substr(wrkd_dept_leg, 1, 3) == "414") ~ "900000040390000",
+    (nchar(wrkd_dept_leg) == 15 &
+       substr(wrkd_dept_leg, 1, 1) == "4") ~ paste0("9000000",
+                                                    substr(wrkd_dept_leg, 8, 10),
+                                                    "90000"),
+    (nchar(wrkd_dept_leg) == 15 &
+       substr(wrkd_dept_leg, 1, 1) == "3") ~ paste0("9000000",
+                                                    substr(wrkd_dept_leg, 8, 10),
+                                                    "90000"),
+    nchar(wrkd_dept_leg) == 15 ~ "101010101010101",
     TRUE ~ "900000000090000"
   )) %>%
   mutate(hospital = case_when(
@@ -363,7 +374,7 @@ processed_data <- processed_data %>%
        substr(wrkd_dept_leg, 1, 2) == "44") ~ "630571",
     (nchar(wrkd_dept_leg) == 10 &
        substr(wrkd_dept_leg, 1, 2) == "50") ~ "630571",
-    nchar(cost_center_info) == 8 ~ "NY0014",
+    nchar(wrkd_dept_leg) == 8 ~ "NY0014",
     (nchar(wrkd_dept_leg) == 15 &
        substr(wrkd_dept_leg, 1, 3) == "102") ~ "NY0014",
     (nchar(wrkd_dept_leg) == 15 &
@@ -376,7 +387,16 @@ processed_data <- processed_data %>%
        substr(wrkd_dept_leg, 1, 3) == "401") ~ "630571",
     (nchar(wrkd_dept_leg) == 15 &
        substr(wrkd_dept_leg, 1, 3) == "408") ~ "630571",
-    nchar(cost_center_info) == 15 ~ "NY0014",
+    (nchar(wrkd_dept_leg) == 15 &
+       substr(wrkd_dept_leg, 1, 3) == "414") ~ "630571",
+    (nchar(wrkd_dept_leg) == 15 &
+       substr(wrkd_dept_leg, 1, 1) == "4") ~ "630571",
+    (nchar(wrkd_dept_leg) == 15 &
+       substr(wrkd_dept_leg, 1, 1) == "3" &
+       substr(wrkd_dept_leg, 8, 3) == "302") ~ "NY2163",
+    (nchar(wrkd_dept_leg) == 15 &
+       substr(wrkd_dept_leg, 1, 1) == "3") ~ "NY2162",
+    nchar(wrkd_dept_leg) == 15 ~ "NY0014",
     Facility == "MSH - Mount Sinai Hospital" ~ "NY0014",
     Facility == "MSSM - ICAHN School of Medicine" ~ "NY0014",
     Facility == "MSQ - Mount Sinai Queens" ~ "NY0014",
@@ -406,8 +426,7 @@ if (row_count != nrow(processed_data)) {
 cc_map_fail <- processed_data %>%
   select(wrkd_dept_leg, Department.Billed) %>%
   filter(!(wrkd_dept_leg %in% code_conversion$COST.CENTER.LEGACY) 
-         # uncomment next line if want to exclude the Oracle Cost Centers  
-         # & nchar(wrkd_dept_leg) != 15
+         & nchar(wrkd_dept_leg) != 15
            ) %>%
   distinct() %>%
   mutate(Department.Billed =
